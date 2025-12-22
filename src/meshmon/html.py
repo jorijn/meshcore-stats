@@ -306,9 +306,44 @@ BASE_TEMPLATE = """
             font-variant-numeric: tabular-nums;
             color: var(--text);
         }
+        /* Tooltips - work on hover (desktop) and tap/focus (mobile) */
         .tooltip-trigger {
             cursor: help;
             border-bottom: 1px dotted var(--text-subtle);
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip-trigger::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 0;
+            top: 100%;
+            margin-top: var(--space-1);
+            background: var(--text);
+            color: white;
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--radius);
+            font-size: var(--font-size-xs);
+            font-weight: 400;
+            white-space: normal;
+            width: max-content;
+            max-width: 250px;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease, visibility 0.15s ease;
+            pointer-events: none;
+            box-shadow: var(--shadow);
+            line-height: 1.4;
+        }
+        .tooltip-trigger:hover::after,
+        .tooltip-trigger:focus::after {
+            opacity: 1;
+            visibility: visible;
+        }
+        .tooltip-trigger:focus {
+            outline: none;
+            border-bottom-color: var(--primary);
         }
 
         /* Charts */
@@ -474,7 +509,7 @@ NODE_TEMPLATE = """
                 <tbody>
                 {% for key, value, tooltip in snapshot_table %}
                 <tr>
-                    <th>{% if tooltip %}<span class="tooltip-trigger" title="{{ tooltip }}">{{ key }}</span>{% else %}{{ key }}{% endif %}</th>
+                        <th>{% if tooltip %}<span class="tooltip-trigger" tabindex="0" data-tooltip="{{ tooltip }}">{{ key }}</span>{% else %}{{ key }}{% endif %}</th>
                     <td>{{ value }}</td>
                 </tr>
                 {% endfor %}
