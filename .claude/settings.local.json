@@ -12,7 +12,8 @@
       "Bash(done)",
       "Bash(ls:*)",
       "Bash(source .envrc)",
-      "Bash(.direnv/python-3.12/bin/python:*)"
+      "Bash(.direnv/python-3.12/bin/python:*)",
+      "Bash(xargs:*)"
     ]
   }
 }
