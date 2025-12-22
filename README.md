@@ -287,6 +287,46 @@ If repeater collection shows "cooldown active":
 | `COMPANION_METRICS` | (see code) | Companion metric mappings |
 | `REPEATER_METRICS` | (see code) | Repeater metric mappings |
 
+## Metrics Reference
+
+### Repeater Metrics
+
+| Metric | Source Path | RRD Type | Display Unit | Description |
+|--------|-------------|----------|--------------|-------------|
+| `bat_v` | `derived.bat_v` | GAUGE | Voltage (V) | Battery voltage (from status.bat / 1000) |
+| `bat_pct` | `derived.bat_pct` | GAUGE | Battery (%) | Battery percentage (calculated from voltage) |
+| `rx` | `derived.rx` | DERIVE | Packets/min | Total packets received (from status.nb_recv) |
+| `tx` | `derived.tx` | DERIVE | Packets/min | Total packets sent (from status.nb_sent) |
+| `rssi` | `derived.rssi` | GAUGE | RSSI (dBm) | Last received signal strength |
+| `snr` | `derived.snr` | GAUGE | SNR (dB) | Last signal-to-noise ratio |
+| `uptime` | `status.uptime` | GAUGE | Hours | Device uptime (displayed in hours) |
+| `noise` | `status.noise_floor` | GAUGE | dBm | Background RF noise floor |
+| `airtime` | `status.airtime` | DERIVE | Seconds/min | Transmit airtime rate |
+| `rx_air` | `status.rx_airtime` | DERIVE | Seconds/min | Receive airtime rate |
+| `fl_dups` | `status.flood_dups` | DERIVE | Packets/min | Duplicate flood packets received |
+| `di_dups` | `status.direct_dups` | DERIVE | Packets/min | Duplicate direct packets received |
+| `fl_tx` | `status.sent_flood` | DERIVE | Packets/min | Flood packets transmitted |
+| `fl_rx` | `status.recv_flood` | DERIVE | Packets/min | Flood packets received |
+| `di_tx` | `status.sent_direct` | DERIVE | Packets/min | Direct packets transmitted |
+| `di_rx` | `status.recv_direct` | DERIVE | Packets/min | Direct packets received |
+| `txq` | `status.tx_queue_len` | GAUGE | Queue depth | Current transmit queue length |
+
+### Companion Metrics
+
+| Metric | Source Path | RRD Type | Display Unit | Description |
+|--------|-------------|----------|--------------|-------------|
+| `bat_v` | `derived.bat_v` | GAUGE | Voltage (V) | Battery voltage |
+| `bat_pct` | `derived.bat_pct` | GAUGE | Battery (%) | Battery percentage (calculated from voltage) |
+| `contacts` | `derived.contacts_count` | GAUGE | Count | Number of known contacts |
+| `rx` | `stats.packets.recv` | DERIVE | Packets/min | Packets received |
+| `tx` | `stats.packets.sent` | DERIVE | Packets/min | Packets sent |
+| `uptime` | `stats.core.uptime_secs` | GAUGE | Hours | Device uptime (displayed in hours) |
+
+### RRD Data Source Types
+
+- **GAUGE**: Instantaneous values stored as-is (battery voltage, RSSI, queue depth)
+- **DERIVE**: Counter values that compute rate of change (packets, airtime). RRD stores the per-second rate; charts multiply by 60 to display per-minute values.
+
 ## License
 
 MIT

@@ -115,8 +115,9 @@ Format: `ds_name=dotted.path,ds_name2=other.path`
 
 **Current configuration:**
 ```bash
-COMPANION_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,contacts=derived.contacts_count,rx=stats.packets.recv,tx=stats.packets.sent"
-REPEATER_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,neigh=derived.neighbours_count,rx=derived.rx,tx=derived.tx,rssi=derived.rssi,snr=derived.snr"
+COMPANION_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,contacts=derived.contacts_count,rx=stats.packets.recv,tx=stats.packets.sent,uptime=stats.core.uptime_secs"
+
+REPEATER_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,rx=derived.rx,tx=derived.tx,rssi=derived.rssi,snr=derived.snr,uptime=status.uptime,noise=status.noise_floor,airtime=status.airtime,rx_air=status.rx_airtime,fl_dups=status.flood_dups,di_dups=status.direct_dups,fl_tx=status.sent_flood,fl_rx=status.recv_flood,di_tx=status.sent_direct,di_rx=status.recv_direct,txq=status.tx_queue_len"
 ```
 
 ## Key Dependencies
@@ -131,8 +132,13 @@ REPEATER_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,neigh=derived.neig
 
 The RRD uses different data source types depending on the metric:
 
-- **GAUGE**: Instantaneous values (bat_v, bat_pct, contacts, neigh, rssi, snr)
-- **DERIVE**: Counter values that show rate of change (rx, tx) - stored as packets/sec, displayed as packets/min
+- **GAUGE**: Instantaneous values (bat_v, bat_pct, contacts, neigh, rssi, snr, uptime, noise, txq)
+- **DERIVE**: Counter values that show rate of change - stored as per-second rate, displayed as per-minute:
+  - `rx`, `tx` - Total packet counters
+  - `airtime`, `rx_air` - TX/RX airtime in seconds
+  - `fl_dups`, `di_dups` - Duplicate packet counters (flood/direct)
+  - `fl_tx`, `fl_rx` - Flood packet counters
+  - `di_tx`, `di_rx` - Direct packet counters
 
 When changing DS types or adding new metrics, you must delete the RRD files and recreate them.
 
@@ -350,16 +356,38 @@ Charts are generated at 800x280 pixels with the following features:
 - Larger fonts (12-14pt) for readability when scaled down
 - White background, no borders, slope mode for smooth lines
 
-Chart labels (Y-axis):
-- `bat_v`: "Voltage (V)"
-- `bat_pct`: "Battery (%)"
-- `contacts`: "Count"
-- `neigh`: "Count"
-- `rx`: "Packets/min" (scaled from per-second DERIVE)
-- `tx`: "Packets/min" (scaled from per-second DERIVE)
-- `rssi`: "RSSI (dBm)"
-- `snr`: "SNR (dB)"
-- `uptime`: "Hours" (scaled from seconds)
+### Repeater Metrics Summary
+
+| Metric | Source | RRD Type | Display Unit | Description |
+|--------|--------|----------|--------------|-------------|
+| `bat_v` | `derived.bat_v` | GAUGE | Voltage (V) | Battery voltage |
+| `bat_pct` | `derived.bat_pct` | GAUGE | Battery (%) | Battery percentage |
+| `rx` | `derived.rx` | DERIVE | Packets/min | Total packets received |
+| `tx` | `derived.tx` | DERIVE | Packets/min | Total packets transmitted |
+| `rssi` | `derived.rssi` | GAUGE | RSSI (dBm) | Signal strength of last packet |
+| `snr` | `derived.snr` | GAUGE | SNR (dB) | Signal-to-noise ratio |
+| `uptime` | `status.uptime` | GAUGE | Hours | Time since reboot |
+| `noise` | `status.noise_floor` | GAUGE | dBm | Background RF noise |
+| `airtime` | `status.airtime` | DERIVE | Seconds/min | TX airtime rate |
+| `rx_air` | `status.rx_airtime` | DERIVE | Seconds/min | RX airtime rate |
+| `fl_dups` | `status.flood_dups` | DERIVE | Packets/min | Flood duplicate packets |
+| `di_dups` | `status.direct_dups` | DERIVE | Packets/min | Direct duplicate packets |
+| `fl_tx` | `status.sent_flood` | DERIVE | Packets/min | Flood packets transmitted |
+| `fl_rx` | `status.recv_flood` | DERIVE | Packets/min | Flood packets received |
+| `di_tx` | `status.sent_direct` | DERIVE | Packets/min | Direct packets transmitted |
+| `di_rx` | `status.recv_direct` | DERIVE | Packets/min | Direct packets received |
+| `txq` | `status.tx_queue_len` | GAUGE | Queue depth | TX queue length |
+
+### Companion Metrics Summary
+
+| Metric | Source | RRD Type | Display Unit | Description |
+|--------|--------|----------|--------------|-------------|
+| `bat_v` | `derived.bat_v` | GAUGE | Voltage (V) | Battery voltage |
+| `bat_pct` | `derived.bat_pct` | GAUGE | Battery (%) | Battery percentage |
+| `contacts` | `derived.contacts_count` | GAUGE | Count | Known mesh nodes |
+| `rx` | `stats.packets.recv` | DERIVE | Packets/min | Total packets received |
+| `tx` | `stats.packets.sent` | DERIVE | Packets/min | Total packets transmitted |
+| `uptime` | `stats.core.uptime_secs` | GAUGE | Hours | Time since reboot |
 
 ## Circuit Breaker
 
