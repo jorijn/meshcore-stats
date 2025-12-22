@@ -792,27 +792,53 @@ def render_node_page(
     charts = []
     chart_labels = {
         "bat_v": "Battery Voltage",
-        "bat_pct": "Battery %",
-        "contacts": "Contacts Count",
-        "neigh": "Neighbours Count",
-        "rx": "RX Packets",
-        "tx": "TX Packets",
-        "rssi": "RSSI",
-        "snr": "SNR",
+        "bat_pct": "Battery Percentage",
+        "contacts": "Known Contacts",
+        "neigh": "Neighbours",
+        "rx": "Packets Received",
+        "tx": "Packets Transmitted",
+        "rssi": "Signal Strength (RSSI)",
+        "snr": "Signal-to-Noise Ratio",
         "uptime": "Uptime",
         "noise": "Noise Floor",
-        "airtime": "TX Airtime",
-        "rx_air": "RX Airtime",
-        "fl_dups": "Flood Duplicates",
-        "di_dups": "Direct Duplicates",
-        "fl_tx": "Flood TX",
-        "fl_rx": "Flood RX",
-        "di_tx": "Direct TX",
-        "di_rx": "Direct RX",
-        "txq": "TX Queue",
+        "airtime": "Transmit Airtime",
+        "rx_air": "Receive Airtime",
+        "fl_dups": "Duplicate Flood Packets",
+        "di_dups": "Duplicate Direct Packets",
+        "fl_tx": "Flood Packets Sent",
+        "fl_rx": "Flood Packets Received",
+        "di_tx": "Direct Packets Sent",
+        "di_rx": "Direct Packets Received",
+        "txq": "Transmit Queue Depth",
     }
 
-    for ds_name in sorted(metrics.keys()):
+    # Chart display order: most important first
+    # Metrics not in this list will appear at the end alphabetically
+    chart_order = [
+        # Battery & health
+        "bat_v", "bat_pct", "uptime",
+        # Signal quality
+        "rssi", "snr", "noise",
+        # Traffic overview
+        "rx", "tx",
+        # Airtime usage
+        "airtime", "rx_air",
+        # Packet breakdown
+        "fl_rx", "fl_tx", "di_rx", "di_tx",
+        # Duplicates & queue
+        "fl_dups", "di_dups", "txq",
+        # Companion-specific
+        "contacts", "neigh",
+    ]
+
+    def chart_sort_key(ds_name: str) -> tuple:
+        """Sort by priority order, then alphabetically for unlisted metrics."""
+        try:
+            return (0, chart_order.index(ds_name))
+        except ValueError:
+            return (1, ds_name)
+
+    for ds_name in sorted(metrics.keys(), key=chart_sort_key):
         chart_path = cfg.out_dir / "assets" / role / f"{ds_name}_{period}.png"
         if chart_path.exists():
             charts.append({
