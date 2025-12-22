@@ -19,6 +19,21 @@ BASE_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - MeshCore Stats</title>
+    <meta name="description" content="{{ meta_description }}">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ title }} - MeshCore Stats">
+    <meta property="og:description" content="{{ meta_description }}">
+    <meta property="og:site_name" content="MeshCore Stats">
+    {% if og_image %}<meta property="og:image" content="{{ og_image }}">{% endif %}
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ title }} - MeshCore Stats">
+    <meta name="twitter:description" content="{{ meta_description }}">
+    {% if og_image %}<meta name="twitter:image" content="{{ og_image }}">{% endif %}
+
     <style>
         :root {
             /* Typography */
@@ -859,6 +874,19 @@ def render_node_page(
     # Base path for tab links: root pages use "", others use "/role"
     base_path = "" if at_root else f"/{role}"
 
+    # Meta description for social sharing
+    meta_descriptions = {
+        "repeater": (
+            f"Live stats for MeshCore LoRa repeater in Oosterhout, NL. "
+            f"Battery, signal strength, packet counts, and uptime charts."
+        ),
+        "companion": (
+            f"Live stats for MeshCore companion node. "
+            f"Battery, contacts, packet counts, and uptime monitoring."
+        ),
+    }
+    meta_description = meta_descriptions.get(role, "MeshCore mesh network statistics dashboard.")
+
     # Create combined template
     full_template = BASE_TEMPLATE.replace(
         "{% block content %}{% endblock %}",
@@ -868,6 +896,7 @@ def render_node_page(
     template = env.from_string(full_template)
     return template.render(
         title=f"{role.capitalize()} - {period.capitalize()}",
+        meta_description=meta_description,
         node_name=node_name,
         pubkey_pre=pubkey_pre,
         status_class=status_class,
