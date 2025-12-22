@@ -1,10 +1,15 @@
 # CLAUDE.md - MeshCore Stats Project Guide
 
+> **Maintenance Note**: This file should always reflect the current state of the project. When making changes to the codebase (adding features, changing architecture, modifying configuration), update this document accordingly. Keep it accurate and comprehensive for future reference.
+
 ## Project Overview
 
 This project monitors a MeshCore LoRa mesh network consisting of:
 - **1 Companion node**: Connected via USB serial to a NUC (local device)
 - **1 Remote repeater**: Reachable over LoRa from the companion
+  - Hardware: **Seeed SenseCAP Solar Node P1-Pro**
+  - Location: **Oosterhout, The Netherlands**
+  - Preset: **MeshCore EU/UK Narrow** (869.618 MHz, 62.5 kHz BW, SF8, CR8)
 
 The system collects metrics, stores them in RRD databases, and generates a static HTML dashboard with charts.
 
@@ -63,10 +68,12 @@ meshcore-stats/
 │   └── state/             # Persistent state (circuit breaker)
 │       └── repeater_circuit.json
 ├── out/                   # Generated static site
-│   ├── index.html
-│   ├── .htaccess          # Apache cache control
+│   ├── day.html           # Repeater pages at root (entry point)
+│   ├── week.html
+│   ├── month.html
+│   ├── year.html
+│   ├── .htaccess          # Apache config (DirectoryIndex, cache control)
 │   ├── companion/         # Companion pages (day/week/month/year.html)
-│   ├── repeater/          # Repeater pages (day/week/month/year.html)
 │   └── assets/            # PNG chart images
 │       ├── companion/
 │       └── repeater/
@@ -283,13 +290,67 @@ python scripts/backfill_rrd.py repeater
 ./scripts/rsync_output.sh
 ```
 
+## Web Dashboard UI
+
+The static site uses a modern, responsive design with the following features:
+
+### Site Structure
+- **Repeater pages at root**: `/day.html`, `/week.html`, etc. (entry point)
+- **Companion pages**: `/companion/day.html`, `/companion/week.html`, etc.
+- **`.htaccess`**: Sets `DirectoryIndex day.html` so `/` loads repeater day view
+
+### Page Layout
+1. **Header**: Site branding, node name, pubkey prefix, status indicator, last updated time
+2. **Navigation**: Node switcher (Repeater/Companion) + period tabs (Day/Week/Month/Year)
+3. **Metrics Bar**: Key values at a glance (Battery, Uptime, RSSI, SNR for repeater)
+4. **Dashboard Grid**: Two-column layout with Snapshot table and About section
+5. **Charts Grid**: Two charts per row on desktop, one on mobile
+
+### Status Indicator
+Color-coded based on data freshness:
+- **Green (online)**: Data less than 30 minutes old
+- **Yellow (stale)**: Data 30 minutes to 2 hours old
+- **Red (offline)**: Data more than 2 hours old
+
+### Tooltips
+- CSS-only tooltips using `data-tooltip` attribute
+- Work on desktop (hover) and mobile (tap via `tabindex="0"` + `:focus`)
+- Show descriptions for technical metrics (RSSI, SNR, etc.)
+
+### Social Sharing
+Open Graph and Twitter Card meta tags for link previews:
+- `og:title`, `og:description`, `og:site_name`
+- `twitter:card` (summary_large_image format)
+- Role-specific descriptions
+
+### Design System (CSS Variables)
+```css
+--primary: #2563eb;        /* Brand blue */
+--bg: #f8fafc;             /* Page background */
+--bg-elevated: #ffffff;    /* Card background */
+--text: #1e293b;           /* Primary text */
+--text-muted: #64748b;     /* Secondary text */
+--border: #e2e8f0;         /* Borders */
+--success: #16a34a;        /* Online status */
+--warning: #ca8a04;        /* Stale status */
+--danger: #dc2626;         /* Offline status */
+```
+
+### Responsive Breakpoints
+- **< 900px**: Single column layout, stacked header
+- **< 600px**: Smaller fonts, stacked table cells, horizontal scroll nav
+
 ## Chart Configuration
 
-Charts are generated at 800x300 pixels with the following layout:
-- 2 charts per row on desktop
-- 1 chart per row on mobile (< 900px)
+Charts are generated at 800x280 pixels with the following features:
+- 2 charts per row on desktop, 1 on mobile (< 900px)
+- Design system colors matching the UI (primary blue #2563eb)
+- Semi-transparent area fill with solid line on top
+- Min/Avg/Max/Current statistics displayed below each chart
+- Larger fonts (12-14pt) for readability when scaled down
+- White background, no borders, slope mode for smooth lines
 
-Chart labels:
+Chart labels (Y-axis):
 - `bat_v`: "Voltage (V)"
 - `bat_pct`: "Battery (%)"
 - `contacts`: "Count"
@@ -298,6 +359,7 @@ Chart labels:
 - `tx`: "Packets/min" (scaled from per-second DERIVE)
 - `rssi`: "RSSI (dBm)"
 - `snr`: "SNR (dB)"
+- `uptime`: "Hours" (scaled from seconds)
 
 ## Circuit Breaker
 
@@ -354,12 +416,14 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 ## Cron Setup (Example)
 
+**Important**: Stagger companion and repeater collection to avoid USB serial conflicts.
+
 ```cron
-# Companion: every minute
+# Companion: every minute at :00
 * * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_companion.py && .direnv/python-3.12.3/bin/python scripts/phase2_rrd_update_companion.py
 
-# Repeater: every 15 minutes
-*/15 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_repeater.py && .direnv/python-3.12.3/bin/python scripts/phase2_rrd_update_repeater.py
+# Repeater: every 15 minutes at :01, :16, :31, :46 (offset by 1 min to avoid USB conflict)
+1,16,31,46 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_repeater.py && .direnv/python-3.12.3/bin/python scripts/phase2_rrd_update_repeater.py
 
 # Charts: every 5 minutes
 */5 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase2_render_charts.py
