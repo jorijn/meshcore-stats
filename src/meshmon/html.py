@@ -132,7 +132,7 @@ BASE_TEMPLATE = """
 <body>
     <div class="container">
         <header>
-            <h1>{{ title }}</h1>
+            <h1>{{ node_name }}{% if pubkey_pre %} <code style="font-size: 0.75rem; color: var(--text-muted);">[{{ pubkey_pre }}]</code>{% endif %}</h1>
             <div class="meta">
                 {% if last_updated %}Last updated: {{ last_updated }}{% endif %}
             </div>
@@ -159,6 +159,13 @@ NODE_TEMPLATE = """
     <a href="{{ base_path }}/month.html" {% if period == 'month' %}class="active"{% endif %}>Month</a>
     <a href="{{ base_path }}/year.html" {% if period == 'year' %}class="active"{% endif %}>Year</a>
 </div>
+
+{% if about %}
+<div class="card">
+    <h2>About this Node</h2>
+    <p style="color: var(--text-muted); line-height: 1.8;">{{ about }}</p>
+</div>
+{% endif %}
 
 {% if snapshot %}
 <div class="card">
@@ -435,6 +442,38 @@ def render_node_page(
     if snapshot and snapshot.get("ts"):
         last_updated = format_time(snapshot["ts"])
 
+    # Extract node name and pubkey prefix
+    node_name = role.capitalize()
+    pubkey_pre = None
+    if snapshot:
+        # Try different paths for node name depending on role
+        node_name = (
+            get_by_path(snapshot, "node.name")
+            or get_by_path(snapshot, "self_info.name")
+            or role.capitalize()
+        )
+        # Pubkey prefix location differs by role
+        pubkey_pre = (
+            get_by_path(snapshot, "status.pubkey_pre")
+            or get_by_path(snapshot, "self_telemetry.pubkey_pre")
+        )
+
+    # About text for each node type
+    about_text = {
+        "repeater": (
+            "This is a MeshCore LoRa mesh repeater located in Oosterhout, The Netherlands. "
+            "The hardware is a Seeed SenseCAP Card Tracker T1000-E running MeshCore firmware. "
+            "It operates on the EU868 frequency band and relays messages across the mesh network. "
+            "Stats are collected every 15 minutes via LoRa from a local companion node, "
+            "stored in RRD databases, and rendered into these charts."
+        ),
+        "companion": (
+            "This is the local MeshCore companion node connected via USB serial to the monitoring system. "
+            "It serves as the gateway to communicate with remote nodes over LoRa. "
+            "Stats are collected every minute directly from the device."
+        ),
+    }
+
     # Base path for tab links: root pages use "", others use "/role"
     base_path = "" if at_root else f"/{role}"
 
@@ -447,9 +486,12 @@ def render_node_page(
     template = env.from_string(full_template)
     return template.render(
         title=f"{role.capitalize()} - {period.capitalize()}",
+        node_name=node_name,
+        pubkey_pre=pubkey_pre,
         role=role,
         period=period,
         base_path=base_path,
+        about=about_text.get(role),
         last_updated=last_updated,
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         snapshot=snapshot,
