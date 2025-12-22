@@ -173,7 +173,7 @@ NODE_TEMPLATE = """
     <table>
         {% for key, value, tooltip in snapshot_table %}
         <tr>
-            <th{% if tooltip %} title="{{ tooltip }}" style="cursor: help;"{% endif %}>{{ key }}</th>
+            <th>{% if tooltip %}<span title="{{ tooltip }}" style="cursor: help; border-bottom: 1px dotted var(--text-muted);">{{ key }}</span>{% else %}{{ key }}{% endif %}</th>
             <td>{{ value }}</td>
         </tr>
         {% endfor %}
