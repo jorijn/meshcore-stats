@@ -8,6 +8,7 @@ from jinja2 import Environment, BaseLoader
 
 from .env import get_config
 from .extract import get_by_path
+from .battery import voltage_to_percentage
 from . import log
 
 
@@ -651,7 +652,8 @@ def extract_snapshot_table(snapshot: dict, role: str) -> list[tuple[str, str, st
         bat_mv = get_by_path(snapshot, "stats.core.battery_mv")
         if bat_mv is not None:
             bat_v = bat_mv / 1000.0
-            table.append(("Battery Voltage", f"{format_value(bat_v)} V",
+            bat_pct = voltage_to_percentage(bat_v)
+            table.append(("Battery Voltage", f"{format_value(bat_v)} V ({bat_pct:.0f}%)",
                          "Current battery voltage (4.2V = full, 3.0V = empty)"))
 
         # Contacts
@@ -703,7 +705,8 @@ def extract_snapshot_table(snapshot: dict, role: str) -> list[tuple[str, str, st
         bat_mv = get_by_path(snapshot, "status.bat")
         if bat_mv is not None:
             bat_v = bat_mv / 1000.0
-            table.append(("Battery Voltage", f"{format_value(bat_v)} V",
+            bat_pct = voltage_to_percentage(bat_v)
+            table.append(("Battery Voltage", f"{format_value(bat_v)} V ({bat_pct:.0f}%)",
                          "Current battery voltage (4.2V = full, 3.0V = empty)"))
 
         # Also check telemetry array for voltage channel
@@ -879,7 +882,7 @@ def render_node_page(
             "The hardware is a <strong>Seeed SenseCAP Solar Node P1-Pro</strong> running MeshCore firmware. "
             "It operates on the <strong>MeshCore EU/UK Narrow</strong> preset "
             "(869.618 MHz, 62.5 kHz bandwidth, SF8, CR8) and relays messages across the mesh network. "
-            "Stats are collected every 15 minutes via LoRa from a local companion node, "
+            "<br><br>Stats are collected every 15 minutes via LoRa from a local companion node, "
             "stored in RRD databases, and rendered into these charts."
         ),
         "companion": (
@@ -908,10 +911,11 @@ def render_node_page(
     metrics_bar = []
     if snapshot:
         if role == "repeater":
-            # Battery voltage
+            # Battery percentage
             bat_mv = get_by_path(snapshot, "status.bat")
             if bat_mv is not None:
-                metrics_bar.append({"value": f"{bat_mv / 1000:.2f}V", "label": "Battery"})
+                bat_pct = voltage_to_percentage(bat_mv / 1000)
+                metrics_bar.append({"value": f"{bat_pct:.0f}%", "label": "Battery"})
             # Uptime
             uptime = get_by_path(snapshot, "status.uptime")
             if uptime is not None:
@@ -925,10 +929,11 @@ def render_node_page(
             if snr is not None:
                 metrics_bar.append({"value": f"{snr:.1f} dB", "label": "SNR"})
         elif role == "companion":
-            # Battery voltage
+            # Battery percentage
             bat_mv = get_by_path(snapshot, "stats.core.battery_mv")
             if bat_mv is not None:
-                metrics_bar.append({"value": f"{bat_mv / 1000:.2f}V", "label": "Battery"})
+                bat_pct = voltage_to_percentage(bat_mv / 1000)
+                metrics_bar.append({"value": f"{bat_pct:.0f}%", "label": "Battery"})
             # Uptime
             uptime = get_by_path(snapshot, "stats.core.uptime_secs")
             if uptime is not None:
