@@ -237,6 +237,11 @@ def graph_rrd(
         "--slope-mode",
         "--alt-autoscale",
         "--rigid",
+        # Larger fonts for readability when scaled down
+        "--font", "DEFAULT:12:",
+        "--font", "LEGEND:14:",
+        "--font", "UNIT:12:",
+        "--font", "AXIS:11:",
     ]
 
     if vertical_label:
