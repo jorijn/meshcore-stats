@@ -22,8 +22,10 @@ data/snapshots/repeater/**/*.json
 data/rrd/*.rrd
 data/state/*.json
 
-# Generated output
-out/
+# Generated output (except .htaccess)
+out/*
+!out/.htaccess
+
 
 # IDE
 .idea/

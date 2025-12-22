@@ -138,9 +138,8 @@ BASE_TEMPLATE = """
             </div>
         </header>
         <nav>
-            <a href="/index.html">Home</a>
+            <a href="/day.html" {% if role == 'repeater' %}class="active"{% endif %}>Repeater</a>
             <a href="/companion/day.html" {% if role == 'companion' %}class="active"{% endif %}>Companion</a>
-            <a href="/repeater/day.html" {% if role == 'repeater' %}class="active"{% endif %}>Repeater</a>
         </nav>
         {% block content %}{% endblock %}
         <footer>
@@ -151,42 +150,14 @@ BASE_TEMPLATE = """
 </html>
 """
 
-INDEX_TEMPLATE = """
-{% extends "base" %}
-{% block content %}
-<div class="card">
-    <h2>MeshCore Network Monitor</h2>
-    <p>Select a node to view stats:</p>
-    <ul style="margin-top: 1rem; list-style: none;">
-        <li style="margin-bottom: 0.5rem;">
-            <a href="/companion/day.html" style="color: var(--primary);">Companion Node</a>
-            {% if companion_snapshot %}
-            <span style="color: var(--text-muted);">
-                - Last: {{ companion_snapshot.ts | format_time }}
-            </span>
-            {% endif %}
-        </li>
-        <li>
-            <a href="/repeater/day.html" style="color: var(--primary);">Repeater Node</a>
-            {% if repeater_snapshot %}
-            <span style="color: var(--text-muted);">
-                - Last: {{ repeater_snapshot.ts | format_time }}
-            </span>
-            {% endif %}
-        </li>
-    </ul>
-</div>
-{% endblock %}
-"""
-
 NODE_TEMPLATE = """
 {% extends "base" %}
 {% block content %}
 <div class="tabs">
-    <a href="/{{ role }}/day.html" {% if period == 'day' %}class="active"{% endif %}>Day</a>
-    <a href="/{{ role }}/week.html" {% if period == 'week' %}class="active"{% endif %}>Week</a>
-    <a href="/{{ role }}/month.html" {% if period == 'month' %}class="active"{% endif %}>Month</a>
-    <a href="/{{ role }}/year.html" {% if period == 'year' %}class="active"{% endif %}>Year</a>
+    <a href="{{ base_path }}/day.html" {% if period == 'day' %}class="active"{% endif %}>Day</a>
+    <a href="{{ base_path }}/week.html" {% if period == 'week' %}class="active"{% endif %}>Week</a>
+    <a href="{{ base_path }}/month.html" {% if period == 'month' %}class="active"{% endif %}>Month</a>
+    <a href="{{ base_path }}/year.html" {% if period == 'year' %}class="active"{% endif %}>Year</a>
 </div>
 
 {% if snapshot %}
@@ -413,41 +384,26 @@ def extract_snapshot_table(snapshot: dict, role: str) -> list[tuple[str, str]]:
     return table
 
 
-def render_index(
-    companion_snapshot: Optional[dict],
-    repeater_snapshot: Optional[dict],
-) -> str:
-    """Render the index page."""
-    env = create_jinja_env()
-
-    # Create combined template
-    full_template = BASE_TEMPLATE.replace(
-        "{% block content %}{% endblock %}",
-        INDEX_TEMPLATE.replace("{% extends \"base\" %}\n{% block content %}", "").replace("{% endblock %}", "")
-    )
-
-    template = env.from_string(full_template)
-    return template.render(
-        title="MeshCore Stats",
-        role=None,
-        last_updated=None,
-        generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        companion_snapshot=companion_snapshot,
-        repeater_snapshot=repeater_snapshot,
-    )
-
-
 def render_node_page(
     role: str,
     period: str,
     snapshot: Optional[dict],
     metrics: dict[str, str],
+    at_root: bool = False,
 ) -> str:
-    """Render a node page (companion or repeater)."""
+    """Render a node page (companion or repeater).
+
+    Args:
+        role: "companion" or "repeater"
+        period: "day", "week", "month", or "year"
+        snapshot: Latest snapshot data
+        metrics: Dict of metric mappings
+        at_root: If True, page is rendered at site root (for repeater)
+    """
     env = create_jinja_env()
     cfg = get_config()
 
-    # Build chart list
+    # Build chart list - assets always in /assets/{role}/
     charts = []
     chart_labels = {
         "bat_v": "Battery Voltage",
@@ -479,6 +435,9 @@ def render_node_page(
     if snapshot and snapshot.get("ts"):
         last_updated = format_time(snapshot["ts"])
 
+    # Base path for tab links: root pages use "", others use "/role"
+    base_path = "" if at_root else f"/{role}"
+
     # Create combined template
     full_template = BASE_TEMPLATE.replace(
         "{% block content %}{% endblock %}",
@@ -490,6 +449,7 @@ def render_node_page(
         title=f"{role.capitalize()} - {period.capitalize()}",
         role=role,
         period=period,
+        base_path=base_path,
         last_updated=last_updated,
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         snapshot=snapshot,
@@ -505,6 +465,9 @@ def write_site(
     """
     Write all static site pages.
 
+    Repeater pages are rendered at the site root (day.html, week.html, etc.).
+    Companion pages are rendered under /companion/.
+
     Returns list of written paths.
     """
     cfg = get_config()
@@ -512,28 +475,22 @@ def write_site(
 
     # Ensure output directories exist
     (cfg.out_dir / "companion").mkdir(parents=True, exist_ok=True)
-    (cfg.out_dir / "repeater").mkdir(parents=True, exist_ok=True)
+    (cfg.out_dir / "assets" / "repeater").mkdir(parents=True, exist_ok=True)
 
-    # Index page
-    index_path = cfg.out_dir / "index.html"
-    index_path.write_text(render_index(companion_snapshot, repeater_snapshot))
-    written.append(index_path)
-    log.debug(f"Wrote {index_path}")
-
-    # Companion pages
+    # Repeater pages at root level
     for period in ["day", "week", "month", "year"]:
-        page_path = cfg.out_dir / "companion" / f"{period}.html"
+        page_path = cfg.out_dir / f"{period}.html"
         page_path.write_text(
-            render_node_page("companion", period, companion_snapshot, cfg.companion_metrics)
+            render_node_page("repeater", period, repeater_snapshot, cfg.repeater_metrics, at_root=True)
         )
         written.append(page_path)
         log.debug(f"Wrote {page_path}")
 
-    # Repeater pages
+    # Companion pages under /companion/
     for period in ["day", "week", "month", "year"]:
-        page_path = cfg.out_dir / "repeater" / f"{period}.html"
+        page_path = cfg.out_dir / "companion" / f"{period}.html"
         page_path.write_text(
-            render_node_page("repeater", period, repeater_snapshot, cfg.repeater_metrics)
+            render_node_page("companion", period, companion_snapshot, cfg.companion_metrics)
         )
         written.append(page_path)
         log.debug(f"Wrote {page_path}")
