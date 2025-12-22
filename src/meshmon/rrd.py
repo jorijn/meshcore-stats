@@ -5,6 +5,7 @@ from typing import Optional
 
 from .env import get_config
 from .extract import format_rrd_value
+from .metrics import is_counter_metric, get_graph_scale
 from . import log
 
 # Try to import rrdtool
@@ -57,18 +58,8 @@ def create_rrd(
     heartbeat = step * 2
     ds_defs = []
 
-    # Counter metrics use DERIVE (handles counter wraps, allows negative for resets)
-    # These are cumulative counters that reset on device reboot
-    counter_metrics = {
-        "rx", "tx",                    # Total packets
-        "airtime", "rx_air",           # Airtime in seconds
-        "fl_dups", "di_dups",          # Duplicate packet counts
-        "fl_tx", "fl_rx",              # Flood packets
-        "di_tx", "di_rx",              # Direct packets
-    }
-
     for ds_name in sorted(metrics.keys()):
-        if ds_name in counter_metrics:
+        if is_counter_metric(ds_name):
             # DERIVE computes rate of change, min 0 to ignore counter resets
             ds_defs.append(f"DS:{ds_name}:DERIVE:{heartbeat}:0:U")
         else:
@@ -152,16 +143,9 @@ def update_rrd(
     # Build update string: timestamp:val1:val2:...
     # Values must be in same order as DS definitions (sorted by name)
     # Counter metrics (DERIVE) require integer values
-    counter_metrics = {
-        "rx", "tx",                    # Total packets
-        "airtime", "rx_air",           # Airtime in seconds
-        "fl_dups", "di_dups",          # Duplicate packet counts
-        "fl_tx", "fl_rx",              # Flood packets
-        "di_tx", "di_rx",              # Direct packets
-    }
     ds_names = sorted(metrics.keys())
     value_strs = [
-        format_rrd_value(values.get(name), as_integer=(name in counter_metrics))
+        format_rrd_value(values.get(name), as_integer=is_counter_metric(name))
         for name in ds_names
     ]
     update_str = f"{ts}:{':'.join(value_strs)}"
@@ -260,29 +244,19 @@ def graph_rrd(
     if vertical_label:
         args.extend(["--vertical-label", vertical_label])
 
-    # Counter metrics (DERIVE) are stored as per-second rates, scale to per-minute
-    counter_metrics = {
-        "rx", "tx",                    # Total packets
-        "fl_dups", "di_dups",          # Duplicate packet counts
-        "fl_tx", "fl_rx",              # Flood packets
-        "di_tx", "di_rx",              # Direct packets
-    }
-    # Airtime metrics: stored as seconds, scale to seconds/min (show rate)
-    airtime_metrics = {"airtime", "rx_air"}
-
     args.append(f"DEF:{ds_name}_raw={rrd_path}:{ds_name}:AVERAGE")
 
-    if ds_name in counter_metrics:
-        # Scale per-second to per-minute for readability
-        args.append(f"CDEF:{ds_name}={ds_name}_raw,60,*")
-    elif ds_name in airtime_metrics:
-        # Airtime: DERIVE gives seconds/second rate, scale to seconds/minute
-        args.append(f"CDEF:{ds_name}={ds_name}_raw,60,*")
-    elif ds_name == "uptime":
-        # Scale seconds to hours for readability
-        args.append(f"CDEF:{ds_name}={ds_name}_raw,3600,/")
-    else:
+    # Apply scaling based on metric type
+    scale = get_graph_scale(ds_name)
+    if scale == 1.0:
         args.append(f"CDEF:{ds_name}={ds_name}_raw")
+    elif scale > 1:
+        # Multiply (e.g., per-second to per-minute: ×60)
+        args.append(f"CDEF:{ds_name}={ds_name}_raw,{int(scale)},*")
+    else:
+        # Divide (e.g., seconds to hours: ÷3600)
+        divisor = int(1 / scale)
+        args.append(f"CDEF:{ds_name}={ds_name}_raw,{divisor},/")
 
     # Area fill with semi-transparent primary color, then line on top
     args.append(f"AREA:{ds_name}#{color_primary}40")  # 40 = ~25% opacity

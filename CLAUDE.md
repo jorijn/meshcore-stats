@@ -475,10 +475,14 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 ## Changing RRD Data Source Types
 
+Metric type configuration is centralized in `src/meshmon/metrics.py`:
+
+- `COUNTER_METRICS`: Set of metrics that use DERIVE (rate of change)
+- `GRAPH_SCALING`: Dict of metric → scale factor for display
+
 If you need to change a metric from GAUGE to DERIVE (or vice versa):
 
-1. Update the `counter_metrics` set in `create_rrd()` function in `src/meshmon/rrd.py`
-2. Update the `counter_metrics` set in `update_rrd()` function (for integer formatting)
-3. Update the `counter_metrics` set in `graph_rrd()` function (for scaling)
-4. Delete existing RRD files: `rm data/rrd/*.rrd`
-5. Backfill: `python scripts/backfill_rrd.py all`
+1. Update `COUNTER_METRICS` in `src/meshmon/metrics.py`
+2. Update `GRAPH_SCALING` if the metric needs display scaling (e.g., ×60 for per-minute)
+3. Delete existing RRD files: `rm data/rrd/*.rrd`
+4. Backfill: `python scripts/backfill_rrd.py all`
