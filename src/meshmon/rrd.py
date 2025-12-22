@@ -170,7 +170,7 @@ def graph_rrd(
     title: Optional[str] = None,
     vertical_label: Optional[str] = None,
     width: int = 800,
-    height: int = 300,
+    height: int = 280,
 ) -> bool:
     """
     Generate a graph from RRD data.
@@ -180,7 +180,7 @@ def graph_rrd(
         ds_name: Data source name to graph
         period: Time period ("day", "week", "month", "year")
         output_path: Output PNG path
-        title: Graph title
+        title: Graph title (not shown in chart, used in card header)
         vertical_label: Y-axis label
         width: Graph width in pixels
         height: Graph height in pixels
@@ -208,15 +208,35 @@ def graph_rrd(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if title is None:
-        title = f"{role.capitalize()} - {ds_name} ({period})"
+    # Design system colors (matching CSS variables)
+    color_primary = "2563eb"        # --primary (blue)
+    color_primary_light = "dbeafe"  # --primary-light
+    color_text = "1e293b"           # --text
+    color_text_muted = "64748b"     # --text-muted
+    color_border = "e2e8f0"         # --border
+    color_bg = "ffffff"             # --bg-elevated (white)
+    color_canvas = "f8fafc"         # --bg (slightly gray)
 
     args = [
         str(output_path),
         "--start", start,
         "--width", str(width),
         "--height", str(height),
-        "--title", title,
+        # Colors matching design system
+        "--color", f"BACK#{color_bg}",
+        "--color", f"CANVAS#{color_bg}",
+        "--color", f"FONT#{color_text}",
+        "--color", f"MGRID#{color_border}",
+        "--color", f"GRID#{color_border}",
+        "--color", f"FRAME#{color_border}",
+        "--color", f"ARROW#{color_text_muted}",
+        "--color", f"AXIS#{color_text_muted}",
+        # Styling
+        "--border", "0",
+        "--full-size-mode",
+        "--slope-mode",
+        "--alt-autoscale",
+        "--rigid",
     ]
 
     if vertical_label:
@@ -236,7 +256,15 @@ def graph_rrd(
     else:
         args.append(f"CDEF:{ds_name}={ds_name}_raw")
 
-    args.append(f"LINE1:{ds_name}#0000FF:{ds_name}")
+    # Area fill with semi-transparent primary color, then line on top
+    args.append(f"AREA:{ds_name}#{color_primary}40")  # 40 = ~25% opacity
+    args.append(f"LINE2:{ds_name}#{color_primary}:  ")  # Label with spacing
+
+    # Add statistics (min/avg/max/current) below the chart
+    args.append(f"GPRINT:{ds_name}:MIN:Min\\: %6.2lf%s")
+    args.append(f"GPRINT:{ds_name}:AVERAGE:Avg\\: %6.2lf%s")
+    args.append(f"GPRINT:{ds_name}:MAX:Max\\: %6.2lf%s")
+    args.append(f"GPRINT:{ds_name}:LAST:Current\\: %6.2lf%s\\n")
 
     try:
         log.debug(f"Generating graph: {output_path}")
