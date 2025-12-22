@@ -13,7 +13,10 @@
       "Bash(ls:*)",
       "Bash(source .envrc)",
       "Bash(.direnv/python-3.12/bin/python:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)"
     ]
   }
 }
