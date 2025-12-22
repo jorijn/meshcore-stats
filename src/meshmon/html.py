@@ -800,6 +800,16 @@ def render_node_page(
         "rssi": "RSSI",
         "snr": "SNR",
         "uptime": "Uptime",
+        "noise": "Noise Floor",
+        "airtime": "TX Airtime",
+        "rx_air": "RX Airtime",
+        "fl_dups": "Flood Duplicates",
+        "di_dups": "Direct Duplicates",
+        "fl_tx": "Flood TX",
+        "fl_rx": "Flood RX",
+        "di_tx": "Direct TX",
+        "di_rx": "Direct RX",
+        "txq": "TX Queue",
     }
 
     for ds_name in sorted(metrics.keys()):

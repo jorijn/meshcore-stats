@@ -58,7 +58,14 @@ def create_rrd(
     ds_defs = []
 
     # Counter metrics use DERIVE (handles counter wraps, allows negative for resets)
-    counter_metrics = {"rx", "tx"}
+    # These are cumulative counters that reset on device reboot
+    counter_metrics = {
+        "rx", "tx",                    # Total packets
+        "airtime", "rx_air",           # Airtime in seconds
+        "fl_dups", "di_dups",          # Duplicate packet counts
+        "fl_tx", "fl_rx",              # Flood packets
+        "di_tx", "di_rx",              # Direct packets
+    }
 
     for ds_name in sorted(metrics.keys()):
         if ds_name in counter_metrics:
@@ -145,7 +152,13 @@ def update_rrd(
     # Build update string: timestamp:val1:val2:...
     # Values must be in same order as DS definitions (sorted by name)
     # Counter metrics (DERIVE) require integer values
-    counter_metrics = {"rx", "tx"}
+    counter_metrics = {
+        "rx", "tx",                    # Total packets
+        "airtime", "rx_air",           # Airtime in seconds
+        "fl_dups", "di_dups",          # Duplicate packet counts
+        "fl_tx", "fl_rx",              # Flood packets
+        "di_tx", "di_rx",              # Direct packets
+    }
     ds_names = sorted(metrics.keys())
     value_strs = [
         format_rrd_value(values.get(name), as_integer=(name in counter_metrics))
@@ -248,12 +261,22 @@ def graph_rrd(
         args.extend(["--vertical-label", vertical_label])
 
     # Counter metrics (DERIVE) are stored as per-second rates, scale to per-minute
-    counter_metrics = {"rx", "tx"}
+    counter_metrics = {
+        "rx", "tx",                    # Total packets
+        "fl_dups", "di_dups",          # Duplicate packet counts
+        "fl_tx", "fl_rx",              # Flood packets
+        "di_tx", "di_rx",              # Direct packets
+    }
+    # Airtime metrics: stored as seconds, scale to seconds/min (show rate)
+    airtime_metrics = {"airtime", "rx_air"}
 
     args.append(f"DEF:{ds_name}_raw={rrd_path}:{ds_name}:AVERAGE")
 
     if ds_name in counter_metrics:
         # Scale per-second to per-minute for readability
+        args.append(f"CDEF:{ds_name}={ds_name}_raw,60,*")
+    elif ds_name in airtime_metrics:
+        # Airtime: DERIVE gives seconds/second rate, scale to seconds/minute
         args.append(f"CDEF:{ds_name}={ds_name}_raw,60,*")
     elif ds_name == "uptime":
         # Scale seconds to hours for readability
@@ -308,6 +331,16 @@ def render_all_charts(role: str, metrics: dict[str, str]) -> list[Path]:
         "rssi": "RSSI (dBm)",
         "snr": "SNR (dB)",
         "uptime": "Hours",
+        "noise": "dBm",
+        "airtime": "Seconds/min",
+        "rx_air": "Seconds/min",
+        "fl_dups": "Packets/min",
+        "di_dups": "Packets/min",
+        "fl_tx": "Packets/min",
+        "fl_rx": "Packets/min",
+        "di_tx": "Packets/min",
+        "di_rx": "Packets/min",
+        "txq": "Queue depth",
     }
 
     for ds_name in sorted(metrics.keys()):
