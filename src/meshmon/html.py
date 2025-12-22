@@ -21,129 +21,413 @@ BASE_TEMPLATE = """
     <title>{{ title }} - MeshCore Stats</title>
     <style>
         :root {
-            --bg: #f5f5f5;
-            --card-bg: #ffffff;
-            --text: #333333;
-            --text-muted: #666666;
-            --border: #dddddd;
+            /* Typography */
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            --font-size-xs: 0.75rem;
+            --font-size-sm: 0.875rem;
+            --font-size-base: 1rem;
+            --font-size-lg: 1.125rem;
+            --font-size-xl: 1.25rem;
+            --font-size-2xl: 1.5rem;
+
+            /* Spacing */
+            --space-1: 0.25rem;
+            --space-2: 0.5rem;
+            --space-3: 0.75rem;
+            --space-4: 1rem;
+            --space-5: 1.25rem;
+            --space-6: 1.5rem;
+            --space-8: 2rem;
+
+            /* Colors */
+            --bg: #f8fafc;
+            --bg-elevated: #ffffff;
+            --bg-sunken: #f1f5f9;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --text-subtle: #94a3b8;
+            --border: #e2e8f0;
+            --border-strong: #cbd5e1;
+
+            /* Brand */
             --primary: #2563eb;
             --primary-hover: #1d4ed8;
+            --primary-light: #dbeafe;
+
+            /* Semantic */
+            --success: #16a34a;
+            --success-light: #dcfce7;
+            --warning: #ca8a04;
+            --warning-light: #fef9c3;
+            --danger: #dc2626;
+            --danger-light: #fee2e2;
+
+            /* Effects */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --radius: 8px;
+            --radius-lg: 12px;
         }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: var(--font-sans);
+            font-size: var(--font-size-base);
             background: var(--bg);
             color: var(--text);
-            line-height: 1.6;
-            padding: 1rem;
+            line-height: 1.5;
+            min-height: 100vh;
         }
-        .container { max-width: 1200px; margin: 0 auto; }
-        header {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem 1.5rem;
-            margin-bottom: 1rem;
-        }
-        header h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-        header .meta { color: var(--text-muted); font-size: 0.875rem; }
-        nav {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.75rem 1rem;
-            margin-bottom: 1rem;
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-        nav a {
-            color: var(--primary);
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-        }
-        nav a:hover { background: var(--primary); color: white; }
-        nav a.active { background: var(--primary); color: white; }
-        .tabs {
-            display: flex;
-            gap: 0.25rem;
-            margin-bottom: 1rem;
-        }
-        .tabs a {
-            padding: 0.5rem 1rem;
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 4px 4px 0 0;
-            text-decoration: none;
-            color: var(--text);
-        }
-        .tabs a.active {
+
+        /* Skip link for accessibility */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: var(--space-4);
             background: var(--primary);
             color: white;
+            padding: var(--space-2) var(--space-4);
+            border-radius: var(--radius);
+            z-index: 1000;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .skip-link:focus { top: var(--space-4); }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--space-4);
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4) var(--space-6);
+            margin-bottom: var(--space-4);
+            box-shadow: var(--shadow-sm);
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: var(--space-6);
+        }
+        .header-brand {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .header-node {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            flex-wrap: wrap;
+        }
+        .header-node h1 {
+            font-size: var(--font-size-xl);
+            font-weight: 600;
+            margin: 0;
+        }
+        .pubkey {
+            font-family: var(--font-mono);
+            font-size: var(--font-size-xs);
+            color: var(--text-muted);
+            background: var(--bg-sunken);
+            padding: var(--space-1) var(--space-2);
+            border-radius: 4px;
+        }
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .status-online { background: var(--success); box-shadow: 0 0 0 3px var(--success-light); }
+        .status-stale { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-light); }
+        .status-offline { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-light); }
+        .header-updated {
+            text-align: right;
+            font-size: var(--font-size-sm);
+            color: var(--text-muted);
+        }
+        .header-updated .label { display: block; font-size: var(--font-size-xs); color: var(--text-subtle); }
+
+        /* Navigation */
+        .main-nav {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-3) var(--space-4);
+            margin-bottom: var(--space-6);
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            flex-wrap: wrap;
+        }
+        .nav-group {
+            display: flex;
+            gap: var(--space-1);
+        }
+        .nav-separator {
+            color: var(--border-strong);
+            padding: 0 var(--space-2);
+            user-select: none;
+        }
+        .nav-link {
+            display: inline-flex;
+            align-items: center;
+            padding: var(--space-2) var(--space-4);
+            border-radius: var(--radius);
+            text-decoration: none;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--text-muted);
+            background: transparent;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+            min-height: 44px;
+        }
+        .nav-link:hover {
+            color: var(--text);
+            background: var(--bg-sunken);
+        }
+        .nav-link.active {
+            color: var(--primary);
+            background: var(--primary-light);
             border-color: var(--primary);
         }
-        .card {
-            background: var(--card-bg);
+
+        /* Focus styles */
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* Metrics Bar */
+        .metrics-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+        .metric {
+            background: var(--bg-elevated);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem 1.5rem;
-            margin-bottom: 1rem;
+            border-radius: var(--radius-lg);
+            padding: var(--space-4) var(--space-5);
+            text-align: center;
+            box-shadow: var(--shadow-sm);
         }
-        .card h2 { font-size: 1.125rem; margin-bottom: 1rem; color: var(--text); }
-        table {
-            width: 100%;
-            border-collapse: collapse;
+        .metric-value {
+            display: block;
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
         }
-        th, td {
-            text-align: left;
-            padding: 0.5rem;
+        .metric-label {
+            display: block;
+            font-size: var(--font-size-xs);
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: var(--space-1);
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-6);
+            margin-bottom: var(--space-6);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+        .card-header {
+            padding: var(--space-4) var(--space-6);
             border-bottom: 1px solid var(--border);
+            background: var(--bg-sunken);
         }
-        th { font-weight: 600; color: var(--text-muted); }
-        .charts {
+        .card-title {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--text);
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            margin: 0;
+        }
+        .card-body { padding: var(--space-5) var(--space-6); }
+        .card-body p { color: var(--text-muted); line-height: 1.7; }
+
+        /* Snapshot Table */
+        .snapshot-table { width: 100%; border-collapse: collapse; }
+        .snapshot-table tbody tr { border-bottom: 1px solid var(--border); }
+        .snapshot-table tbody tr:last-child { border-bottom: none; }
+        .snapshot-table th, .snapshot-table td { padding: var(--space-3) var(--space-2); }
+        .snapshot-table th {
+            text-align: left;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--text-muted);
+            width: 45%;
+        }
+        .snapshot-table td {
+            text-align: right;
+            font-size: var(--font-size-base);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+        }
+        .tooltip-trigger {
+            cursor: help;
+            border-bottom: 1px dotted var(--text-subtle);
+        }
+
+        /* Charts */
+        .charts-section { margin-bottom: var(--space-6); }
+        .charts-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-        }
-        @media (max-width: 900px) {
-            .charts {
-                grid-template-columns: 1fr;
-            }
+            gap: var(--space-4);
         }
         .chart-card {
-            background: var(--card-bg);
+            background: var(--bg-elevated);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
         }
-        .chart-card h3 { font-size: 0.875rem; margin-bottom: 0.5rem; color: var(--text-muted); }
-        .chart-card img { max-width: 100%; height: auto; }
-        footer {
+        .chart-header {
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-sunken);
+            border-bottom: 1px solid var(--border);
+        }
+        .chart-title {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--text);
+            margin: 0;
+        }
+        .chart-body { padding: var(--space-3); }
+        .chart-body img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 4px;
+        }
+
+        /* Footer */
+        .site-footer {
+            margin-top: var(--space-8);
+            padding: var(--space-6);
             text-align: center;
-            padding: 1rem;
+            border-top: 1px solid var(--border);
+        }
+        .footer-brand { font-weight: 600; color: var(--text); }
+        .footer-meta {
+            font-size: var(--font-size-sm);
             color: var(--text-muted);
-            font-size: 0.875rem;
+            margin-top: var(--space-1);
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .site-header {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: var(--space-3);
+            }
+            .header-node { justify-content: center; }
+            .header-updated { text-align: center; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 600px) {
+            html { font-size: 14px; }
+            .container { padding: var(--space-3); }
+            .main-nav {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .nav-group {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: var(--space-1);
+            }
+            .nav-separator { display: none; }
+            .metrics-bar { grid-template-columns: repeat(2, 1fr); }
+            .card-body { padding: var(--space-4); }
+            .snapshot-table th, .snapshot-table td {
+                display: block;
+                width: 100%;
+                text-align: left;
+                padding: var(--space-1) 0;
+            }
+            .snapshot-table th {
+                font-size: var(--font-size-xs);
+                padding-top: var(--space-3);
+            }
+            .snapshot-table td {
+                font-size: var(--font-size-lg);
+                padding-bottom: var(--space-3);
+                border-bottom: 1px solid var(--border);
+            }
+            .snapshot-table tbody tr { border-bottom: none; }
+            .snapshot-table tbody tr:last-child td { border-bottom: none; }
         }
     </style>
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     <div class="container">
-        <header>
-            <h1>{{ node_name }}{% if pubkey_pre %} <code style="font-size: 0.75rem; color: var(--text-muted);">[{{ pubkey_pre }}]</code>{% endif %}</h1>
-            <div class="meta">
-                {% if last_updated %}Last updated: {{ last_updated }}{% endif %}
+        <header class="site-header">
+            <div class="header-brand">MeshCore Stats</div>
+            <div class="header-node">
+                <h1>{{ node_name }}</h1>
+                {% if pubkey_pre %}<code class="pubkey">{{ pubkey_pre }}</code>{% endif %}
+                <span class="status-indicator status-{{ status_class }}" title="{{ status_text }}"></span>
+            </div>
+            <div class="header-updated">
+                <span class="label">Last updated</span>
+                {% if last_updated %}{{ last_updated }}{% else %}N/A{% endif %}
             </div>
         </header>
-        <nav>
-            <a href="/day.html" {% if role == 'repeater' %}class="active"{% endif %}>Repeater</a>
-            <a href="/companion/day.html" {% if role == 'companion' %}class="active"{% endif %}>Companion</a>
+
+        <nav class="main-nav" aria-label="Main navigation">
+            <div class="nav-group" aria-label="Node selection">
+                <a href="/day.html" class="nav-link{% if role == 'repeater' %} active{% endif %}"{% if role == 'repeater' %} aria-current="page"{% endif %}>Repeater</a>
+                <a href="/companion/day.html" class="nav-link{% if role == 'companion' %} active{% endif %}"{% if role == 'companion' %} aria-current="page"{% endif %}>Companion</a>
+            </div>
+            <span class="nav-separator" aria-hidden="true">|</span>
+            <div class="nav-group" aria-label="Time period">
+                <a href="{{ base_path }}/day.html" class="nav-link{% if period == 'day' %} active{% endif %}">Day</a>
+                <a href="{{ base_path }}/week.html" class="nav-link{% if period == 'week' %} active{% endif %}">Week</a>
+                <a href="{{ base_path }}/month.html" class="nav-link{% if period == 'month' %} active{% endif %}">Month</a>
+                <a href="{{ base_path }}/year.html" class="nav-link{% if period == 'year' %} active{% endif %}">Year</a>
+            </div>
         </nav>
+
+        <main id="main-content">
         {% block content %}{% endblock %}
-        <footer>
-            MeshCore Stats &middot; Generated {{ generated_at }}
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-brand">MeshCore Stats</div>
+            <div class="footer-meta">Generated {{ generated_at }}</div>
         </footer>
     </div>
 </body>
@@ -153,45 +437,69 @@ BASE_TEMPLATE = """
 NODE_TEMPLATE = """
 {% extends "base" %}
 {% block content %}
-<div class="tabs">
-    <a href="{{ base_path }}/day.html" {% if period == 'day' %}class="active"{% endif %}>Day</a>
-    <a href="{{ base_path }}/week.html" {% if period == 'week' %}class="active"{% endif %}>Week</a>
-    <a href="{{ base_path }}/month.html" {% if period == 'month' %}class="active"{% endif %}>Month</a>
-    <a href="{{ base_path }}/year.html" {% if period == 'year' %}class="active"{% endif %}>Year</a>
-</div>
-
-{% if about %}
-<div class="card">
-    <h2>About this Node</h2>
-    <p style="color: var(--text-muted); line-height: 1.8;">{{ about | safe }}</p>
-</div>
-{% endif %}
-
-{% if snapshot %}
-<div class="card">
-    <h2>Latest Snapshot</h2>
-    <table>
-        {% for key, value, tooltip in snapshot_table %}
-        <tr>
-            <th>{% if tooltip %}<span title="{{ tooltip }}" style="cursor: help; border-bottom: 1px dotted var(--text-muted);">{{ key }}</span>{% else %}{{ key }}{% endif %}</th>
-            <td>{{ value }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-</div>
-{% endif %}
-
-<div class="card">
-    <h2>Charts - {{ period | capitalize }}</h2>
-    <div class="charts">
-        {% for chart in charts %}
-        <div class="chart-card">
-            <h3>{{ chart.label }}</h3>
-            <img src="{{ chart.src }}" alt="{{ chart.label }}">
-        </div>
-        {% endfor %}
+{% if metrics_bar %}
+<section class="metrics-bar" aria-label="Key metrics">
+    {% for m in metrics_bar %}
+    <div class="metric">
+        <span class="metric-value">{{ m.value }}</span>
+        <span class="metric-label">{{ m.label }}</span>
     </div>
+    {% endfor %}
+</section>
+{% endif %}
+
+<div class="dashboard-grid">
+    {% if snapshot %}
+    <section class="card" aria-labelledby="snapshot-heading">
+        <div class="card-header">
+            <h2 id="snapshot-heading" class="card-title">Latest Snapshot</h2>
+        </div>
+        <div class="card-body">
+            <table class="snapshot-table">
+                <tbody>
+                {% for key, value, tooltip in snapshot_table %}
+                <tr>
+                    <th>{% if tooltip %}<span class="tooltip-trigger" title="{{ tooltip }}">{{ key }}</span>{% else %}{{ key }}{% endif %}</th>
+                    <td>{{ value }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if about %}
+    <section class="card" aria-labelledby="about-heading">
+        <div class="card-header">
+            <h2 id="about-heading" class="card-title">About this Node</h2>
+        </div>
+        <div class="card-body">
+            <p>{{ about | safe }}</p>
+        </div>
+    </section>
+    {% endif %}
 </div>
+
+<section class="charts-section card" aria-labelledby="charts-heading">
+    <div class="card-header">
+        <h2 id="charts-heading" class="card-title">Charts - {{ period | capitalize }}</h2>
+    </div>
+    <div class="card-body">
+        <div class="charts-grid">
+            {% for chart in charts %}
+            <article class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">{{ chart.label }}</h3>
+                </div>
+                <div class="chart-body">
+                    <img src="{{ chart.src }}" alt="{{ chart.label }} over the last {{ period }}" loading="lazy">
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </div>
+</section>
 {% endblock %}
 """
 
@@ -495,6 +803,59 @@ def render_node_page(
         ),
     }
 
+    # Calculate status indicator based on last update time
+    status_class = "offline"
+    status_text = "No data"
+    if snapshot and snapshot.get("ts"):
+        age_seconds = int(datetime.now().timestamp()) - snapshot["ts"]
+        if age_seconds < 1800:  # 30 minutes
+            status_class = "online"
+            status_text = "Online"
+        elif age_seconds < 7200:  # 2 hours
+            status_class = "stale"
+            status_text = "Stale data"
+        else:
+            status_class = "offline"
+            status_text = "Offline"
+
+    # Build metrics bar with key values
+    metrics_bar = []
+    if snapshot:
+        if role == "repeater":
+            # Battery voltage
+            bat_mv = get_by_path(snapshot, "status.bat")
+            if bat_mv is not None:
+                metrics_bar.append({"value": f"{bat_mv / 1000:.2f}V", "label": "Battery"})
+            # Uptime
+            uptime = get_by_path(snapshot, "status.uptime")
+            if uptime is not None:
+                metrics_bar.append({"value": format_uptime(uptime), "label": "Uptime"})
+            # RSSI
+            rssi = get_by_path(snapshot, "status.last_rssi")
+            if rssi is not None:
+                metrics_bar.append({"value": f"{rssi} dBm", "label": "RSSI"})
+            # SNR
+            snr = get_by_path(snapshot, "status.last_snr")
+            if snr is not None:
+                metrics_bar.append({"value": f"{snr:.1f} dB", "label": "SNR"})
+        elif role == "companion":
+            # Battery voltage
+            bat_mv = get_by_path(snapshot, "stats.core.battery_mv")
+            if bat_mv is not None:
+                metrics_bar.append({"value": f"{bat_mv / 1000:.2f}V", "label": "Battery"})
+            # Uptime
+            uptime = get_by_path(snapshot, "stats.core.uptime_secs")
+            if uptime is not None:
+                metrics_bar.append({"value": format_uptime(uptime), "label": "Uptime"})
+            # Contacts
+            contacts = get_by_path(snapshot, "derived.contacts_count")
+            if contacts is not None:
+                metrics_bar.append({"value": str(contacts), "label": "Contacts"})
+            # RX packets
+            rx = get_by_path(snapshot, "stats.packets.recv")
+            if rx is not None:
+                metrics_bar.append({"value": f"{rx:,}", "label": "RX Packets"})
+
     # Base path for tab links: root pages use "", others use "/role"
     base_path = "" if at_root else f"/{role}"
 
@@ -509,6 +870,8 @@ def render_node_page(
         title=f"{role.capitalize()} - {period.capitalize()}",
         node_name=node_name,
         pubkey_pre=pubkey_pre,
+        status_class=status_class,
+        status_text=status_text,
         role=role,
         period=period,
         base_path=base_path,
@@ -517,6 +880,7 @@ def render_node_page(
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         snapshot=snapshot,
         snapshot_table=snapshot_table,
+        metrics_bar=metrics_bar,
         charts=charts,
     )
 
