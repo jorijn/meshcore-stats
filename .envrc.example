@@ -1,0 +1,35 @@
+# MeshCore Stats - Environment Configuration
+# Copy this file to .envrc and adjust values
+
+# Connection settings
+export MESH_TRANSPORT=serial
+# export MESH_SERIAL_PORT=/dev/ttyUSB0  # Leave unset for auto-detect
+export MESH_SERIAL_BAUD=115200
+export MESH_DEBUG=0
+
+# Remote repeater identity (at least one required)
+export REPEATER_NAME="my-repeater"
+# export REPEATER_KEY_PREFIX="a1b2c3"
+# export REPEATER_PASSWORD=""
+
+# Intervals (seconds)
+export COMPANION_STEP=60
+export REPEATER_STEP=900
+export REMOTE_TIMEOUT_S=10
+export REMOTE_RETRY_ATTEMPTS=2
+export REMOTE_RETRY_BACKOFF_S=4
+export REMOTE_CB_FAILS=6
+export REMOTE_CB_COOLDOWN_S=3600
+
+# Paths
+export SNAPSHOT_DIR=./data/snapshots
+export RRD_DIR=./data/rrd
+export STATE_DIR=./data/state
+export OUT_DIR=./out
+
+# Metric mappings (ds_name=dotted.path)
+export COMPANION_METRICS="bat_v=bat.voltage_v,contacts=derived.contacts_count,rx=stats.rx_packets,tx=stats.tx_packets"
+export REPEATER_METRICS="bat_v=telemetry.bat,bat_pct=telemetry.bat_pct,neigh=derived.neighbours_count,rx=telemetry.rx_packets,tx=telemetry.tx_packets,rssi=status.rssi,snr=status.snr"
+
+# Optional
+export REPEATER_FETCH_ACL=0

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(meshcore-cli:*)",
+      "Bash(.direnv/python-3.14/bin/pip index:*)",
+      "Bash(.direnv/python-3.14/bin/pip install:*)",
+      "Bash(.direnv/python-3.12/bin/pip:*)",
+      "Bash(rrdtool info:*)",
+      "Bash(rrdtool fetch:*)",
+      "Bash(cat:*)",
+      "Bash(xargs cat:*)",
+      "Bash(done)",
+      "Bash(ls:*)",
+      "Bash(source .envrc)",
+      "Bash(.direnv/python-3.12/bin/python:*)"
+    ]
+  }
+}
