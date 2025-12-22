@@ -930,7 +930,7 @@ def render_node_page(
 
     template = env.from_string(full_template)
     return template.render(
-        title=f"{role.capitalize()} - {period.capitalize()}",
+        title=f"{node_name} - {period.capitalize()}",
         meta_description=meta_description,
         node_name=node_name,
         pubkey_pre=pubkey_pre,
