@@ -171,9 +171,9 @@ NODE_TEMPLATE = """
 <div class="card">
     <h2>Latest Snapshot</h2>
     <table>
-        {% for key, value in snapshot_table %}
+        {% for key, value, tooltip in snapshot_table %}
         <tr>
-            <th>{{ key }}</th>
+            <th{% if tooltip %} title="{{ tooltip }}" style="cursor: help;"{% endif %}>{{ key }}</th>
             <td>{{ value }}</td>
         </tr>
         {% endfor %}
@@ -275,118 +275,138 @@ def create_jinja_env() -> Environment:
     return env
 
 
-def extract_snapshot_table(snapshot: dict, role: str) -> list[tuple[str, str]]:
+def extract_snapshot_table(snapshot: dict, role: str) -> list[tuple[str, str, str]]:
     """
     Extract key-value pairs from snapshot for display.
 
-    Returns list of (label, formatted_value) tuples.
+    Returns list of (label, formatted_value, tooltip) tuples.
     """
     table = []
 
     # Timestamp
     ts = snapshot.get("ts")
     if ts:
-        table.append(("Timestamp", format_time(ts)))
+        table.append(("Timestamp", format_time(ts), "When this snapshot was captured"))
 
     if role == "companion":
         # Battery (from stats.core.battery_mv in millivolts)
         bat_mv = get_by_path(snapshot, "stats.core.battery_mv")
         if bat_mv is not None:
             bat_v = bat_mv / 1000.0
-            table.append(("Battery Voltage", f"{format_value(bat_v)} V"))
+            table.append(("Battery Voltage", f"{format_value(bat_v)} V",
+                         "Current battery voltage (4.2V = full, 3.0V = empty)"))
 
         # Contacts
         contacts_count = get_by_path(snapshot, "derived.contacts_count")
         if contacts_count is not None:
-            table.append(("Contacts", str(contacts_count)))
+            table.append(("Contacts", str(contacts_count),
+                         "Number of known nodes in the mesh network"))
 
         # Packets (from stats.packets.recv/sent)
         rx = get_by_path(snapshot, "stats.packets.recv")
         if rx is not None:
-            table.append(("RX Packets", format_number(rx)))
+            table.append(("RX Packets", format_number(rx),
+                         "Total packets received since last reboot"))
 
         tx = get_by_path(snapshot, "stats.packets.sent")
         if tx is not None:
-            table.append(("TX Packets", format_number(tx)))
+            table.append(("TX Packets", format_number(tx),
+                         "Total packets transmitted since last reboot"))
 
         # Radio info (from self_info)
         freq = get_by_path(snapshot, "self_info.radio_freq")
         if freq is not None:
-            table.append(("Frequency", f"{format_value(freq)} MHz"))
+            table.append(("Frequency", f"{format_value(freq)} MHz",
+                         "LoRa radio frequency"))
 
         sf = get_by_path(snapshot, "self_info.radio_sf")
         if sf is not None:
-            table.append(("Spreading Factor", str(sf)))
+            table.append(("Spreading Factor", str(sf),
+                         "LoRa spreading factor (higher = longer range, slower speed)"))
 
         bw = get_by_path(snapshot, "self_info.radio_bw")
         if bw is not None:
-            table.append(("Bandwidth", f"{format_value(bw)} kHz"))
+            table.append(("Bandwidth", f"{format_value(bw)} kHz",
+                         "LoRa channel bandwidth"))
 
         tx_power = get_by_path(snapshot, "self_info.tx_power")
         if tx_power is not None:
-            table.append(("TX Power", f"{tx_power} dBm"))
+            table.append(("TX Power", f"{tx_power} dBm",
+                         "Transmit power in decibels relative to 1 milliwatt"))
 
         # Uptime
         uptime = get_by_path(snapshot, "stats.core.uptime_secs")
         if uptime is not None:
-            table.append(("Uptime", format_uptime(uptime)))
+            table.append(("Uptime", format_uptime(uptime),
+                         "Time since last device reboot"))
 
     elif role == "repeater":
         # Battery - status.bat is in millivolts
         bat_mv = get_by_path(snapshot, "status.bat")
         if bat_mv is not None:
             bat_v = bat_mv / 1000.0
-            table.append(("Battery Voltage", f"{format_value(bat_v)} V"))
+            table.append(("Battery Voltage", f"{format_value(bat_v)} V",
+                         "Current battery voltage (4.2V = full, 3.0V = empty)"))
 
         # Also check telemetry array for voltage channel
         telemetry = snapshot.get("telemetry")
         if isinstance(telemetry, list):
             for item in telemetry:
                 if isinstance(item, dict) and item.get("type") == "voltage":
-                    table.append(("Battery (telemetry)", f"{format_value(item.get('value'))} V"))
+                    table.append(("Battery (telemetry)", f"{format_value(item.get('value'))} V",
+                                 "Battery voltage from telemetry channel"))
                     break
 
         # Neighbours
         neigh = get_by_path(snapshot, "derived.neighbours_count")
         if neigh is not None:
-            table.append(("Neighbours", str(neigh)))
+            table.append(("Neighbours", str(neigh),
+                         "Number of directly reachable mesh nodes"))
 
         # Radio stats - actual field names from status
         rssi = get_by_path(snapshot, "status.last_rssi")
         if rssi is not None:
-            table.append(("RSSI", f"{rssi} dBm"))
+            table.append(("RSSI", f"{rssi} dBm",
+                         "Received Signal Strength Indicator of last packet (closer to 0 = stronger)"))
 
         snr = get_by_path(snapshot, "status.last_snr")
         if snr is not None:
-            table.append(("SNR", f"{format_value(snr)} dB"))
+            table.append(("SNR", f"{format_value(snr)} dB",
+                         "Signal-to-Noise Ratio of last packet (higher = cleaner signal)"))
 
         noise = get_by_path(snapshot, "status.noise_floor")
         if noise is not None:
-            table.append(("Noise Floor", f"{noise} dBm"))
+            table.append(("Noise Floor", f"{noise} dBm",
+                         "Background radio noise level (lower = quieter environment)"))
 
         # Packets - from status, not telemetry
         rx = get_by_path(snapshot, "status.nb_recv")
         if rx is not None:
-            table.append(("RX Packets", format_number(rx)))
+            table.append(("RX Packets", format_number(rx),
+                         "Total packets received since last reboot"))
 
         tx = get_by_path(snapshot, "status.nb_sent")
         if tx is not None:
-            table.append(("TX Packets", format_number(tx)))
+            table.append(("TX Packets", format_number(tx),
+                         "Total packets transmitted since last reboot"))
 
         # Uptime
         uptime = get_by_path(snapshot, "status.uptime")
         if uptime is not None:
-            table.append(("Uptime", format_uptime(uptime)))
+            table.append(("Uptime", format_uptime(uptime),
+                         "Time since last device reboot"))
 
         # Airtime
         airtime = get_by_path(snapshot, "status.airtime")
         if airtime is not None:
-            table.append(("TX Airtime", format_duration(airtime)))
+            table.append(("TX Airtime", format_duration(airtime),
+                         "Total time spent transmitting (legal limit: 10% duty cycle)"))
 
         # Skip reason
         skip = get_by_path(snapshot, "skip_reason")
         if skip:
-            table.append(("Status", f"Skipped: {skip}"))
+            table.append(("Status", f"Skipped: {skip}",
+                         "Data collection was skipped for this snapshot"))
 
     return table
 
