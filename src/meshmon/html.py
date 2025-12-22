@@ -163,7 +163,7 @@ NODE_TEMPLATE = """
 {% if about %}
 <div class="card">
     <h2>About this Node</h2>
-    <p style="color: var(--text-muted); line-height: 1.8;">{{ about }}</p>
+    <p style="color: var(--text-muted); line-height: 1.8;">{{ about | safe }}</p>
 </div>
 {% endif %}
 
@@ -458,12 +458,13 @@ def render_node_page(
             or get_by_path(snapshot, "self_telemetry.pubkey_pre")
         )
 
-    # About text for each node type
+    # About text for each node type (HTML allowed)
     about_text = {
         "repeater": (
-            "This is a MeshCore LoRa mesh repeater located in Oosterhout, The Netherlands. "
-            "The hardware is a Seeed SenseCAP Solar Node P1-Pro running MeshCore firmware. "
-            "It operates on the EU868 frequency band and relays messages across the mesh network. "
+            "This is a MeshCore LoRa mesh repeater located in <strong>Oosterhout, The Netherlands</strong>. "
+            "The hardware is a <strong>Seeed SenseCAP Solar Node P1-Pro</strong> running MeshCore firmware. "
+            "It operates on the <strong>MeshCore EU/UK Narrow</strong> preset "
+            "(869.618 MHz, 62.5 kHz bandwidth, SF8, CR8) and relays messages across the mesh network. "
             "Stats are collected every 15 minutes via LoRa from a local companion node, "
             "stored in RRD databases, and rendered into these charts."
         ),
