@@ -462,7 +462,7 @@ def render_node_page(
     about_text = {
         "repeater": (
             "This is a MeshCore LoRa mesh repeater located in Oosterhout, The Netherlands. "
-            "The hardware is a Seeed SenseCAP Card Tracker T1000-E running MeshCore firmware. "
+            "The hardware is a Seeed SenseCAP Solar Node P1-Pro running MeshCore firmware. "
             "It operates on the EU868 frequency band and relays messages across the mesh network. "
             "Stats are collected every 15 minutes via LoRa from a local companion node, "
             "stored in RRD databases, and rendered into these charts."
