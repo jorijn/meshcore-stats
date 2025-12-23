@@ -383,7 +383,7 @@ BASE_TEMPLATE = """
         /* Footer */
         .site-footer {
             margin-top: var(--space-8);
-            padding: var(--space-6);
+            padding: var(--space-6) var(--space-4);
             text-align: center;
             border-top: 1px solid var(--border);
         }
@@ -392,6 +392,52 @@ BASE_TEMPLATE = """
             font-size: var(--font-size-sm);
             color: var(--text-muted);
             margin-top: var(--space-1);
+        }
+        .footer-contact {
+            margin-top: var(--space-4);
+            padding-top: var(--space-4);
+            border-top: 1px solid var(--border);
+        }
+        .footer-contact-heading {
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--space-3);
+        }
+        .footer-contact-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--space-2) var(--space-4);
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .footer-contact-link {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            font-size: var(--font-size-sm);
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: var(--radius);
+            transition: color 0.15s ease, background-color 0.15s ease;
+            min-height: 44px;
+            min-width: 44px;
+        }
+        .footer-contact-link:hover,
+        .footer-contact-link:focus {
+            color: var(--primary);
+            background-color: var(--primary-light);
+        }
+        .footer-contact-link svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            fill: currentColor;
         }
 
         /* Responsive */
@@ -479,6 +525,35 @@ BASE_TEMPLATE = """
         <footer class="site-footer">
             <div class="footer-brand">MeshCore Stats</div>
             <div class="footer-meta">Generated {{ generated_at }}</div>
+            <nav class="footer-contact" aria-label="Contact links">
+                <h2 class="footer-contact-heading">Contact</h2>
+                <ul class="footer-contact-list">
+                    <li>
+                        <a href="mailto:jorijn@jorijn.com" class="footer-contact-link" aria-label="Send email to jorijn@jorijn.com">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                            <span>Email</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/jorijn" class="footer-contact-link" rel="noopener" target="_blank" aria-label="GitHub profile (opens in new tab)">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.341-3.369-1.341-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+                            <span>GitHub</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://jorijn.com" class="footer-contact-link" rel="noopener" target="_blank" aria-label="Personal website (opens in new tab)">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                            <span>Website</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://toot.community/@jorijn" class="footer-contact-link" rel="me noopener" target="_blank" aria-label="Mastodon profile (opens in new tab)">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21.327 8.566c0-4.339-2.843-5.61-2.843-5.61-1.433-.658-3.894-.935-6.451-.956h-.063c-2.557.021-5.016.298-6.45.956 0 0-2.843 1.272-2.843 5.61 0 .993-.019 2.181.012 3.441.103 4.243.778 8.425 4.701 9.463 1.809.479 3.362.579 4.612.51 2.268-.126 3.541-.809 3.541-.809l-.075-1.646s-1.621.511-3.441.449c-1.804-.062-3.707-.194-3.999-2.409a4.523 4.523 0 0 1-.04-.621s1.77.432 4.014.535c1.372.063 2.658-.08 3.965-.236 2.506-.299 4.688-1.843 4.962-3.254.434-2.223.398-5.424.398-5.424zm-3.353 5.59h-2.081V9.057c0-1.075-.452-1.62-1.357-1.62-1 0-1.501.647-1.501 1.927v2.791h-2.069V9.364c0-1.28-.501-1.927-1.502-1.927-.905 0-1.357.546-1.357 1.62v5.099H6.026V8.903c0-1.074.273-1.927.823-2.558.566-.631 1.307-.955 2.228-.955 1.065 0 1.872.409 2.405 1.228l.518.869.519-.869c.533-.819 1.34-1.228 2.405-1.228.92 0 1.662.324 2.228.955.549.631.822 1.484.822 2.558v5.253z"/></svg>
+                            <span>Mastodon</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
         </footer>
     </div>
 </body>
