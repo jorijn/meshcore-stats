@@ -261,8 +261,8 @@ def graph_rrd(
     # Apply smoothing to battery metrics to reduce fluctuations
     # TREND applies a centered moving average over a time window
     if ds_name in ("bat_v", "bat_pct"):
-        # Smoothing window: 1 hour for better stability
-        args.append(f"CDEF:{ds_name}={ds_name}_scaled,3600,TREND")
+        # Smoothing window: 2 hours for better stability
+        args.append(f"CDEF:{ds_name}={ds_name}_scaled,7200,TREND")
     else:
         args.append(f"CDEF:{ds_name}={ds_name}_scaled")
 
