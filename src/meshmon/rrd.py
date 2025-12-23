@@ -249,14 +249,22 @@ def graph_rrd(
     # Apply scaling based on metric type
     scale = get_graph_scale(ds_name)
     if scale == 1.0:
-        args.append(f"CDEF:{ds_name}={ds_name}_raw")
+        args.append(f"CDEF:{ds_name}_scaled={ds_name}_raw")
     elif scale > 1:
         # Multiply (e.g., per-second to per-minute: ×60)
-        args.append(f"CDEF:{ds_name}={ds_name}_raw,{int(scale)},*")
+        args.append(f"CDEF:{ds_name}_scaled={ds_name}_raw,{int(scale)},*")
     else:
         # Divide (e.g., seconds to hours: ÷3600)
         divisor = int(1 / scale)
-        args.append(f"CDEF:{ds_name}={ds_name}_raw,{divisor},/")
+        args.append(f"CDEF:{ds_name}_scaled={ds_name}_raw,{divisor},/")
+
+    # Apply smoothing to battery metrics to reduce fluctuations
+    # TREND applies a centered moving average over a time window
+    if ds_name in ("bat_v", "bat_pct"):
+        # Smoothing window: 1 hour for better stability
+        args.append(f"CDEF:{ds_name}={ds_name}_scaled,3600,TREND")
+    else:
+        args.append(f"CDEF:{ds_name}={ds_name}_scaled")
 
     # Area fill with semi-transparent primary color, then line on top
     args.append(f"AREA:{ds_name}#{color_primary}40")  # 40 = ~25% opacity
