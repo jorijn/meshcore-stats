@@ -10,8 +10,19 @@ from .env import get_config
 from .extract import get_by_path
 from .battery import voltage_to_percentage
 from .snapshot_config import extract_snapshot_table
+from .formatters import (
+    format_time,
+    format_value,
+    format_number,
+    format_duration,
+    format_uptime,
+)
 from . import log
 
+
+# Status indicator thresholds (seconds)
+STATUS_ONLINE_THRESHOLD = 1800  # 30 minutes
+STATUS_STALE_THRESHOLD = 7200   # 2 hours
 
 # Singleton Jinja2 environment
 _jinja_env: Optional[Environment] = None
@@ -44,73 +55,6 @@ def get_jinja_env() -> Environment:
 
     _jinja_env = env
     return env
-
-
-def format_time(ts: Optional[int]) -> str:
-    """Format Unix timestamp to human readable string."""
-    if ts is None:
-        return "N/A"
-    try:
-        dt = datetime.fromtimestamp(ts)
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
-    except (ValueError, OSError):
-        return "N/A"
-
-
-def format_value(value: Any) -> str:
-    """Format a value for display."""
-    if value is None:
-        return "N/A"
-    if isinstance(value, float):
-        return f"{value:.2f}"
-    return str(value)
-
-
-def format_number(value: int) -> str:
-    """Format an integer with thousands separators."""
-    if value is None:
-        return "N/A"
-    return f"{value:,}"
-
-
-def format_duration(seconds: int) -> str:
-    """Format duration in seconds to human readable string (days, hours, minutes, seconds)."""
-    if seconds is None:
-        return "N/A"
-
-    days = seconds // 86400
-    hours = (seconds % 86400) // 3600
-    mins = (seconds % 3600) // 60
-    secs = seconds % 60
-
-    parts = []
-    if days > 0:
-        parts.append(f"{days}d")
-    if hours > 0 or days > 0:
-        parts.append(f"{hours}h")
-    if mins > 0 or hours > 0 or days > 0:
-        parts.append(f"{mins}m")
-    parts.append(f"{secs}s")
-
-    return " ".join(parts)
-
-
-def format_uptime(seconds: int) -> str:
-    """Format uptime seconds to human readable string (days, hours, minutes)."""
-    days = seconds // 86400
-    hours = (seconds % 86400) // 3600
-    mins = (seconds % 3600) // 60
-
-    parts = []
-    if days > 0:
-        parts.append(f"{days}d")
-    if hours > 0 or days > 0:
-        parts.append(f"{hours}h")
-    parts.append(f"{mins}m")
-
-    return " ".join(parts)
-
-
 
 
 def build_page_context(
@@ -232,10 +176,10 @@ def build_page_context(
     status_text = "No data"
     if snapshot and snapshot.get("ts"):
         age_seconds = int(datetime.now().timestamp()) - snapshot["ts"]
-        if age_seconds < 1800:  # 30 minutes
+        if age_seconds < STATUS_ONLINE_THRESHOLD:
             status_class = "online"
             status_text = "Online"
-        elif age_seconds < 7200:  # 2 hours
+        elif age_seconds < STATUS_STALE_THRESHOLD:
             status_class = "stale"
             status_text = "Stale data"
         else:
