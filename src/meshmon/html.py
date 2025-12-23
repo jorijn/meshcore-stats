@@ -385,7 +385,6 @@ BASE_TEMPLATE = """
             margin-top: var(--space-8);
             padding: var(--space-5) var(--space-4);
             text-align: center;
-            border-top: 1px solid var(--border);
         }
         .footer-contact-list {
             display: flex;
