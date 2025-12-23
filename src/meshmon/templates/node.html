@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+{% if metrics_bar %}
+<section class="metrics-bar" aria-label="Key metrics">
+    {% for m in metrics_bar %}
+    <div class="metric">
+        <span class="metric-value">{{ m.value }}</span>
+        <span class="metric-label">{{ m.label }}</span>
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
+
+<div class="dashboard-grid">
+    {% if snapshot %}
+    <section class="card" aria-labelledby="snapshot-heading">
+        <div class="card-header">
+            <h2 id="snapshot-heading" class="card-title">Latest Snapshot</h2>
+        </div>
+        <div class="card-body">
+            <table class="snapshot-table">
+                <tbody>
+                {% for key, value, tooltip in snapshot_table %}
+                <tr>
+                        <th>{% if tooltip %}<span class="tooltip-trigger" tabindex="0" data-tooltip="{{ tooltip }}">{{ key }}</span>{% else %}{{ key }}{% endif %}</th>
+                    <td>{{ value }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if about %}
+    <section class="card" aria-labelledby="about-heading">
+        <div class="card-header">
+            <h2 id="about-heading" class="card-title">About this Node</h2>
+        </div>
+        <div class="card-body">
+            <p>{{ about | safe }}</p>
+        </div>
+    </section>
+    {% endif %}
+</div>
+
+<section class="charts-section card" aria-labelledby="charts-heading">
+    <div class="card-header">
+        <h2 id="charts-heading" class="card-title">Charts - {{ period | capitalize }}</h2>
+    </div>
+    <div class="card-body">
+        <div class="charts-grid">
+            {% for chart in charts %}
+            <article class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">{{ chart.label }}</h3>
+                </div>
+                <div class="chart-body">
+                    <img src="{{ chart.src }}" alt="{{ chart.label }} over the last {{ period }}" loading="lazy">
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}
