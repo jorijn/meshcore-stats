@@ -383,28 +383,9 @@ BASE_TEMPLATE = """
         /* Footer */
         .site-footer {
             margin-top: var(--space-8);
-            padding: var(--space-6) var(--space-4);
+            padding: var(--space-5) var(--space-4);
             text-align: center;
             border-top: 1px solid var(--border);
-        }
-        .footer-brand { font-weight: 600; color: var(--text); }
-        .footer-meta {
-            font-size: var(--font-size-sm);
-            color: var(--text-muted);
-            margin-top: var(--space-1);
-        }
-        .footer-contact {
-            margin-top: var(--space-4);
-            padding-top: var(--space-4);
-            border-top: 1px solid var(--border);
-        }
-        .footer-contact-heading {
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: var(--space-3);
         }
         .footer-contact-list {
             display: flex;
@@ -523,10 +504,7 @@ BASE_TEMPLATE = """
         </main>
 
         <footer class="site-footer">
-            <div class="footer-brand">MeshCore Stats</div>
-            <div class="footer-meta">Generated {{ generated_at }}</div>
             <nav class="footer-contact" aria-label="Contact links">
-                <h2 class="footer-contact-heading">Contact</h2>
                 <ul class="footer-contact-list">
                     <li>
                         <a href="mailto:jorijn@jorijn.com" class="footer-contact-link" aria-label="Send email to jorijn@jorijn.com">
