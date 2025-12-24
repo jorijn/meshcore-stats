@@ -116,7 +116,7 @@ REPEATER_FIELDS = [
         tooltip="Battery voltage from telemetry channel",
         formatter=lambda v: f"{format_value(v)} V",
         computer=lambda snapshot: next(
-            (item.get("value") for item in snapshot.get("telemetry", [])
+            (item.get("value") for item in (snapshot.get("telemetry", []) if snapshot else [])
              if isinstance(item, dict) and item.get("type") == "voltage"),
             None
         ),
