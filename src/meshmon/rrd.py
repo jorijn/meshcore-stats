@@ -244,6 +244,12 @@ def graph_rrd(
     if vertical_label:
         args.extend(["--vertical-label", vertical_label])
 
+    # Fixed Y-axis ranges for battery metrics
+    if ds_name == "bat_v":
+        args.extend(["--lower-limit", "2.9", "--upper-limit", "4.3"])
+    elif ds_name == "bat_pct":
+        args.extend(["--lower-limit", "0", "--upper-limit", "100"])
+
     args.append(f"DEF:{ds_name}_raw={rrd_path}:{ds_name}:AVERAGE")
 
     # Apply scaling based on metric type
