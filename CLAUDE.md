@@ -383,7 +383,7 @@ This applies a centered moving average over 7200 seconds (2 hours), effectively 
 | `tx` | `derived.tx` | DERIVE | Packets/min | Total packets transmitted |
 | `rssi` | `derived.rssi` | GAUGE | RSSI (dBm) | Signal strength of last packet |
 | `snr` | `derived.snr` | GAUGE | SNR (dB) | Signal-to-noise ratio |
-| `uptime` | `status.uptime` | GAUGE | Hours | Time since reboot (seconds ÷ 3600) |
+| `uptime` | `status.uptime` | GAUGE | Days | Time since reboot (seconds ÷ 86400) |
 | `noise` | `status.noise_floor` | GAUGE | dBm | Background RF noise |
 | `airtime` | `status.airtime` | DERIVE | Seconds/min | TX airtime rate |
 | `rx_air` | `status.rx_airtime` | DERIVE | Seconds/min | RX airtime rate |
@@ -404,7 +404,7 @@ This applies a centered moving average over 7200 seconds (2 hours), effectively 
 | `contacts` | `derived.contacts_count` | GAUGE | Count | Known mesh nodes |
 | `rx` | `stats.packets.recv` | DERIVE | Packets/min | Total packets received |
 | `tx` | `stats.packets.sent` | DERIVE | Packets/min | Total packets transmitted |
-| `uptime` | `stats.core.uptime_secs` | GAUGE | Hours | Time since reboot (seconds ÷ 3600) |
+| `uptime` | `stats.core.uptime_secs` | GAUGE | Days | Time since reboot (seconds ÷ 86400) |
 
 ## Circuit Breaker
 

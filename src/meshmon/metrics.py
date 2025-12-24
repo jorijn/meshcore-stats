@@ -33,8 +33,8 @@ GRAPH_SCALING = {
     # Airtime: per-second → per-minute (×60)
     "airtime": 60,
     "rx_air": 60,
-    # Uptime: seconds → hours (÷3600)
-    "uptime": 1 / 3600,
+    # Uptime: seconds → days (÷86400)
+    "uptime": 1 / 86400,
 }
 
 

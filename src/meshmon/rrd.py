@@ -312,7 +312,7 @@ def render_all_charts(role: str, metrics: dict[str, str]) -> list[Path]:
         "tx": "Packets/min",
         "rssi": "RSSI (dBm)",
         "snr": "SNR (dB)",
-        "uptime": "Hours",
+        "uptime": "Days",
         "noise": "dBm",
         "airtime": "Seconds/min",
         "rx_air": "Seconds/min",

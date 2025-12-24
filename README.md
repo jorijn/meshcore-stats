@@ -299,7 +299,7 @@ If repeater collection shows "cooldown active":
 | `tx` | `derived.tx` | DERIVE | Packets/min | Total packets sent (from status.nb_sent) |
 | `rssi` | `derived.rssi` | GAUGE | RSSI (dBm) | Last received signal strength |
 | `snr` | `derived.snr` | GAUGE | SNR (dB) | Last signal-to-noise ratio |
-| `uptime` | `status.uptime` | GAUGE | Hours | Device uptime (seconds ÷ 3600) |
+| `uptime` | `status.uptime` | GAUGE | Days | Device uptime (seconds ÷ 86400) |
 | `noise` | `status.noise_floor` | GAUGE | dBm | Background RF noise floor |
 | `airtime` | `status.airtime` | DERIVE | Seconds/min | Transmit airtime rate |
 | `rx_air` | `status.rx_airtime` | DERIVE | Seconds/min | Receive airtime rate |
@@ -320,7 +320,7 @@ If repeater collection shows "cooldown active":
 | `contacts` | `derived.contacts_count` | GAUGE | Count | Number of known contacts |
 | `rx` | `stats.packets.recv` | DERIVE | Packets/min | Packets received |
 | `tx` | `stats.packets.sent` | DERIVE | Packets/min | Packets sent |
-| `uptime` | `stats.core.uptime_secs` | GAUGE | Hours | Device uptime (seconds ÷ 3600) |
+| `uptime` | `stats.core.uptime_secs` | GAUGE | Days | Device uptime (seconds ÷ 86400) |
 
 ### RRD Data Source Types
 
