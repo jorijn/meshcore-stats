@@ -327,16 +327,6 @@ If repeater collection shows "cooldown active":
 - **GAUGE**: Instantaneous values stored as-is (battery voltage, RSSI, queue depth)
 - **DERIVE**: Counter values that compute rate of change (packets, airtime). RRD stores the per-second rate; charts multiply by 60 to display per-minute values.
 
-### Battery Smoothing
-
-Battery voltage (`bat_v`) and percentage (`bat_pct`) charts use a 2-hour rolling average (TREND function) to smooth out short-term fluctuations. This is necessary because:
-
-- **LoRa query timing variability**: Remote status requests can have unpredictable delays due to mesh routing and airtime contention
-- **Measurement noise**: Battery voltage readings can fluctuate slightly between measurements
-- **Better trend visibility**: Smoothing reveals the actual battery discharge pattern without visual noise
-
-The underlying data in the RRD remains unmodified - only the chart display applies the TREND smoothing.
-
 ## License
 
 MIT

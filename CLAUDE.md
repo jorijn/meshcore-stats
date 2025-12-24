@@ -356,23 +356,6 @@ Charts are generated at 800x280 pixels with the following features:
 - Larger fonts (12-14pt) for readability when scaled down
 - White background, no borders, slope mode for smooth lines
 
-### Battery Smoothing
-
-Battery voltage and percentage charts (`bat_v`, `bat_pct`) use RRD's TREND function to apply a 2-hour centered rolling average. This smoothing is applied at chart render time and does not affect the stored data.
-
-**Why smoothing is needed:**
-- Remote repeater queries over LoRa have variable response times due to mesh routing and airtime contention
-- Battery readings can fluctuate slightly between measurements due to load variations
-- Without smoothing, charts show noisy sawtooth patterns that obscure the actual discharge trend
-- 2-hour window provides good balance between responsiveness and stability
-
-The smoothing is implemented in `src/meshmon/rrd.py` by creating a TREND CDEF:
-```
-CDEF:bat_v=bat_v_scaled,7200,TREND
-```
-
-This applies a centered moving average over 7200 seconds (2 hours), effectively filtering out short-term noise while preserving the overall discharge pattern.
-
 ### Repeater Metrics Summary
 
 | Metric | Source | RRD Type | Display Unit | Description |

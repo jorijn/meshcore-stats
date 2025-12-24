@@ -246,7 +246,7 @@ def graph_rrd(
 
     # Fixed Y-axis ranges for battery metrics
     if ds_name == "bat_v":
-        args.extend(["--lower-limit", "2.9", "--upper-limit", "4.3"])
+        args.extend(["--lower-limit", "3.0", "--upper-limit", "4.2"])
     elif ds_name == "bat_pct":
         args.extend(["--lower-limit", "0", "--upper-limit", "100"])
 
@@ -264,13 +264,7 @@ def graph_rrd(
         divisor = int(1 / scale)
         args.append(f"CDEF:{ds_name}_scaled={ds_name}_raw,{divisor},/")
 
-    # Apply smoothing to battery metrics to reduce fluctuations
-    # TREND applies a centered moving average over a time window
-    if ds_name in ("bat_v", "bat_pct"):
-        # Smoothing window: 2 hours for better stability
-        args.append(f"CDEF:{ds_name}={ds_name}_scaled,7200,TREND")
-    else:
-        args.append(f"CDEF:{ds_name}={ds_name}_scaled")
+    args.append(f"CDEF:{ds_name}={ds_name}_scaled")
 
     # Area fill with semi-transparent primary color, then line on top
     args.append(f"AREA:{ds_name}#{color_primary}40")  # 40 = ~25% opacity

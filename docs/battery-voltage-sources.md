@@ -114,10 +114,6 @@ bat_v = status.bat / 1000  # Convert millivolts to volts
 
 The telemetry value can serve as a secondary validation check but should not be the primary source for charting or alerting.
 
-## Additional Smoothing
-
-Even with the more stable `status.bat` source, a 2-hour rolling average (TREND function in RRD) is applied to charts to further smooth out short-term fluctuations. This reveals the true discharge/charge pattern without visual noise.
-
 ## Data Source
 
 Analysis based on snapshots from:
