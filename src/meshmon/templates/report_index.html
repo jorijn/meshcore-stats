@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="reports-intro-card card">
+    <div class="card-body">
+        <p>Monthly and yearly statistics reports for the mesh network. Each report is available as a web page, plain text, or JSON.</p>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+{% for section in report_sections %}
+<section class="card" aria-labelledby="reports-{{ section.role }}-heading">
+    <div class="card-header">
+        <h2 id="reports-{{ section.role }}-heading" class="card-title">{{ section.role | capitalize }}</h2>
+    </div>
+    <div class="card-body">
+        {% if section.years %}
+        {% for year_data in section.years %}
+        <div class="report-year-section">
+            <h3 class="report-year-heading">{{ year_data.year }}</h3>
+            <ul class="report-list">
+                <li class="report-item">
+                    <span class="report-name">Annual Summary</span>
+                    <span class="report-links">
+                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/" class="report-link-view">View</a>
+                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/report.txt" class="report-link-dl">TXT</a>
+                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/report.json" class="report-link-dl">JSON</a>
+                    </span>
+                </li>
+                {% for month in year_data.months | reverse %}
+                <li class="report-item">
+                    <span class="report-name">{{ month.name }}</span>
+                    <span class="report-links">
+                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/{{ '%02d' | format(month.month) }}/" class="report-link-view">View</a>
+                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/{{ '%02d' | format(month.month) }}/report.txt" class="report-link-dl">TXT</a>
+                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/{{ '%02d' | format(month.month) }}/report.json" class="report-link-dl">JSON</a>
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% if not loop.last %}
+        <hr class="report-year-divider">
+        {% endif %}
+        {% endfor %}
+        {% else %}
+        <p class="report-empty">No reports available yet.</p>
+        {% endif %}
+    </div>
+</section>
+{% endfor %}
+</div>
+{% endblock %}

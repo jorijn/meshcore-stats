@@ -33,6 +33,7 @@ Phase 1: Collect → JSON snapshots
 Phase 2: Update  → RRD databases
          Render  → PNG charts
 Phase 3: Render  → Static HTML site
+Phase 4: Render  → Reports (monthly/yearly statistics)
 ```
 
 ## Directory Structure
@@ -48,7 +49,8 @@ meshcore-stats/
 │   ├── extract.py         # Metric extraction from snapshots
 │   ├── retry.py           # Retry logic & circuit breaker
 │   ├── rrd.py             # RRD database operations
-│   └── html.py            # HTML/chart generation
+│   ├── html.py            # HTML/chart generation
+│   └── reports.py         # Report generation (WeeWX-style)
 ├── scripts/               # Executable scripts (cron-friendly)
 │   ├── phase1_collect_companion.py
 │   ├── phase1_collect_repeater.py
@@ -56,6 +58,7 @@ meshcore-stats/
 │   ├── phase2_rrd_update_repeater.py
 │   ├── phase2_render_charts.py
 │   ├── phase3_render_site.py
+│   ├── phase4_render_reports.py  # Monthly/yearly reports
 │   ├── backfill_rrd.py    # Rebuild RRD from historical snapshots
 │   └── rsync_output.sh    # Deploy to web server
 ├── data/
@@ -74,9 +77,17 @@ meshcore-stats/
 │   ├── year.html
 │   ├── .htaccess          # Apache config (DirectoryIndex, cache control)
 │   ├── companion/         # Companion pages (day/week/month/year.html)
-│   └── assets/            # PNG chart images
-│       ├── companion/
-│       └── repeater/
+│   ├── assets/            # PNG chart images
+│   │   ├── companion/
+│   │   └── repeater/
+│   └── reports/           # Monthly/yearly statistics reports
+│       ├── index.html     # Reports listing page
+│       ├── repeater/      # Repeater reports by year/month
+│       │   └── YYYY/
+│       │       ├── index.html, report.txt, report.json  # Yearly
+│       │       └── MM/
+│       │           └── index.html, report.txt, report.json  # Monthly
+│       └── companion/     # Same structure as repeater
 └── .envrc                 # Environment configuration
 ```
 
@@ -105,6 +116,12 @@ All configuration via environment variables (see `.envrc`):
 ### Intervals
 - `COMPANION_STEP`: RRD step for companion (default: 60s)
 - `REPEATER_STEP`: RRD step for repeater (default: 900s / 15min)
+
+### Report Location Metadata
+- `REPORT_LOCATION_NAME`: Location name for report headers (default: "Oosterhout, The Netherlands")
+- `REPORT_LAT`: Latitude in decimal degrees (default: 51.6674308)
+- `REPORT_LON`: Longitude in decimal degrees (default: 4.8596901)
+- `REPORT_ELEV`: Elevation in meters (default: 10.0)
 
 ### Metric Mappings
 
@@ -272,6 +289,22 @@ python scripts/phase2_render_charts.py
 # Generate static site pages
 python scripts/phase3_render_site.py
 ```
+
+### Phase 4: Reports
+
+Generates monthly and yearly statistics reports in HTML, TXT (WeeWX-style ASCII), and JSON formats:
+
+```bash
+# Generate all reports
+python scripts/phase4_render_reports.py
+```
+
+Reports are generated for all available months/years based on snapshot data. Output structure:
+- `/reports/` - Index page listing all available reports
+- `/reports/{role}/{year}/` - Yearly report (HTML, TXT, JSON)
+- `/reports/{role}/{year}/{month}/` - Monthly report (HTML, TXT, JSON)
+
+Counter metrics (rx, tx, airtime) are aggregated from absolute counter values in snapshots, with proper handling of device reboots (negative deltas).
 
 ### Backfill Historical Data
 
@@ -458,6 +491,9 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 # HTML: every 5 minutes
 */5 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase3_render_site.py
+
+# Reports: daily at midnight (historical stats don't change often)
+0 0 * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase4_render_reports.py
 
 # Deploy: every 5 minutes (after removing --dry-run from script)
 */5 * * * * cd /home/jorijn/apps/meshcore-stats && ./scripts/rsync_output.sh

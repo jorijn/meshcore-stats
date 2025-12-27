@@ -1,5 +1,6 @@
 """HTML rendering helpers using Jinja2 templates."""
 
+import calendar
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -316,3 +317,416 @@ def write_site(
         log.debug(f"Wrote {page_path}")
 
     return written
+
+
+# =============================================================================
+# Report rendering functions
+# =============================================================================
+
+
+def build_monthly_table_data(
+    agg: "MonthlyAggregate", role: str
+) -> tuple[list[dict], list[dict]]:
+    """Build table headers and rows for a monthly report.
+
+    Args:
+        agg: Monthly aggregate data
+        role: "companion" or "repeater"
+
+    Returns:
+        (headers, rows) where each header/cell is a dict with label/value/tooltip/class
+    """
+    from .reports import MetricStats
+
+    if role == "repeater":
+        headers = [
+            {"label": "Day", "tooltip": None},
+            {"label": "V (avg)", "tooltip": "Average battery voltage"},
+            {"label": "% (avg)", "tooltip": "Average battery percentage"},
+            {"label": "V (min)", "tooltip": "Minimum battery voltage"},
+            {"label": "Time", "tooltip": "Time of minimum voltage"},
+            {"label": "V (max)", "tooltip": "Maximum battery voltage"},
+            {"label": "Time", "tooltip": "Time of maximum voltage"},
+            {"label": "RSSI", "tooltip": "Average signal strength (dBm)"},
+            {"label": "SNR", "tooltip": "Average signal-to-noise ratio (dB)"},
+            {"label": "Noise", "tooltip": "Average noise floor (dBm)"},
+            {"label": "RX", "tooltip": "Total packets received"},
+            {"label": "TX", "tooltip": "Total packets transmitted"},
+            {"label": "Air", "tooltip": "Total TX airtime (seconds)"},
+        ]
+
+        rows = []
+        for daily in agg.daily:
+            m = daily.metrics
+            bat_v = m.get("bat_v", MetricStats())
+            bat_pct = m.get("bat_pct", MetricStats())
+            rssi = m.get("rssi", MetricStats())
+            snr = m.get("snr", MetricStats())
+            noise = m.get("noise", MetricStats())
+            rx = m.get("rx", MetricStats())
+            tx = m.get("tx", MetricStats())
+            airtime = m.get("airtime", MetricStats())
+
+            rows.append({
+                "is_summary": False,
+                "cells": [
+                    {"value": f"{daily.date.day:02d}", "class": None},
+                    {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
+                    {"value": bat_v.min_time.strftime("%H:%M") if bat_v.min_time else "-", "class": None},
+                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
+                    {"value": bat_v.max_time.strftime("%H:%M") if bat_v.max_time else "-", "class": None},
+                    {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
+                    {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
+                    {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                    {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                    {"value": f"{airtime.total:,}" if airtime.total else "-", "class": None},
+                ],
+            })
+
+        # Add summary row
+        s = agg.summary
+        bat_v = s.get("bat_v", MetricStats())
+        bat_pct = s.get("bat_pct", MetricStats())
+        rssi = s.get("rssi", MetricStats())
+        snr = s.get("snr", MetricStats())
+        noise = s.get("noise", MetricStats())
+        rx = s.get("rx", MetricStats())
+        tx = s.get("tx", MetricStats())
+        airtime = s.get("airtime", MetricStats())
+
+        rows.append({
+            "is_summary": True,
+            "cells": [
+                {"value": "Total", "class": None},
+                {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
+                {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": None},
+                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
+                {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": None},
+                {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
+                {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
+                {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                {"value": f"{airtime.total:,}" if airtime.total else "-", "class": None},
+            ],
+        })
+
+    else:  # companion
+        headers = [
+            {"label": "Day", "tooltip": None},
+            {"label": "V (avg)", "tooltip": "Average battery voltage"},
+            {"label": "% (avg)", "tooltip": "Average battery percentage"},
+            {"label": "V (min)", "tooltip": "Minimum battery voltage"},
+            {"label": "Time", "tooltip": "Time of minimum voltage"},
+            {"label": "V (max)", "tooltip": "Maximum battery voltage"},
+            {"label": "Time", "tooltip": "Time of maximum voltage"},
+            {"label": "Contacts", "tooltip": "Average number of mesh contacts"},
+            {"label": "RX", "tooltip": "Total packets received"},
+            {"label": "TX", "tooltip": "Total packets transmitted"},
+        ]
+
+        rows = []
+        for daily in agg.daily:
+            m = daily.metrics
+            bat_v = m.get("bat_v", MetricStats())
+            bat_pct = m.get("bat_pct", MetricStats())
+            contacts = m.get("contacts", MetricStats())
+            rx = m.get("rx", MetricStats())
+            tx = m.get("tx", MetricStats())
+
+            rows.append({
+                "is_summary": False,
+                "cells": [
+                    {"value": f"{daily.date.day:02d}", "class": None},
+                    {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
+                    {"value": bat_v.min_time.strftime("%H:%M") if bat_v.min_time else "-", "class": None},
+                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
+                    {"value": bat_v.max_time.strftime("%H:%M") if bat_v.max_time else "-", "class": None},
+                    {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                    {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                ],
+            })
+
+        # Summary row
+        s = agg.summary
+        bat_v = s.get("bat_v", MetricStats())
+        bat_pct = s.get("bat_pct", MetricStats())
+        contacts = s.get("contacts", MetricStats())
+        rx = s.get("rx", MetricStats())
+        tx = s.get("tx", MetricStats())
+
+        rows.append({
+            "is_summary": True,
+            "cells": [
+                {"value": "Total", "class": None},
+                {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
+                {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": None},
+                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
+                {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": None},
+                {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+            ],
+        })
+
+    return headers, rows
+
+
+def build_yearly_table_data(
+    agg: "YearlyAggregate", role: str
+) -> tuple[list[dict], list[dict]]:
+    """Build table headers and rows for a yearly report.
+
+    Args:
+        agg: Yearly aggregate data
+        role: "companion" or "repeater"
+
+    Returns:
+        (headers, rows) where each header/cell is a dict with label/value/tooltip/class
+    """
+    from .reports import MetricStats
+
+    if role == "repeater":
+        headers = [
+            {"label": "Month", "tooltip": None},
+            {"label": "V (avg)", "tooltip": "Average battery voltage"},
+            {"label": "% (avg)", "tooltip": "Average battery percentage"},
+            {"label": "V (max)", "tooltip": "Maximum battery voltage"},
+            {"label": "Day", "tooltip": "Day of maximum voltage"},
+            {"label": "V (min)", "tooltip": "Minimum battery voltage"},
+            {"label": "Day", "tooltip": "Day of minimum voltage"},
+            {"label": "RSSI", "tooltip": "Average signal strength (dBm)"},
+            {"label": "SNR", "tooltip": "Average signal-to-noise ratio (dB)"},
+            {"label": "RX", "tooltip": "Total packets received"},
+            {"label": "TX", "tooltip": "Total packets transmitted"},
+        ]
+
+        rows = []
+        for monthly in agg.monthly:
+            s = monthly.summary
+            bat_v = s.get("bat_v", MetricStats())
+            bat_pct = s.get("bat_pct", MetricStats())
+            rssi = s.get("rssi", MetricStats())
+            snr = s.get("snr", MetricStats())
+            rx = s.get("rx", MetricStats())
+            tx = s.get("tx", MetricStats())
+
+            rows.append({
+                "is_summary": False,
+                "cells": [
+                    {"value": calendar.month_abbr[monthly.month], "class": None},
+                    {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
+                    {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": None},
+                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
+                    {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": None},
+                    {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
+                    {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                    {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                ],
+            })
+
+        # Summary row
+        s = agg.summary
+        bat_v = s.get("bat_v", MetricStats())
+        bat_pct = s.get("bat_pct", MetricStats())
+        rssi = s.get("rssi", MetricStats())
+        snr = s.get("snr", MetricStats())
+        rx = s.get("rx", MetricStats())
+        tx = s.get("tx", MetricStats())
+
+        max_month = calendar.month_abbr[bat_v.max_time.month] if bat_v.max_time else "-"
+        min_month = calendar.month_abbr[bat_v.min_time.month] if bat_v.min_time else "-"
+
+        rows.append({
+            "is_summary": True,
+            "cells": [
+                {"value": "Total", "class": None},
+                {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
+                {"value": max_month, "class": None},
+                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
+                {"value": min_month, "class": None},
+                {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
+                {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+            ],
+        })
+
+    else:  # companion
+        headers = [
+            {"label": "Month", "tooltip": None},
+            {"label": "V (avg)", "tooltip": "Average battery voltage"},
+            {"label": "% (avg)", "tooltip": "Average battery percentage"},
+            {"label": "V (max)", "tooltip": "Maximum battery voltage"},
+            {"label": "Day", "tooltip": "Day of maximum voltage"},
+            {"label": "V (min)", "tooltip": "Minimum battery voltage"},
+            {"label": "Day", "tooltip": "Day of minimum voltage"},
+            {"label": "Contacts", "tooltip": "Average number of mesh contacts"},
+            {"label": "RX", "tooltip": "Total packets received"},
+            {"label": "TX", "tooltip": "Total packets transmitted"},
+        ]
+
+        rows = []
+        for monthly in agg.monthly:
+            s = monthly.summary
+            bat_v = s.get("bat_v", MetricStats())
+            bat_pct = s.get("bat_pct", MetricStats())
+            contacts = s.get("contacts", MetricStats())
+            rx = s.get("rx", MetricStats())
+            tx = s.get("tx", MetricStats())
+
+            rows.append({
+                "is_summary": False,
+                "cells": [
+                    {"value": calendar.month_abbr[monthly.month], "class": None},
+                    {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
+                    {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": None},
+                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
+                    {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": None},
+                    {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                    {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                ],
+            })
+
+        # Summary row
+        s = agg.summary
+        bat_v = s.get("bat_v", MetricStats())
+        bat_pct = s.get("bat_pct", MetricStats())
+        contacts = s.get("contacts", MetricStats())
+        rx = s.get("rx", MetricStats())
+        tx = s.get("tx", MetricStats())
+
+        max_month = calendar.month_abbr[bat_v.max_time.month] if bat_v.max_time else "-"
+        min_month = calendar.month_abbr[bat_v.min_time.month] if bat_v.min_time else "-"
+
+        rows.append({
+            "is_summary": True,
+            "cells": [
+                {"value": "Total", "class": None},
+                {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
+                {"value": max_month, "class": None},
+                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
+                {"value": min_month, "class": None},
+                {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+            ],
+        })
+
+    return headers, rows
+
+
+def render_report_page(
+    agg: Any,
+    node_name: str,
+    report_type: str,
+    prev_report: Optional[dict] = None,
+    next_report: Optional[dict] = None,
+) -> str:
+    """Render a report page (monthly or yearly).
+
+    Args:
+        agg: MonthlyAggregate or YearlyAggregate
+        node_name: Name of the node
+        report_type: "monthly" or "yearly"
+        prev_report: Dict with 'url' and 'label' for previous report link
+        next_report: Dict with 'url' and 'label' for next report link
+
+    Returns:
+        Rendered HTML string
+    """
+    from .reports import format_lat_lon
+
+    cfg = get_config()
+    env = get_jinja_env()
+
+    lat_str, lon_str = format_lat_lon(cfg.report_lat, cfg.report_lon)
+    now = datetime.now()
+
+    if report_type == "monthly":
+        report_title = f"Monthly Report - {calendar.month_name[agg.month]} {agg.year}"
+        download_prefix = f"{agg.role}-{agg.year}-{agg.month:02d}"
+        headers, rows = build_monthly_table_data(agg, agg.role)
+    else:
+        report_title = f"Yearly Report - {agg.year}"
+        download_prefix = f"{agg.role}-{agg.year}"
+        headers, rows = build_yearly_table_data(agg, agg.role)
+
+    context = {
+        "title": report_title,
+        "meta_description": f"MeshCore {report_type} report for {node_name}",
+        "page_type": "reports",
+        "node_name": node_name,
+        "role": agg.role,
+        "base_path": "",
+        "status_class": "online",
+        "status_text": "Report",
+        "pubkey_pre": None,
+        "last_updated": None,
+        "report_title": report_title,
+        "location_name": cfg.report_location_name,
+        "lat_str": lat_str,
+        "lon_str": lon_str,
+        "elev": f"{cfg.report_elev:.0f}",
+        "generated_at": now.strftime("%Y-%m-%d %H:%M"),
+        "generated_iso": now.isoformat(),
+        "download_prefix": download_prefix,
+        "table_headers": headers,
+        "table_rows": rows,
+        "prev_report": prev_report,
+        "next_report": next_report,
+    }
+
+    template = env.get_template("report.html")
+    return template.render(**context)
+
+
+def render_reports_index(report_sections: list[dict]) -> str:
+    """Render the reports index page.
+
+    Args:
+        report_sections: List of dicts with 'role' and 'years' keys.
+            Each year has 'year' and 'months' (list of dicts with 'month' and 'name')
+
+    Returns:
+        Rendered HTML string
+    """
+    cfg = get_config()
+    env = get_jinja_env()
+
+    context = {
+        "title": "Reports",
+        "meta_description": "Monthly and yearly statistics reports for MeshCore nodes",
+        "page_type": "reports",
+        "node_name": "Reports",
+        "role": None,
+        "base_path": "",
+        "status_class": "online",
+        "status_text": "Reports",
+        "pubkey_pre": None,
+        "last_updated": None,
+        "report_sections": report_sections,
+    }
+
+    template = env.get_template("report_index.html")
+    return template.render(**context)

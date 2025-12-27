@@ -29,6 +29,17 @@ def get_bool(key: str, default: bool = False) -> bool:
     return val in ("1", "true", "yes", "on")
 
 
+def get_float(key: str, default: float) -> float:
+    """Get float env var."""
+    val = os.environ.get(key)
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except ValueError:
+        return default
+
+
 def get_path(key: str, default: str) -> Path:
     """Get path env var, expanding user and making absolute."""
     val = os.environ.get(key, default)
@@ -91,6 +102,22 @@ class Config:
         # Metric mappings
         self.companion_metrics = parse_metrics("COMPANION_METRICS")
         self.repeater_metrics = parse_metrics("REPEATER_METRICS")
+
+        # Report location metadata
+        self.report_location_name = get_str(
+            "REPORT_LOCATION_NAME", "Oosterhout, The Netherlands"
+        )
+        self.report_lat = get_float("REPORT_LAT", 51.6674308)
+        self.report_lon = get_float("REPORT_LON", 4.8596901)
+        self.report_elev = get_float("REPORT_ELEV", 10.0)
+
+        # Node display names for reports
+        self.repeater_display_name = get_str(
+            "REPEATER_DISPLAY_NAME", "jorijn.com Repeater N"
+        )
+        self.companion_display_name = get_str(
+            "COMPANION_DISPLAY_NAME", "Companion Node"
+        )
 
         # Defaults if not specified
         # Based on actual payload structure from device
