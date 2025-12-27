@@ -72,7 +72,7 @@
 
         /* Dark theme via system preference */
         @media (prefers-color-scheme: dark) {
-            :root:not([data-theme="light"]) {
+            :root {
                 --bg: #0f172a;
                 --bg-elevated: #1e293b;
                 --bg-sunken: #020617;
@@ -93,52 +93,6 @@
                 --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
                 --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.3);
             }
-        }
-
-        /* Explicit light theme override (for manual toggle) */
-        [data-theme="light"] {
-            --bg: #f8fafc;
-            --bg-elevated: #ffffff;
-            --bg-sunken: #f1f5f9;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --text-subtle: #94a3b8;
-            --border: #e2e8f0;
-            --border-strong: #cbd5e1;
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --primary-light: #dbeafe;
-            --success: #16a34a;
-            --success-light: #dcfce7;
-            --warning: #ca8a04;
-            --warning-light: #fef9c3;
-            --danger: #dc2626;
-            --danger-light: #fee2e2;
-            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-        }
-
-        /* Explicit dark theme override (for manual toggle) */
-        [data-theme="dark"] {
-            --bg: #0f172a;
-            --bg-elevated: #1e293b;
-            --bg-sunken: #020617;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-            --text-subtle: #64748b;
-            --border: #334155;
-            --border-strong: #475569;
-            --primary: #3b82f6;
-            --primary-hover: #60a5fa;
-            --primary-light: #1e3a5f;
-            --success: #22c55e;
-            --success-light: #14532d;
-            --warning: #eab308;
-            --warning-light: #422006;
-            --danger: #ef4444;
-            --danger-light: #450a0a;
-            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.3);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -222,33 +176,6 @@
         .status-stale { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-light); }
         .status-offline { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-light); }
 
-        /* Theme toggle button */
-        .theme-toggle {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: var(--space-2);
-            cursor: pointer;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s, border-color 0.2s;
-            flex-shrink: 0;
-        }
-        .theme-toggle:hover { color: var(--text); border-color: var(--border-strong); }
-        .theme-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-        .theme-toggle svg { width: 20px; height: 20px; }
-        /* Show moon in light mode (option to go dark), sun in dark mode (option to go light) */
-        .theme-toggle .icon-sun { display: none; }
-        .theme-toggle .icon-moon { display: block; }
-        [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
-        [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme]) .theme-toggle .icon-sun { display: block; }
-            :root:not([data-theme]) .theme-toggle .icon-moon { display: none; }
-        }
-
         .header-updated {
             display: flex;
             align-items: center;
@@ -272,40 +199,106 @@
             box-shadow: var(--shadow-sm);
             display: flex;
             align-items: center;
-            gap: var(--space-2);
+            justify-content: space-between;
+            gap: var(--space-4);
             flex-wrap: wrap;
         }
-        .nav-group {
+        .nav-primary {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            flex-wrap: wrap;
+        }
+        /* Node selector - segmented control style */
+        .nav-nodes {
+            display: flex;
+            background: var(--bg-sunken);
+            border-radius: var(--radius);
+            padding: 3px;
+            gap: 2px;
+        }
+        .nav-node {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-4);
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--text-muted);
+            background: transparent;
+            transition: all 0.15s ease;
+            min-height: 38px;
+        }
+        .nav-node:hover {
+            color: var(--text);
+        }
+        .nav-node.active {
+            color: var(--text);
+            background: var(--bg-elevated);
+            box-shadow: var(--shadow-sm);
+        }
+        /* Period tabs - pill style */
+        .nav-periods {
             display: flex;
             gap: var(--space-1);
         }
-        .nav-separator {
-            color: var(--border-strong);
-            padding: 0 var(--space-2);
-            user-select: none;
-        }
-        .nav-link {
+        .nav-period {
             display: inline-flex;
             align-items: center;
-            padding: var(--space-2) var(--space-4);
+            padding: var(--space-2) var(--space-3);
             border-radius: var(--radius);
             text-decoration: none;
             font-size: var(--font-size-sm);
             font-weight: 500;
             color: var(--text-muted);
             background: transparent;
-            border: 1px solid transparent;
             transition: all 0.15s ease;
-            min-height: 44px;
+            min-height: 38px;
         }
-        .nav-link:hover {
+        .nav-period:hover {
             color: var(--text);
             background: var(--bg-sunken);
         }
-        .nav-link.active {
+        .nav-period.active {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+        /* Reports link - utility style */
+        .nav-utility {
+            display: flex;
+            align-items: center;
+        }
+        .nav-reports {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--radius);
+            text-decoration: none;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--text-muted);
+            background: transparent;
+            border: 1px solid var(--border);
+            transition: all 0.15s ease;
+            min-height: 38px;
+        }
+        .nav-reports:hover {
+            color: var(--text);
+            background: var(--bg-sunken);
+            border-color: var(--border-strong);
+        }
+        .nav-reports.active {
             color: var(--primary);
             background: var(--primary-light);
             border-color: var(--primary);
+        }
+        .nav-reports-icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
         }
 
         /* Focus styles */
@@ -529,13 +522,23 @@
             .main-nav {
                 flex-direction: column;
                 align-items: stretch;
+                gap: var(--space-3);
             }
-            .nav-group {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-                padding-bottom: var(--space-1);
+            .nav-primary {
+                flex-direction: column;
+                align-items: stretch;
+                gap: var(--space-3);
             }
-            .nav-separator { display: none; }
+            .nav-nodes {
+                justify-content: center;
+            }
+            .nav-periods {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            .nav-utility {
+                justify-content: center;
+            }
             .metrics-bar { grid-template-columns: repeat(2, 1fr); }
             .card-body { padding: var(--space-4); }
             .snapshot-table th, .snapshot-table td {
@@ -864,13 +867,6 @@
         }
 
     </style>
-    <script>
-    // Apply saved theme immediately to prevent flash
-    (function() {
-        var saved = localStorage.getItem('theme');
-        if (saved) document.documentElement.setAttribute('data-theme', saved);
-    })();
-    </script>
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -888,40 +884,33 @@
                     <span class="label">Last updated</span>
                     {% if last_updated %}{{ last_updated }}{% else %}N/A{% endif %}
                 </div>
-                <button type="button" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle theme">
-                    <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="5"/>
-                        <line x1="12" y1="1" x2="12" y2="3"/>
-                        <line x1="12" y1="21" x2="12" y2="23"/>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                        <line x1="1" y1="12" x2="3" y2="12"/>
-                        <line x1="21" y1="12" x2="23" y2="12"/>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                    </svg>
-                    <svg class="icon-moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                    </svg>
-                </button>
             </div>
         </header>
 
         <nav class="main-nav" aria-label="Main navigation">
-            <div class="nav-group" aria-label="Node selection">
-                <a href="/day.html" class="nav-link{% if role == 'repeater' and page_type != 'reports' %} active{% endif %}"{% if role == 'repeater' and page_type != 'reports' %} aria-current="page"{% endif %}>Repeater</a>
-                <a href="/companion/day.html" class="nav-link{% if role == 'companion' and page_type != 'reports' %} active{% endif %}"{% if role == 'companion' and page_type != 'reports' %} aria-current="page"{% endif %}>Companion</a>
+            <div class="nav-primary">
+                <div class="nav-nodes" role="tablist" aria-label="Node selection">
+                    <a href="/day.html" class="nav-node{% if role == 'repeater' and page_type != 'reports' %} active{% endif %}" role="tab"{% if role == 'repeater' and page_type != 'reports' %} aria-selected="true"{% endif %}>Repeater</a>
+                    <a href="/companion/day.html" class="nav-node{% if role == 'companion' and page_type != 'reports' %} active{% endif %}" role="tab"{% if role == 'companion' and page_type != 'reports' %} aria-selected="true"{% endif %}>Companion</a>
+                </div>
+                <div class="nav-periods" role="tablist" aria-label="Time period">
+                    <a href="{{ base_path }}/day.html" class="nav-period{% if period == 'day' %} active{% endif %}" role="tab"{% if period == 'day' %} aria-selected="true"{% endif %}>Day</a>
+                    <a href="{{ base_path }}/week.html" class="nav-period{% if period == 'week' %} active{% endif %}" role="tab"{% if period == 'week' %} aria-selected="true"{% endif %}>Week</a>
+                    <a href="{{ base_path }}/month.html" class="nav-period{% if period == 'month' %} active{% endif %}" role="tab"{% if period == 'month' %} aria-selected="true"{% endif %}>Month</a>
+                    <a href="{{ base_path }}/year.html" class="nav-period{% if period == 'year' %} active{% endif %}" role="tab"{% if period == 'year' %} aria-selected="true"{% endif %}>Year</a>
+                </div>
             </div>
-            <span class="nav-separator" aria-hidden="true">|</span>
-            <div class="nav-group" aria-label="Time period">
-                <a href="{{ base_path }}/day.html" class="nav-link{% if period == 'day' %} active{% endif %}">Day</a>
-                <a href="{{ base_path }}/week.html" class="nav-link{% if period == 'week' %} active{% endif %}">Week</a>
-                <a href="{{ base_path }}/month.html" class="nav-link{% if period == 'month' %} active{% endif %}">Month</a>
-                <a href="{{ base_path }}/year.html" class="nav-link{% if period == 'year' %} active{% endif %}">Year</a>
-            </div>
-            <span class="nav-separator" aria-hidden="true">|</span>
-            <div class="nav-group" aria-label="Reports">
-                <a href="/reports/" class="nav-link{% if page_type == 'reports' %} active{% endif %}"{% if page_type == 'reports' %} aria-current="page"{% endif %}>Reports</a>
+            <div class="nav-utility">
+                <a href="/reports/" class="nav-reports{% if page_type == 'reports' %} active{% endif %}"{% if page_type == 'reports' %} aria-current="page"{% endif %}>
+                    <svg class="nav-reports-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14,2 14,8 20,8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10,9 9,9 8,9"/>
+                    </svg>
+                    Reports
+                </a>
             </div>
         </nav>
 
@@ -960,40 +949,5 @@
             </nav>
         </footer>
     </div>
-    <script>
-    (function() {
-        const toggle = document.querySelector('.theme-toggle');
-        const root = document.documentElement;
-
-        // Update chart images to match theme
-        function updateCharts(theme) {
-            document.querySelectorAll('.themed-chart').forEach(function(img) {
-                if (img.dataset[theme]) {
-                    img.src = img.dataset[theme];
-                }
-            });
-        }
-
-        // Restore saved preference and update charts on page load
-        const saved = localStorage.getItem('theme');
-        if (saved) {
-            root.setAttribute('data-theme', saved);
-            toggle.setAttribute('aria-pressed', saved === 'dark');
-            // Update charts to match saved theme (overrides <picture> source selection)
-            updateCharts(saved);
-        }
-
-        toggle.addEventListener('click', function() {
-            const current = root.getAttribute('data-theme');
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const newTheme = current ? (current === 'dark' ? 'light' : 'dark')
-                                     : (prefersDark ? 'light' : 'dark');
-            root.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            toggle.setAttribute('aria-pressed', newTheme === 'dark');
-            updateCharts(newTheme);
-        });
-    })();
-    </script>
 </body>
 </html>
