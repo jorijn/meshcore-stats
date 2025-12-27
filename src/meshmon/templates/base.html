@@ -566,6 +566,13 @@
         }
 
     </style>
+    <script>
+    // Apply saved theme immediately to prevent flash
+    (function() {
+        var saved = localStorage.getItem('theme');
+        if (saved) document.documentElement.setAttribute('data-theme', saved);
+    })();
+    </script>
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
