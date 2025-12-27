@@ -106,12 +106,14 @@ async def with_retries(
     for attempt in range(1, attempts + 1):
         try:
             result = await fn()
+            if attempt > 1:
+                log.info(f"{name}: succeeded on attempt {attempt}/{attempts}")
             return (True, result, None)
         except Exception as e:
             last_exception = e
-            log.debug(f"{name} attempt {attempt}/{attempts} failed: {e}")
+            log.info(f"{name}: attempt {attempt}/{attempts} failed: {e}")
             if attempt < attempts:
-                log.debug(f"Retrying in {backoff_s}s...")
+                log.debug(f"{name}: retrying in {backoff_s}s...")
                 await asyncio.sleep(backoff_s)
 
     return (False, None, last_exception)

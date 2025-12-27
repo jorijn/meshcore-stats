@@ -19,7 +19,7 @@ import asyncio
 import sys
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Coroutine, Optional
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -104,7 +104,7 @@ async def query_repeater_with_retry(
     mc: Any,
     contact: Any,
     command_name: str,
-    command_coro_fn,
+    command_coro_fn: Callable[[], Coroutine[Any, Any, Any]],
 ) -> tuple[bool, Optional[dict], Optional[str]]:
     """
     Query repeater with retry logic.
@@ -190,7 +190,7 @@ async def collect_repeater() -> int:
         "derived": {},
     }
 
-    any_success = False
+    status_ok = False
 
     # Commands are accessed via mc.commands
     cmd = mc.commands
@@ -243,26 +243,11 @@ async def collect_repeater() -> int:
             lambda: cmd.req_status_sync(contact, timeout=0, min_timeout=cfg.remote_timeout_s),
         )
         if success:
-            any_success = True
+            status_ok = True
             snapshot["status"] = payload
             log.debug(f"req_status_sync: {payload}")
         else:
-            log.warn(f"req_status_sync failed: {err} (repeater may be unreachable or not support binary requests)")
-
-        # Query telemetry (using _sync version which returns payload directly)
-        log.debug("Querying repeater telemetry...")
-        success, payload, err = await query_repeater_with_retry(
-            mc,
-            contact,
-            "req_telemetry_sync",
-            lambda: cmd.req_telemetry_sync(contact, timeout=0, min_timeout=cfg.remote_timeout_s),
-        )
-        if success:
-            any_success = True
-            snapshot["telemetry"] = payload
-            log.debug(f"req_telemetry_sync: {payload}")
-        else:
-            log.warn(f"req_telemetry_sync failed: {err} (repeater may be unreachable or not support binary requests)")
+            log.warn(f"req_status_sync failed: {err}")
 
         # Optional ACL query (using _sync version)
         if cfg.repeater_fetch_acl:
@@ -279,20 +264,8 @@ async def collect_repeater() -> int:
             else:
                 log.debug(f"req_acl_sync failed: {err}")
 
-        # Derive values
-        if snapshot["telemetry"]:
-            tel = snapshot["telemetry"]
-            # Try to extract neighbour count
-            if isinstance(tel, dict):
-                if "neighbours" in tel:
-                    neigh = tel["neighbours"]
-                    if isinstance(neigh, list):
-                        snapshot["derived"]["neighbours_count"] = len(neigh)
-                    elif isinstance(neigh, int):
-                        snapshot["derived"]["neighbours_count"] = neigh
-
         # Update circuit breaker
-        if any_success:
+        if status_ok:
             cb.record_success()
             log.debug("Circuit breaker: recorded success")
         else:
@@ -314,26 +287,17 @@ async def collect_repeater() -> int:
     # Print summary
     summary_parts = [f"ts={ts}"]
 
-    if snapshot["telemetry"]:
-        tel = snapshot["telemetry"]
-        if isinstance(tel, dict):
-            bat = tel.get("bat") or tel.get("battery_v")
-            if bat is not None:
-                summary_parts.append(f"bat={bat}V")
-
-            bat_pct = tel.get("bat_pct") or tel.get("battery_pct")
-            if bat_pct is not None:
-                summary_parts.append(f"bat_pct={bat_pct}%")
-
-    neigh = snapshot["derived"].get("neighbours_count")
-    if neigh is not None:
-        summary_parts.append(f"neighbours={neigh}")
-
     if snapshot["status"]:
         status = snapshot["status"]
         if isinstance(status, dict):
-            rx = status.get("rx_packets")
-            tx = status.get("tx_packets")
+            bat = status.get("bat")
+            if bat is not None:
+                summary_parts.append(f"bat={bat / 1000:.2f}V")
+            uptime = status.get("uptime")
+            if uptime is not None:
+                summary_parts.append(f"uptime={uptime // 86400}d")
+            rx = status.get("nb_recv")
+            tx = status.get("nb_sent")
             if rx is not None:
                 summary_parts.append(f"rx={rx}")
             if tx is not None:
@@ -345,7 +309,7 @@ async def collect_repeater() -> int:
     path = write_snapshot("repeater", ts, snapshot)
     log.info(f"Snapshot written to {path}")
 
-    return 0 if any_success else 1
+    return 0 if status_ok else 1
 
 
 def main():

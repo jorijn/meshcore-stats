@@ -97,7 +97,7 @@ All configuration via environment variables (see `.envrc`):
 
 ### Timeouts & Retry
 - `REMOTE_TIMEOUT_S`: Minimum timeout for LoRa requests (default: 10)
-- `REMOTE_RETRY_ATTEMPTS`: Number of retry attempts (default: 2)
+- `REMOTE_RETRY_ATTEMPTS`: Number of retry attempts (default: 5)
 - `REMOTE_RETRY_BACKOFF_S`: Seconds between retries (default: 4)
 - `REMOTE_CB_FAILS`: Failures before circuit breaker opens (default: 6)
 - `REMOTE_CB_COOLDOWN_S`: Circuit breaker cooldown (default: 3600)
@@ -125,7 +125,7 @@ REPEATER_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,rx=derived.rx,tx=d
 - **meshcore**: Python library for MeshCore device communication
   - Commands accessed via `mc.commands.method_name()`
   - Contacts returned as dict keyed by public key
-  - Binary requests (`req_status_sync`, `req_telemetry_sync`) return payload directly
+  - Binary request `req_status_sync` returns payload directly
 - **rrdtool-bindings**: RRD database operations
 
 ## RRD Data Source Types
@@ -225,9 +225,9 @@ Uses piecewise linear interpolation between points.
     "uptime": 842491,
     "airtime": 32817
   },
-  "telemetry": [
-    {"channel": 1, "type": "voltage", "value": 4.02}
-  ]
+  "telemetry": null,       // No longer fetched (all data comes from status)
+  "acl": null,
+  "derived": {}
 }
 ```
 
@@ -428,7 +428,7 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 ## Known Issues
 
-1. **Repeater not responding**: If `req_status_sync` and `req_telemetry_sync` timeout, the repeater may:
+1. **Repeater not responding**: If `req_status_sync` times out after all retry attempts, the repeater may:
    - Not support binary protocol requests
    - Have incorrect admin password configured
    - Have routing issues (asymmetric path)
