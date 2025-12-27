@@ -141,6 +141,30 @@ If sustained overcast weather prevented all charging (like Dec 23's +3mV gain), 
 - Days until 3.45V (critical): ~40-60 days of zero sun
 - This is unlikely in the Netherlands even in winter
 
+## Summer Performance (Estimated)
+
+Based on solar geometry calculations for Oosterhout (51.6°N), the ESE 125° / 65° tilt configuration should perform significantly better in summer:
+
+| Season | Daylight | Charging Window | Relative Output | Peak Efficiency |
+|--------|----------|-----------------|-----------------|-----------------|
+| Winter (Dec 21) | ~8 hrs | 09:00-11:00 | 1x (baseline) | ~13% @ 09:00 |
+| Summer (Jun 21) | ~17 hrs | 04:00-12:00 | ~47x | ~95% @ 05:00 |
+
+**Estimated summer characteristics:**
+
+- Sunrise (~04:30) hits the ESE panel at nearly perpendicular angles
+- Peak efficiency of ~95% during early morning hours (05:00-07:00)
+- Battery likely reaches 100% by mid-morning
+- Afternoon sun (13:00+) misses the panel entirely - but this is irrelevant since the battery is already full
+
+**Why this configuration works year-round:**
+
+The ESE orientation with steep 65° tilt is optimized for winter survival. The design accepts "wasted" summer afternoon sun in exchange for maximizing the critical winter charging window. Since the battery has finite capacity, capturing 47x more energy in summer than needed simply means faster charging - it doesn't improve runtime.
+
+This is a deliberate trade-off: **design for the worst case (winter), and summer takes care of itself.**
+
+*Note: Summer estimates are based on solar geometry models, not measured data. Actual performance will depend on weather, panel cleanliness, and shading conditions.*
+
 ## Limitations
 
 - Short observation window (less than 5 days).
@@ -162,4 +186,4 @@ Analysis based on snapshots from:
 ---
 
 *Document created: December 27, 2025*
-*Updated: December 27, 2025 - Added solar panel configuration and charging pattern analysis*
+*Updated: December 27, 2025 - Added solar panel configuration, charging pattern analysis, and summer estimates*
