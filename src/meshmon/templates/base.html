@@ -565,6 +565,304 @@
             }
         }
 
+        /* Visually hidden - for screen readers only */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Reports index page */
+        .reports-intro-card {
+            margin-bottom: var(--space-6);
+        }
+        .reports-intro-card .card-body {
+            padding: var(--space-4) var(--space-6);
+        }
+        .reports-intro-card .card-body p {
+            color: var(--text-muted);
+            margin: 0;
+            font-size: var(--font-size-sm);
+        }
+        .report-year-section {
+            margin-bottom: var(--space-4);
+        }
+        .report-year-section:last-child {
+            margin-bottom: 0;
+        }
+        .report-year-heading {
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0 0 var(--space-2) 0;
+        }
+        .report-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .report-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--space-2) 0;
+            border-bottom: 1px solid var(--border);
+            font-size: var(--font-size-sm);
+        }
+        .report-item:last-child {
+            border-bottom: none;
+        }
+        .report-name {
+            color: var(--text);
+        }
+        .report-links {
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-3);
+        }
+        .report-link-view {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            min-width: 2.5rem;
+            text-align: right;
+        }
+        .report-link-view:hover {
+            text-decoration: underline;
+        }
+        .report-link-dl {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: var(--font-size-xs);
+            min-width: 2rem;
+            text-align: right;
+        }
+        .report-link-dl:hover {
+            color: var(--text);
+        }
+        .report-link-dl:focus-visible {
+            color: var(--primary);
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+        .report-year-divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: var(--space-4) 0;
+        }
+        .report-empty {
+            color: var(--text-muted);
+            font-size: var(--font-size-sm);
+            margin: 0;
+        }
+
+        /* Report detail page */
+        .report-page { margin-bottom: var(--space-6); }
+        .report-header { margin-bottom: var(--space-4); }
+
+        /* Report header bar - title and downloads side by side */
+        .report-header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: var(--space-3);
+        }
+
+        /* Download buttons group */
+        .report-downloads {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Button styles (reusable) */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-4);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            text-decoration: none;
+            border-radius: var(--radius);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+            min-height: 36px;
+        }
+        .btn:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+        .btn--sm {
+            padding: var(--space-1) var(--space-3);
+            font-size: var(--font-size-xs);
+            min-height: 32px;
+        }
+        .btn--secondary {
+            background: var(--bg-elevated);
+            border-color: var(--border);
+            color: var(--text-muted);
+        }
+        .btn--secondary:hover {
+            background: var(--bg-sunken);
+            border-color: var(--border-strong);
+            color: var(--text);
+        }
+        .btn-icon {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        /* Inline metadata - horizontal flow with dividers */
+        .report-meta-inline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: var(--space-2) var(--space-4);
+            margin: 0;
+        }
+        .meta-group {
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-2);
+        }
+        .meta-group dt {
+            font-size: var(--font-size-xs);
+            color: var(--text-subtle);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .meta-group dd {
+            font-size: var(--font-size-sm);
+            color: var(--text);
+            font-weight: 500;
+            margin: 0;
+        }
+        .meta-divider {
+            width: 1px;
+            height: 1em;
+            background: var(--border);
+            align-self: center;
+        }
+        .report-content { margin-bottom: var(--space-4); }
+        .table-scroll-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--font-size-sm);
+            font-variant-numeric: tabular-nums;
+        }
+        .report-table th, .report-table td {
+            padding: var(--space-2) var(--space-3);
+            text-align: right;
+            white-space: nowrap;
+            border-bottom: 1px solid var(--border);
+        }
+        .report-table th {
+            background: var(--bg-sunken);
+            font-weight: 600;
+            color: var(--text);
+            position: sticky;
+            top: 0;
+        }
+        .report-table th:first-child,
+        .report-table td:first-child {
+            text-align: left;
+        }
+        .report-table tbody tr:hover {
+            background: var(--bg-sunken);
+        }
+        .report-table .summary-row {
+            font-weight: 600;
+            background: var(--bg-sunken);
+        }
+        .report-table .summary-row td {
+            border-top: 2px solid var(--border-strong);
+        }
+        .report-pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-4) var(--space-5);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+        }
+        .report-pagination .pagination-link {
+            font-size: var(--font-size-sm);
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--radius);
+            transition: color 0.15s, background-color 0.15s;
+            min-width: 100px;
+        }
+        .report-pagination .pagination-link:hover {
+            color: var(--text);
+            background: var(--bg-sunken);
+        }
+        .report-pagination .pagination-link--disabled {
+            color: var(--text-subtle);
+            pointer-events: none;
+        }
+        .report-pagination .pagination-link--prev {
+            text-align: left;
+        }
+        .report-pagination .pagination-link--next {
+            text-align: right;
+        }
+        .report-pagination .pagination-center {
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--primary);
+            text-decoration: none;
+            padding: var(--space-2) var(--space-4);
+            background: var(--primary-light);
+            border-radius: var(--radius);
+            transition: background-color 0.15s;
+        }
+        .report-pagination .pagination-center:hover {
+            background: var(--primary);
+            color: white;
+        }
+        @media (max-width: 600px) {
+            .report-header-bar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .report-downloads {
+                width: 100%;
+            }
+            .report-downloads .btn {
+                flex: 1;
+            }
+            .report-meta-inline {
+                flex-direction: column;
+                gap: var(--space-2);
+            }
+            .meta-divider {
+                display: none;
+            }
+            .report-table { font-size: var(--font-size-xs); }
+            .report-table th, .report-table td { padding: var(--space-1) var(--space-2); }
+            .report-pagination { flex-direction: column; }
+        }
+
     </style>
     <script>
     // Apply saved theme immediately to prevent flash
@@ -582,14 +880,15 @@
             <div class="header-node">
                 <h1>{{ node_name }}</h1>
                 {% if pubkey_pre %}<code class="pubkey">{{ pubkey_pre }}</code>{% endif %}
-                <span class="status-indicator status-{{ status_class }}" title="{{ status_text }}"></span>
+                <span class="status-indicator status-{{ status_class }}" title="{{ status_text }}" aria-hidden="true"></span>
+                <span class="visually-hidden">Status: {{ status_text }}</span>
             </div>
             <div class="header-updated">
                 <div class="updated-text">
                     <span class="label">Last updated</span>
                     {% if last_updated %}{{ last_updated }}{% else %}N/A{% endif %}
                 </div>
-                <button class="theme-toggle" aria-label="Toggle dark mode" title="Toggle theme">
+                <button type="button" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle theme">
                     <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="5"/>
                         <line x1="12" y1="1" x2="12" y2="3"/>
@@ -610,8 +909,8 @@
 
         <nav class="main-nav" aria-label="Main navigation">
             <div class="nav-group" aria-label="Node selection">
-                <a href="/day.html" class="nav-link{% if role == 'repeater' %} active{% endif %}"{% if role == 'repeater' %} aria-current="page"{% endif %}>Repeater</a>
-                <a href="/companion/day.html" class="nav-link{% if role == 'companion' %} active{% endif %}"{% if role == 'companion' %} aria-current="page"{% endif %}>Companion</a>
+                <a href="/day.html" class="nav-link{% if role == 'repeater' and page_type != 'reports' %} active{% endif %}"{% if role == 'repeater' and page_type != 'reports' %} aria-current="page"{% endif %}>Repeater</a>
+                <a href="/companion/day.html" class="nav-link{% if role == 'companion' and page_type != 'reports' %} active{% endif %}"{% if role == 'companion' and page_type != 'reports' %} aria-current="page"{% endif %}>Companion</a>
             </div>
             <span class="nav-separator" aria-hidden="true">|</span>
             <div class="nav-group" aria-label="Time period">
@@ -619,6 +918,10 @@
                 <a href="{{ base_path }}/week.html" class="nav-link{% if period == 'week' %} active{% endif %}">Week</a>
                 <a href="{{ base_path }}/month.html" class="nav-link{% if period == 'month' %} active{% endif %}">Month</a>
                 <a href="{{ base_path }}/year.html" class="nav-link{% if period == 'year' %} active{% endif %}">Year</a>
+            </div>
+            <span class="nav-separator" aria-hidden="true">|</span>
+            <div class="nav-group" aria-label="Reports">
+                <a href="/reports/" class="nav-link{% if page_type == 'reports' %} active{% endif %}"{% if page_type == 'reports' %} aria-current="page"{% endif %}>Reports</a>
             </div>
         </nav>
 

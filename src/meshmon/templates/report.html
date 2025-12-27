@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block content %}
+<article class="report-page">
+    <header class="report-header card">
+        <div class="card-header report-header-bar">
+            <h2 class="card-title">{{ report_title }}</h2>
+            <div class="report-downloads" role="group" aria-label="Download report">
+                <a href="report.txt" class="btn btn--secondary btn--sm" download="{{ download_prefix }}.txt">
+                    <svg class="btn-icon" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>TXT</span>
+                </a>
+                <a href="report.json" class="btn btn--secondary btn--sm" download="{{ download_prefix }}.json">
+                    <svg class="btn-icon" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>JSON</span>
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <dl class="report-meta-inline">
+                <div class="meta-group">
+                    <dt>Node</dt>
+                    <dd>{{ node_name }}</dd>
+                </div>
+                <span class="meta-divider" aria-hidden="true"></span>
+                <div class="meta-group">
+                    <dt>Location</dt>
+                    <dd>{{ location_name }}</dd>
+                </div>
+                <span class="meta-divider" aria-hidden="true"></span>
+                <div class="meta-group">
+                    <dt>Coordinates</dt>
+                    <dd>{{ lat_str }}, {{ lon_str }} ({{ elev }}m)</dd>
+                </div>
+                <span class="meta-divider" aria-hidden="true"></span>
+                <div class="meta-group">
+                    <dt>Generated</dt>
+                    <dd><time datetime="{{ generated_iso }}">{{ generated_at }}</time></dd>
+                </div>
+            </dl>
+        </div>
+    </header>
+
+    <section class="report-content card" aria-labelledby="report-data-heading">
+        <div class="card-header">
+            <h2 id="report-data-heading" class="card-title">Report Data</h2>
+        </div>
+        <div class="card-body">
+            <div class="table-scroll-wrapper">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            {% for header in table_headers %}
+                            <th scope="col"{% if header.tooltip %} title="{{ header.tooltip }}"{% endif %}>{{ header.label }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in table_rows %}
+                        <tr{% if row.is_summary %} class="summary-row"{% endif %}>
+                            {% for cell in row.cells %}
+                            <td{% if cell.class %} class="{{ cell.class }}"{% endif %}>{{ cell.value }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <nav class="report-pagination" aria-label="Report navigation">
+        {% if prev_report %}
+        <a href="{{ prev_report.url }}" class="pagination-link pagination-link--prev" rel="prev">
+            &larr; {{ prev_report.label }}
+        </a>
+        {% else %}
+        <span class="pagination-link pagination-link--prev pagination-link--disabled">&larr; Previous</span>
+        {% endif %}
+
+        <a href="/reports/" class="pagination-center" rel="up">All Reports</a>
+
+        {% if next_report %}
+        <a href="{{ next_report.url }}" class="pagination-link pagination-link--next" rel="next">
+            {{ next_report.label }} &rarr;
+        </a>
+        {% else %}
+        <span class="pagination-link pagination-link--next pagination-link--disabled">Next &rarr;</span>
+        {% endif %}
+    </nav>
+</article>
+{% endblock %}
