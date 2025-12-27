@@ -1,4 +1,4 @@
-DirectoryIndex day.html
+DirectoryIndex day.html index.html
 
 <FilesMatch "\.(html|png|json)$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
