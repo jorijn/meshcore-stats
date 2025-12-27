@@ -123,11 +123,13 @@ def build_page_context(
             return (1, ds_name)
 
     for ds_name in sorted(metrics.keys(), key=chart_sort_key):
-        chart_path = cfg.out_dir / "assets" / role / f"{ds_name}_{period}.png"
+        # Check if light theme chart exists (both themes generated together)
+        chart_path = cfg.out_dir / "assets" / role / f"{ds_name}_{period}_light.png"
         if chart_path.exists():
             charts.append({
                 "label": chart_labels.get(ds_name, ds_name),
-                "src": f"/assets/{role}/{ds_name}_{period}.png",
+                "src_light": f"/assets/{role}/{ds_name}_{period}_light.png",
+                "src_dark": f"/assets/{role}/{ds_name}_{period}_dark.png",
             })
 
     # Extract snapshot table

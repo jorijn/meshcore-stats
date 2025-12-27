@@ -1,12 +1,61 @@
 """RRD create, update, and graph helpers."""
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from .env import get_config
 from .extract import format_rrd_value
 from .metrics import is_counter_metric, get_graph_scale
 from . import log
+
+# Type alias for theme names
+ThemeName = Literal["light", "dark"]
+
+
+@dataclass(frozen=True, slots=True)
+class ChartTheme:
+    """Color palette for RRD chart rendering."""
+
+    back: str
+    canvas: str
+    font: str
+    axis: str
+    frame: str
+    arrow: str
+    grid: str
+    mgrid: str
+    line: str
+    area: str  # Includes alpha, e.g., "2563eb40"
+
+
+CHART_THEMES: dict[ThemeName, ChartTheme] = {
+    "light": ChartTheme(
+        back="ffffff",
+        canvas="ffffff",
+        font="1e293b",
+        axis="64748b",
+        frame="e2e8f0",
+        arrow="64748b",
+        grid="e2e8f0",
+        mgrid="cbd5e1",
+        line="2563eb",
+        area="2563eb40",
+    ),
+    "dark": ChartTheme(
+        back="1e293b",
+        canvas="1e293b",
+        font="f1f5f9",
+        axis="94a3b8",
+        frame="334155",
+        arrow="94a3b8",
+        grid="334155",
+        mgrid="475569",
+        line="3b82f6",
+        area="3b82f640",
+    ),
+}
+
 
 # Try to import rrdtool
 try:
@@ -168,6 +217,7 @@ def graph_rrd(
     vertical_label: Optional[str] = None,
     width: int = 800,
     height: int = 280,
+    theme: ThemeName = "light",
 ) -> bool:
     """
     Generate a graph from RRD data.
@@ -181,10 +231,14 @@ def graph_rrd(
         vertical_label: Y-axis label
         width: Graph width in pixels
         height: Graph height in pixels
+        theme: Color theme ("light" or "dark")
 
     Returns:
         True on success, False on error
     """
+    if theme not in CHART_THEMES:
+        raise ValueError(f"Unknown theme '{theme}'. Valid: {list(CHART_THEMES.keys())}")
+
     if not RRDTOOL_AVAILABLE:
         log.error("rrdtool-bindings not available")
         return False
@@ -205,29 +259,23 @@ def graph_rrd(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Design system colors (matching CSS variables)
-    color_primary = "2563eb"        # --primary (blue)
-    color_primary_light = "dbeafe"  # --primary-light
-    color_text = "1e293b"           # --text
-    color_text_muted = "64748b"     # --text-muted
-    color_border = "e2e8f0"         # --border
-    color_bg = "ffffff"             # --bg-elevated (white)
-    color_canvas = "f8fafc"         # --bg (slightly gray)
+    # Get theme colors
+    colors = CHART_THEMES[theme]
 
     args = [
         str(output_path),
         "--start", start,
         "--width", str(width),
         "--height", str(height),
-        # Colors matching design system
-        "--color", f"BACK#{color_bg}",
-        "--color", f"CANVAS#{color_bg}",
-        "--color", f"FONT#{color_text}",
-        "--color", f"MGRID#{color_border}",
-        "--color", f"GRID#{color_border}",
-        "--color", f"FRAME#{color_border}",
-        "--color", f"ARROW#{color_text_muted}",
-        "--color", f"AXIS#{color_text_muted}",
+        # Colors from theme
+        "--color", f"BACK#{colors.back}",
+        "--color", f"CANVAS#{colors.canvas}",
+        "--color", f"FONT#{colors.font}",
+        "--color", f"MGRID#{colors.mgrid}",
+        "--color", f"GRID#{colors.grid}",
+        "--color", f"FRAME#{colors.frame}",
+        "--color", f"ARROW#{colors.arrow}",
+        "--color", f"AXIS#{colors.axis}",
         # Styling
         "--border", "0",
         "--full-size-mode",
@@ -267,8 +315,8 @@ def graph_rrd(
     args.append(f"CDEF:{ds_name}={ds_name}_scaled")
 
     # Area fill with semi-transparent primary color, then line on top
-    args.append(f"AREA:{ds_name}#{color_primary}40")  # 40 = ~25% opacity
-    args.append(f"LINE2:{ds_name}#{color_primary}:  ")  # Label with spacing
+    args.append(f"AREA:{ds_name}#{colors.area}")
+    args.append(f"LINE2:{ds_name}#{colors.line}:  ")  # Label with spacing
 
     # Add statistics (min/avg/max/current) below the chart
     args.append(f"GPRINT:{ds_name}:MIN:Min\\: %6.2lf%s")
@@ -287,7 +335,7 @@ def graph_rrd(
 
 def render_all_charts(role: str, metrics: dict[str, str]) -> list[Path]:
     """
-    Render all charts for a role.
+    Render all charts for a role in both light and dark themes.
 
     Args:
         role: "companion" or "repeater"
@@ -299,6 +347,7 @@ def render_all_charts(role: str, metrics: dict[str, str]) -> list[Path]:
     cfg = get_config()
     charts_dir = cfg.out_dir / "assets" / role
     periods = ["day", "week", "month", "year"]
+    themes: list[ThemeName] = ["light", "dark"]
 
     generated = []
 
@@ -327,16 +376,18 @@ def render_all_charts(role: str, metrics: dict[str, str]) -> list[Path]:
 
     for ds_name in sorted(metrics.keys()):
         for period in periods:
-            output_path = charts_dir / f"{ds_name}_{period}.png"
-            vlabel = labels.get(ds_name, "Value")
+            for theme in themes:
+                output_path = charts_dir / f"{ds_name}_{period}_{theme}.png"
+                vlabel = labels.get(ds_name, "Value")
 
-            if graph_rrd(
-                role=role,
-                ds_name=ds_name,
-                period=period,
-                output_path=output_path,
-                vertical_label=vlabel,
-            ):
-                generated.append(output_path)
+                if graph_rrd(
+                    role=role,
+                    ds_name=ds_name,
+                    period=period,
+                    output_path=output_path,
+                    vertical_label=vlabel,
+                    theme=theme,
+                ):
+                    generated.append(output_path)
 
     return generated

@@ -56,7 +56,10 @@
                     <h3 class="chart-title">{{ chart.label }}</h3>
                 </div>
                 <div class="chart-body">
-                    <img src="{{ chart.src }}" alt="{{ chart.label }} over the last {{ period }}" loading="lazy">
+                    <picture>
+                        <source srcset="{{ chart.src_dark }}" media="(prefers-color-scheme: dark)">
+                        <img src="{{ chart.src_light }}" alt="{{ chart.label }} over the last {{ period }}" loading="lazy" class="themed-chart" data-light="{{ chart.src_light }}" data-dark="{{ chart.src_dark }}">
+                    </picture>
                 </div>
             </article>
             {% endfor %}
