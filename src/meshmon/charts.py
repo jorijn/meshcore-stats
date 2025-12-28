@@ -458,8 +458,14 @@ def render_chart_svg(
                     # Convert to matplotlib date units (days) and use 80% of interval for bar width
                     bar_width = (avg_delta_seconds / 86400) * 0.8
                 else:
-                    # Single point - use default width
-                    bar_width = 0.04  # ~1 hour in days
+                    # Single point - use period-appropriate width based on typical bin size
+                    fallback_widths = {
+                        "day": 0.04,    # ~1 hour in days
+                        "week": 0.02,   # ~30 min in days
+                        "month": 0.08,  # ~2 hours in days
+                        "year": 1.0,    # 1 day
+                    }
+                    bar_width = fallback_widths.get(ts.period, 0.04)
 
                 # Plot bars
                 ax.bar(timestamps, values, width=bar_width,

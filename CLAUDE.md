@@ -380,6 +380,10 @@ Charts are generated as inline SVGs using matplotlib (`src/meshmon/charts.py`).
 - **Themes**: Light and dark variants (CSS `prefers-color-scheme` switches between them)
 - **Inline**: SVGs are embedded directly in HTML for zero additional requests
 - **Tooltips**: Data points embedded as JSON in SVG `data-points` attribute
+- **Chart Type Selection**:
+  - **Bar charts**: Used for counter metrics (rx, tx, airtime, etc.) to visualize discrete time buckets for rate-based data
+  - **Line charts**: Used for gauge metrics (bat_v, rssi, uptime, etc.) to show continuous measurements over time
+  - Determined by `is_counter_metric()` in `src/meshmon/metrics.py`
 
 ### Time Aggregation (Binning)
 Data points are aggregated into bins to keep chart file sizes reasonable and lines clean:
@@ -393,8 +397,9 @@ Data points are aggregated into bins to keep chart file sizes reasonable and lin
 
 ### Visual Style
 - 2 charts per row on desktop, 1 on mobile (< 900px)
-- Amber/orange line color (#b45309 light, #f59e0b dark)
-- Semi-transparent area fill with solid line on top
+- Amber/orange color scheme (#b45309 light, #f59e0b dark)
+- **Line charts** (gauges): Semi-transparent area fill with solid line on top
+- **Bar charts** (counters): Solid bars with 90% opacity, auto-calculated width based on data intervals
 - Min/Avg/Max statistics displayed in chart footer
 - Current value displayed in chart header
 

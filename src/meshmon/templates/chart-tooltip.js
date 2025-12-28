@@ -173,27 +173,27 @@
     const yMin = parseFloat(svg.dataset.yMin);
     const yMax = parseFloat(svg.dataset.yMax);
 
-    // Find the path with data-points
-    const path = svg.querySelector('path[data-points]');
-    if (!path) return;
+    // Find the data element (path for line charts, rect for bar charts)
+    const dataElement = svg.querySelector('path[data-points], rect[data-points]');
+    if (!dataElement) return;
 
-    // Parse and cache data points and path coordinates on first access
-    if (!path._dataPoints) {
+    // Parse and cache data points and element coordinates on first access
+    if (!dataElement._dataPoints) {
       try {
-        const json = path.dataset.points.replace(/&quot;/g, '"');
-        path._dataPoints = JSON.parse(json);
+        const json = dataElement.dataset.points.replace(/&quot;/g, '"');
+        dataElement._dataPoints = JSON.parse(json);
       } catch (e) {
         console.warn('Failed to parse chart data:', e);
         return;
       }
     }
 
-    // Cache the path's bounding box for coordinate mapping
-    if (!path._pathBox) {
-      path._pathBox = path.getBBox();
+    // Cache the element's bounding box for coordinate mapping
+    if (!dataElement._pathBox) {
+      dataElement._pathBox = dataElement.getBBox();
     }
 
-    const pathBox = path._pathBox;
+    const pathBox = dataElement._pathBox;
 
     // Get mouse position in SVG coordinate space
     const svgRect = svg.getBoundingClientRect();
@@ -213,7 +213,7 @@
     const targetTs = xStart + clampedRelX * (xEnd - xStart);
 
     // Find closest data point by timestamp
-    const result = findClosestPoint(path._dataPoints, targetTs);
+    const result = findClosestPoint(dataElement._dataPoints, targetTs);
     if (!result) return;
 
     const { point } = result;
