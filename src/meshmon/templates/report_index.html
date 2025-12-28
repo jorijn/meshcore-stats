@@ -1,52 +1,49 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="reports-intro-card card">
-    <div class="card-body">
-        <p>Monthly and yearly statistics reports for the mesh network. Each report is available as a web page, plain text, or JSON.</p>
-    </div>
-</div>
+{% block body %}
+<div class="reports-layout">
+  <header class="reports-header">
+    <nav class="reports-breadcrumb">
+      <a href="{{ css_path }}day.html">Dashboard</a>
+      <span>/</span>
+      <span>Reports</span>
+    </nav>
+    <h1 class="reports-title">Reports Archive</h1>
+    <p class="reports-subtitle">Monthly and yearly statistics for the MeshCore network</p>
+  </header>
 
-<div class="dashboard-grid">
-{% for section in report_sections %}
-<section class="card" aria-labelledby="reports-{{ section.role }}-heading">
-    <div class="card-header">
-        <h2 id="reports-{{ section.role }}-heading" class="card-title">{{ section.role | capitalize }}</h2>
-    </div>
-    <div class="card-body">
-        {% if section.years %}
-        {% for year_data in section.years %}
-        <div class="report-year-section">
-            <h3 class="report-year-heading">{{ year_data.year }}</h3>
-            <ul class="report-list">
-                <li class="report-item">
-                    <span class="report-name">Annual Summary</span>
-                    <span class="report-links">
-                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/" class="report-link-view">View</a>
-                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/report.txt" class="report-link-dl">TXT</a>
-                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/report.json" class="report-link-dl">JSON</a>
-                    </span>
-                </li>
-                {% for month in year_data.months | reverse %}
-                <li class="report-item">
-                    <span class="report-name">{{ month.name }}</span>
-                    <span class="report-links">
-                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/{{ '%02d' | format(month.month) }}/" class="report-link-view">View</a>
-                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/{{ '%02d' | format(month.month) }}/report.txt" class="report-link-dl">TXT</a>
-                        <a href="/reports/{{ section.role }}/{{ year_data.year }}/{{ '%02d' | format(month.month) }}/report.json" class="report-link-dl">JSON</a>
-                    </span>
-                </li>
-                {% endfor %}
-            </ul>
+  {% for section in report_sections %}
+  <section style="margin-bottom: var(--space-3xl);">
+    <h2 style="font-family: 'Instrument Serif', Georgia, serif; font-size: var(--text-xl); margin-bottom: var(--space-lg);">{{ section.role | capitalize }}</h2>
+    <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-lg);">
+      {{ section.description }}
+    </p>
+
+    {% if section.years %}
+    <div class="archive-list">
+      {% for year_data in section.years %}
+      <article class="archive-year">
+        <h3 class="archive-year-title"><a href="{{ css_path }}reports/{{ section.role }}/{{ year_data.year }}/">{{ year_data.year }}</a></h3>
+        <div class="archive-months">
+          {% for month_num in range(1, 13) %}
+          {% set month_data = year_data.months | selectattr('month', 'equalto', month_num) | list | first %}
+          {% if month_data %}
+          <a href="{{ css_path }}reports/{{ section.role }}/{{ year_data.year }}/{{ '%02d' | format(month_num) }}/" class="archive-month">{{ month_abbrs[month_num] }}</a>
+          {% else %}
+          <span class="archive-month empty">{{ month_abbrs[month_num] }}</span>
+          {% endif %}
+          {% endfor %}
         </div>
-        {% if not loop.last %}
-        <hr class="report-year-divider">
-        {% endif %}
-        {% endfor %}
-        {% else %}
-        <p class="report-empty">No reports available yet.</p>
-        {% endif %}
+      </article>
+      {% endfor %}
     </div>
-</section>
-{% endfor %}
+    {% else %}
+    <p style="font-size: var(--text-sm); color: var(--text-muted);">No reports available yet.</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <footer class="site-footer" style="margin-top: var(--space-3xl);">
+    <a href="{{ css_path }}day.html">Back to Dashboard</a>
+  </footer>
 </div>
 {% endblock %}

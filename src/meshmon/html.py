@@ -1,6 +1,7 @@
 """HTML rendering helpers using Jinja2 templates."""
 
 import calendar
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -10,7 +11,6 @@ from jinja2 import Environment, PackageLoader, select_autoescape
 from .env import get_config
 from .extract import get_by_path
 from .battery import voltage_to_percentage
-from .snapshot_config import extract_snapshot_table
 from .formatters import (
     format_time,
     format_value,
@@ -24,6 +24,77 @@ from . import log
 # Status indicator thresholds (seconds)
 STATUS_ONLINE_THRESHOLD = 1800  # 30 minutes
 STATUS_STALE_THRESHOLD = 7200   # 2 hours
+
+# Period titles and subtitles
+PERIOD_CONFIG = {
+    "day": ("24-Hour Observations", "Radio telemetry from the past day"),
+    "week": ("7-Day Observations", "Radio telemetry from the past week"),
+    "month": ("30-Day Observations", "Radio telemetry from the past month"),
+    "year": ("365-Day Observations", "Radio telemetry from the past year"),
+}
+
+# Chart groupings for repeater
+REPEATER_CHART_GROUPS = [
+    {
+        "title": "Power",
+        "metrics": ["bat_v", "bat_pct"],
+    },
+    {
+        "title": "Signal Quality",
+        "metrics": ["rssi", "snr", "noise"],
+    },
+    {
+        "title": "Packet Traffic",
+        "metrics": ["rx", "tx", "fl_rx", "fl_tx", "di_rx", "di_tx"],
+    },
+    {
+        "title": "Airtime",
+        "metrics": ["airtime", "rx_air"],
+    },
+    {
+        "title": "Duplicates & Queue",
+        "metrics": ["fl_dups", "di_dups", "txq", "uptime"],
+    },
+]
+
+# Chart groupings for companion
+COMPANION_CHART_GROUPS = [
+    {
+        "title": "Power",
+        "metrics": ["bat_v", "bat_pct"],
+    },
+    {
+        "title": "Network",
+        "metrics": ["contacts", "uptime"],
+    },
+    {
+        "title": "Packet Traffic",
+        "metrics": ["rx", "tx"],
+    },
+]
+
+# Chart labels
+CHART_LABELS = {
+    "bat_v": "Battery Voltage",
+    "bat_pct": "Battery Percentage",
+    "contacts": "Known Contacts",
+    "neigh": "Neighbours",
+    "rx": "Packets Received",
+    "tx": "Packets Transmitted",
+    "rssi": "RSSI",
+    "snr": "Signal-to-Noise Ratio",
+    "uptime": "Uptime",
+    "noise": "Noise Floor",
+    "airtime": "TX Airtime",
+    "rx_air": "RX Airtime",
+    "fl_dups": "Flood Duplicates",
+    "di_dups": "Direct Duplicates",
+    "fl_tx": "Flood TX",
+    "fl_rx": "Flood RX",
+    "di_tx": "Direct TX",
+    "di_rx": "Direct RX",
+    "txq": "TX Queue Length",
+}
 
 # Singleton Jinja2 environment
 _jinja_env: Optional[Environment] = None
@@ -58,6 +129,290 @@ def get_jinja_env() -> Environment:
     return env
 
 
+def get_status(ts: Optional[int]) -> tuple[str, str]:
+    """Determine status based on timestamp age.
+
+    Returns:
+        (status_class, status_text) tuple
+    """
+    if not ts:
+        return ("offline", "No data")
+
+    age_seconds = int(datetime.now().timestamp()) - ts
+    if age_seconds < STATUS_ONLINE_THRESHOLD:
+        return ("online", "Online")
+    elif age_seconds < STATUS_STALE_THRESHOLD:
+        return ("stale", "Stale")
+    else:
+        return ("offline", "Offline")
+
+
+def build_repeater_metrics(snapshot: Optional[dict]) -> dict:
+    """Build metrics data from repeater snapshot.
+
+    Returns dict with critical_metrics, secondary_metrics, traffic_metrics.
+    """
+    if not snapshot:
+        return {
+            "critical_metrics": [],
+            "secondary_metrics": [],
+            "traffic_metrics": [],
+        }
+
+    status = snapshot.get("status", {})
+
+    # Battery
+    bat_mv = status.get("bat")
+    bat_v = bat_mv / 1000 if bat_mv else None
+    bat_pct = voltage_to_percentage(bat_v) if bat_v else None
+
+    # Critical metrics (top 4 in sidebar)
+    critical_metrics = []
+    if bat_v:
+        critical_metrics.append({
+            "value": f"{bat_v:.2f}",
+            "unit": "V",
+            "label": "Battery",
+            "bar_pct": int(bat_pct) if bat_pct else 0,
+        })
+    if bat_pct:
+        critical_metrics.append({
+            "value": f"{bat_pct:.0f}",
+            "unit": "%",
+            "label": "Charge",
+        })
+
+    rssi = status.get("last_rssi")
+    if rssi is not None:
+        critical_metrics.append({
+            "value": str(rssi),
+            "unit": "dBm",
+            "label": "RSSI",
+        })
+
+    snr = status.get("last_snr")
+    if snr is not None:
+        critical_metrics.append({
+            "value": f"{snr:.2f}",
+            "unit": "dB",
+            "label": "SNR",
+        })
+
+    # Secondary metrics
+    secondary_metrics = []
+    uptime = status.get("uptime")
+    if uptime is not None:
+        secondary_metrics.append({
+            "label": "Uptime",
+            "value": format_uptime(uptime),
+        })
+
+    noise = status.get("noise_floor")
+    if noise is not None:
+        secondary_metrics.append({
+            "label": "Noise Floor",
+            "value": f"{noise} dBm",
+        })
+
+    txq = status.get("tx_queue_len")
+    if txq is not None:
+        secondary_metrics.append({
+            "label": "TX Queue",
+            "value": str(txq),
+        })
+
+    # Traffic metrics
+    traffic_metrics = []
+    traffic_fields = [
+        ("RX", "nb_recv"),
+        ("TX", "nb_sent"),
+        ("Flood RX", "recv_flood"),
+        ("Flood TX", "sent_flood"),
+        ("Direct RX", "recv_direct"),
+        ("Direct TX", "sent_direct"),
+        ("Airtime TX", "airtime"),
+        ("Airtime RX", "rx_airtime"),
+    ]
+    for label, key in traffic_fields:
+        val = status.get(key)
+        if val is not None:
+            if "airtime" in key.lower():
+                traffic_metrics.append({"label": label, "value": f"{val:,}s"})
+            else:
+                traffic_metrics.append({"label": label, "value": f"{val:,}"})
+
+    return {
+        "critical_metrics": critical_metrics,
+        "secondary_metrics": secondary_metrics,
+        "traffic_metrics": traffic_metrics,
+    }
+
+
+def build_companion_metrics(snapshot: Optional[dict]) -> dict:
+    """Build metrics data from companion snapshot.
+
+    Returns dict with critical_metrics, secondary_metrics.
+    """
+    if not snapshot:
+        return {
+            "critical_metrics": [],
+            "secondary_metrics": [],
+            "traffic_metrics": [],
+        }
+
+    stats = snapshot.get("stats", {}).get("core", {})
+    packets = snapshot.get("stats", {}).get("packets", {})
+    derived = snapshot.get("derived", {})
+
+    # Battery
+    bat_mv = stats.get("battery_mv")
+    if not bat_mv:
+        bat_mv = get_by_path(snapshot, "bat.level")
+    bat_v = bat_mv / 1000 if bat_mv else None
+    bat_pct = voltage_to_percentage(bat_v) if bat_v else None
+
+    # Critical metrics
+    critical_metrics = []
+    if bat_v:
+        critical_metrics.append({
+            "value": f"{bat_v:.2f}",
+            "unit": "V",
+            "label": "Battery",
+            "bar_pct": int(bat_pct) if bat_pct else 0,
+        })
+    if bat_pct:
+        critical_metrics.append({
+            "value": f"{bat_pct:.0f}",
+            "unit": "%",
+            "label": "Charge",
+        })
+
+    contacts = derived.get("contacts_count")
+    if contacts is not None:
+        critical_metrics.append({
+            "value": str(contacts),
+            "unit": None,
+            "label": "Contacts",
+        })
+
+    uptime = stats.get("uptime_secs")
+    if uptime is not None:
+        critical_metrics.append({
+            "value": format_uptime(uptime),
+            "unit": None,
+            "label": "Uptime",
+        })
+
+    # Secondary metrics
+    secondary_metrics = []
+    rx = packets.get("recv")
+    if rx is not None:
+        secondary_metrics.append({"label": "Packets RX", "value": f"{rx:,}"})
+    tx = packets.get("sent")
+    if tx is not None:
+        secondary_metrics.append({"label": "Packets TX", "value": f"{tx:,}"})
+
+    return {
+        "critical_metrics": critical_metrics,
+        "secondary_metrics": secondary_metrics,
+        "traffic_metrics": [],
+    }
+
+
+def build_node_details(role: str, snapshot: Optional[dict]) -> list[dict]:
+    """Build node details for sidebar."""
+    cfg = get_config()
+    details = []
+
+    if role == "repeater":
+        details.append({"label": "Location", "value": "Oosterhout, NL"})
+        details.append({"label": "Coordinates", "value": f"{cfg.report_lat:.4f}°N, {cfg.report_lon:.4f}°E"})
+        details.append({"label": "Elevation", "value": f"{cfg.report_elev:.0f}m"})
+        details.append({"label": "Hardware", "value": "SenseCAP P1-Pro"})
+    elif role == "companion" and snapshot:
+        device_info = snapshot.get("device_info", {})
+        model = device_info.get("model", "Unknown")
+        ver = device_info.get("ver", "Unknown")
+        details.append({"label": "Model", "value": model})
+        details.append({"label": "Firmware", "value": ver})
+        details.append({"label": "Connection", "value": "USB Serial"})
+
+    return details
+
+
+def build_radio_config(snapshot: Optional[dict]) -> list[dict]:
+    """Build radio config for sidebar."""
+    if not snapshot:
+        return []
+
+    self_info = snapshot.get("self_info", {})
+    if not self_info:
+        # For repeater, we might not have self_info, use defaults
+        return [
+            {"label": "Frequency", "value": "869.618 MHz"},
+            {"label": "Bandwidth", "value": "62.5 kHz"},
+            {"label": "Spread Factor", "value": "SF8"},
+            {"label": "Coding Rate", "value": "CR8"},
+        ]
+
+    config = []
+    freq = self_info.get("radio_freq")
+    if freq:
+        config.append({"label": "Frequency", "value": f"{freq} MHz"})
+    bw = self_info.get("radio_bw")
+    if bw:
+        config.append({"label": "Bandwidth", "value": f"{bw} kHz"})
+    sf = self_info.get("radio_sf")
+    if sf:
+        config.append({"label": "Spread Factor", "value": f"SF{sf}"})
+    cr = self_info.get("radio_cr")
+    if cr:
+        config.append({"label": "Coding Rate", "value": f"CR{cr}"})
+
+    return config
+
+
+def build_chart_groups(
+    role: str,
+    period: str,
+    metrics: dict[str, str],
+) -> list[dict]:
+    """Build chart groups for template.
+
+    Each group contains title and list of charts with their data.
+    """
+    cfg = get_config()
+    groups_config = REPEATER_CHART_GROUPS if role == "repeater" else COMPANION_CHART_GROUPS
+
+    groups = []
+    for group in groups_config:
+        charts = []
+        for metric in group["metrics"]:
+            if metric not in metrics:
+                continue
+
+            # Check if chart exists
+            chart_path = cfg.out_dir / "assets" / role / f"{metric}_{period}_light.png"
+            if not chart_path.exists():
+                continue
+
+            charts.append({
+                "label": CHART_LABELS.get(metric, metric),
+                "src_light": f"/assets/{role}/{metric}_{period}_light.png",
+                "src_dark": f"/assets/{role}/{metric}_{period}_dark.png",
+                "current": None,  # Could be populated from RRD if needed
+                "stats": None,    # Could be populated from RRD if needed
+            })
+
+        if charts:
+            groups.append({
+                "title": group["title"],
+                "charts": charts,
+            })
+
+    return groups
+
+
 def build_page_context(
     role: str,
     period: str,
@@ -65,166 +420,56 @@ def build_page_context(
     metrics: dict[str, str],
     at_root: bool,
 ) -> dict[str, Any]:
-    """Build template context dictionary.
-
-    Extracted from render_node_page() for clarity.
-
-    Args:
-        role: "companion" or "repeater"
-        period: "day", "week", "month", or "year"
-        snapshot: Latest snapshot data
-        metrics: Dict of metric mappings
-        at_root: If True, page is rendered at site root (for repeater)
-
-    Returns:
-        Dictionary of template context variables
-    """
+    """Build template context dictionary for node pages."""
     cfg = get_config()
 
-    # Build chart list - assets always in /assets/{role}/
-    charts = []
-    chart_labels = {
-        "bat_v": "Battery Voltage",
-        "bat_pct": "Battery Percentage",
-        "contacts": "Known Contacts",
-        "neigh": "Neighbours",
-        "rx": "Packets Received",
-        "tx": "Packets Transmitted",
-        "rssi": "Signal Strength (RSSI)",
-        "snr": "Signal-to-Noise Ratio",
-        "uptime": "Uptime",
-        "noise": "Noise Floor",
-        "airtime": "Transmit Airtime",
-        "rx_air": "Receive Airtime",
-        "fl_dups": "Duplicate Flood Packets",
-        "di_dups": "Duplicate Direct Packets",
-        "fl_tx": "Flood Packets Sent",
-        "fl_rx": "Flood Packets Received",
-        "di_tx": "Direct Packets Sent",
-        "di_rx": "Direct Packets Received",
-        "txq": "Transmit Queue Depth",
-    }
-
-    # Chart display order: most important first
-    chart_order = [
-        "bat_v", "bat_pct", "uptime",
-        "rssi", "snr", "noise",
-        "rx", "tx",
-        "airtime", "rx_air",
-        "fl_rx", "fl_tx", "di_rx", "di_tx",
-        "fl_dups", "di_dups", "txq",
-        "contacts", "neigh",
-    ]
-
-    def chart_sort_key(ds_name: str) -> tuple:
-        """Sort by priority order, then alphabetically for unlisted metrics."""
-        try:
-            return (0, chart_order.index(ds_name))
-        except ValueError:
-            return (1, ds_name)
-
-    for ds_name in sorted(metrics.keys(), key=chart_sort_key):
-        # Check if light theme chart exists (both themes generated together)
-        chart_path = cfg.out_dir / "assets" / role / f"{ds_name}_{period}_light.png"
-        if chart_path.exists():
-            charts.append({
-                "label": chart_labels.get(ds_name, ds_name),
-                "src_light": f"/assets/{role}/{ds_name}_{period}_light.png",
-                "src_dark": f"/assets/{role}/{ds_name}_{period}_dark.png",
-            })
-
-    # Extract snapshot table
-    snapshot_table = []
-    if snapshot:
-        snapshot_table = extract_snapshot_table(snapshot, role)
-
-    # Get last updated time
-    last_updated = None
-    if snapshot and snapshot.get("ts"):
-        last_updated = format_time(snapshot["ts"])
-
-    # Extract node name and pubkey prefix
+    # Get node name
     node_name = role.capitalize()
     pubkey_pre = None
     if snapshot:
         node_name = (
             get_by_path(snapshot, "node.name")
             or get_by_path(snapshot, "self_info.name")
-            or role.capitalize()
+            or (cfg.repeater_display_name if role == "repeater" else cfg.companion_display_name)
         )
         pubkey_pre = (
             get_by_path(snapshot, "status.pubkey_pre")
             or get_by_path(snapshot, "self_telemetry.pubkey_pre")
         )
 
-    # About text for each node type (HTML allowed)
-    about_text = {
-        "repeater": (
-            "This is a MeshCore LoRa mesh repeater located in <strong>Oosterhout, The Netherlands</strong>. "
-            "The hardware is a <strong>Seeed SenseCAP Solar Node P1-Pro</strong> running MeshCore firmware. "
-            "It operates on the <strong>MeshCore EU/UK Narrow</strong> preset "
-            "(869.618 MHz, 62.5 kHz bandwidth, SF8, CR8) and relays messages across the mesh network. "
-            "<br><br>Stats are collected every 15 minutes via LoRa from a local companion node, "
-            "stored in RRD databases, and rendered into these charts."
-        ),
-        "companion": (
-            "This is the local MeshCore companion node connected via USB serial to the monitoring system. "
-            "It serves as the gateway to communicate with remote nodes over LoRa. "
-            "Stats are collected every minute directly from the device."
-        ),
-    }
+    # Status
+    ts = snapshot.get("ts") if snapshot else None
+    status_class, status_text = get_status(ts)
 
-    # Calculate status indicator based on last update time
-    status_class = "offline"
-    status_text = "No data"
-    if snapshot and snapshot.get("ts"):
-        age_seconds = int(datetime.now().timestamp()) - snapshot["ts"]
-        if age_seconds < STATUS_ONLINE_THRESHOLD:
-            status_class = "online"
-            status_text = "Online"
-        elif age_seconds < STATUS_STALE_THRESHOLD:
-            status_class = "stale"
-            status_text = "Stale data"
-        else:
-            status_class = "offline"
-            status_text = "Offline"
+    # Last updated
+    last_updated = None
+    last_updated_iso = None
+    if ts:
+        dt = datetime.fromtimestamp(ts)
+        last_updated = dt.strftime("%b %d, %Y at %H:%M UTC")
+        last_updated_iso = dt.isoformat()
 
-    # Build metrics bar with key values
-    metrics_bar = []
-    if snapshot:
-        if role == "repeater":
-            bat_mv = get_by_path(snapshot, "status.bat")
-            if bat_mv is not None:
-                bat_pct = voltage_to_percentage(bat_mv / 1000)
-                metrics_bar.append({"value": f"{bat_pct:.0f}%", "label": "Battery"})
-            uptime = get_by_path(snapshot, "status.uptime")
-            if uptime is not None:
-                metrics_bar.append({"value": format_uptime(uptime), "label": "Uptime"})
-            rssi = get_by_path(snapshot, "status.last_rssi")
-            if rssi is not None:
-                metrics_bar.append({"value": f"{rssi} dBm", "label": "RSSI"})
-            snr = get_by_path(snapshot, "status.last_snr")
-            if snr is not None:
-                metrics_bar.append({"value": f"{snr:.1f} dB", "label": "SNR"})
-        elif role == "companion":
-            bat_mv = get_by_path(snapshot, "stats.core.battery_mv")
-            if bat_mv is not None:
-                bat_pct = voltage_to_percentage(bat_mv / 1000)
-                metrics_bar.append({"value": f"{bat_pct:.0f}%", "label": "Battery"})
-            uptime = get_by_path(snapshot, "stats.core.uptime_secs")
-            if uptime is not None:
-                metrics_bar.append({"value": format_uptime(uptime), "label": "Uptime"})
-            contacts = get_by_path(snapshot, "derived.contacts_count")
-            if contacts is not None:
-                metrics_bar.append({"value": str(contacts), "label": "Contacts"})
-            rx = get_by_path(snapshot, "stats.packets.recv")
-            if rx is not None:
-                metrics_bar.append({"value": f"{rx:,}", "label": "RX Packets"})
+    # Build metrics for sidebar
+    if role == "repeater":
+        metrics_data = build_repeater_metrics(snapshot)
+    else:
+        metrics_data = build_companion_metrics(snapshot)
 
-    # Base path for tab links
-    base_path = "" if at_root else f"/{role}"
+    # Node details
+    node_details = build_node_details(role, snapshot)
 
-    # Meta description for social sharing
+    # Radio config
+    radio_config = build_radio_config(snapshot)
+
+    # Chart groups
+    chart_groups = build_chart_groups(role, period, metrics)
+
+    # Period config
+    page_title, page_subtitle = PERIOD_CONFIG.get(period, ("Observations", "Radio telemetry"))
+    if role == "companion":
+        page_subtitle = page_subtitle.replace("Radio", "Companion node")
+
+    # Meta description
     meta_descriptions = {
         "repeater": (
             "Live stats for MeshCore LoRa repeater in Oosterhout, NL. "
@@ -236,24 +481,48 @@ def build_page_context(
         ),
     }
 
+    # CSS and link paths - depend on whether we're at root or in /companion/
+    css_path = "/" if at_root else "../"
+    base_path = "" if at_root else "/companion"
+
     return {
-        "title": f"{node_name} - {period.capitalize()}",
+        # Page meta
+        "title": f"{node_name} — {period.capitalize()}",
         "meta_description": meta_descriptions.get(role, "MeshCore mesh network statistics dashboard."),
-        "og_image": None,  # Optional, can be added later
+        "og_image": None,
+        "css_path": css_path,
+
+        # Node info
         "node_name": node_name,
         "pubkey_pre": pubkey_pre,
+        "role": role,
         "status_class": status_class,
         "status_text": status_text,
-        "role": role,
+
+        # Sidebar metrics
+        "critical_metrics": metrics_data["critical_metrics"],
+        "secondary_metrics": metrics_data["secondary_metrics"],
+        "traffic_metrics": metrics_data["traffic_metrics"],
+
+        # Node details
+        "node_details": node_details,
+        "radio_config": radio_config,
+
+        # Navigation
         "period": period,
         "base_path": base_path,
-        "about": about_text.get(role),
+        "repeater_link": f"{css_path}day.html",
+        "companion_link": f"{css_path}companion/day.html",
+        "reports_link": f"{css_path}reports/",
+
+        # Timestamps
         "last_updated": last_updated,
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "snapshot": snapshot,
-        "snapshot_table": snapshot_table,
-        "metrics_bar": metrics_bar,
-        "charts": charts,
+        "last_updated_iso": last_updated_iso,
+
+        # Main content
+        "page_title": page_title,
+        "page_subtitle": page_subtitle,
+        "chart_groups": chart_groups,
     }
 
 
@@ -264,19 +533,25 @@ def render_node_page(
     metrics: dict[str, str],
     at_root: bool = False,
 ) -> str:
-    """Render a node page (companion or repeater).
-
-    Args:
-        role: "companion" or "repeater"
-        period: "day", "week", "month", or "year"
-        snapshot: Latest snapshot data
-        metrics: Dict of metric mappings
-        at_root: If True, page is rendered at site root (for repeater)
-    """
+    """Render a node page (companion or repeater)."""
     env = get_jinja_env()
     context = build_page_context(role, period, snapshot, metrics, at_root)
     template = env.get_template("node.html")
     return template.render(**context)
+
+
+def copy_styles():
+    """Copy styles.css to output directory."""
+    cfg = get_config()
+    # styles.css lives alongside templates in src/meshmon/templates/
+    src = Path(__file__).parent / "templates" / "styles.css"
+    dst = cfg.out_dir / "styles.css"
+
+    if src.exists():
+        shutil.copy2(src, dst)
+        log.debug(f"Copied {src} to {dst}")
+    else:
+        log.warn(f"styles.css not found at {src}")
 
 
 def write_site(
@@ -297,6 +572,10 @@ def write_site(
     # Ensure output directories exist
     (cfg.out_dir / "companion").mkdir(parents=True, exist_ok=True)
     (cfg.out_dir / "assets" / "repeater").mkdir(parents=True, exist_ok=True)
+    (cfg.out_dir / "assets" / "companion").mkdir(parents=True, exist_ok=True)
+
+    # Copy styles.css
+    copy_styles()
 
     # Repeater pages at root level
     for period in ["day", "week", "month", "year"]:
@@ -373,14 +652,14 @@ def build_monthly_table_data(
                     {"value": f"{daily.date.day:02d}", "class": None},
                     {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
-                    {"value": bat_v.min_time.strftime("%H:%M") if bat_v.min_time else "-", "class": None},
-                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
-                    {"value": bat_v.max_time.strftime("%H:%M") if bat_v.max_time else "-", "class": None},
+                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
+                    {"value": bat_v.min_time.strftime("%H:%M") if bat_v.min_time else "-", "class": "muted"},
+                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
+                    {"value": bat_v.max_time.strftime("%H:%M") if bat_v.max_time else "-", "class": "muted"},
                     {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                     {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                     {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
-                    {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                     {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
                     {"value": f"{airtime.total:,}" if airtime.total else "-", "class": None},
                 ],
@@ -400,17 +679,17 @@ def build_monthly_table_data(
         rows.append({
             "is_summary": True,
             "cells": [
-                {"value": "Total", "class": None},
+                {"value": "Avg", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
-                {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": None},
-                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
-                {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": None},
+                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
+                {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": "muted"},
+                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
+                {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": "muted"},
                 {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                 {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                 {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
-                {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                 {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
                 {"value": f"{airtime.total:,}" if airtime.total else "-", "class": None},
             ],
@@ -445,12 +724,12 @@ def build_monthly_table_data(
                     {"value": f"{daily.date.day:02d}", "class": None},
                     {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
-                    {"value": bat_v.min_time.strftime("%H:%M") if bat_v.min_time else "-", "class": None},
-                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
-                    {"value": bat_v.max_time.strftime("%H:%M") if bat_v.max_time else "-", "class": None},
+                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
+                    {"value": bat_v.min_time.strftime("%H:%M") if bat_v.min_time else "-", "class": "muted"},
+                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
+                    {"value": bat_v.max_time.strftime("%H:%M") if bat_v.max_time else "-", "class": "muted"},
                     {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
-                    {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                     {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
                 ],
             })
@@ -466,15 +745,15 @@ def build_monthly_table_data(
         rows.append({
             "is_summary": True,
             "cells": [
-                {"value": "Total", "class": None},
+                {"value": "Avg", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
-                {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": None},
-                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
-                {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": None},
+                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
+                {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": "muted"},
+                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
+                {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": "muted"},
                 {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
-                {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                 {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
             ],
         })
@@ -527,13 +806,13 @@ def build_yearly_table_data(
                     {"value": calendar.month_abbr[monthly.month], "class": None},
                     {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
-                    {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": None},
-                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
-                    {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": None},
+                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
+                    {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": "muted"},
+                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
+                    {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": "muted"},
                     {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                     {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
-                    {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                     {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
                 ],
             })
@@ -556,13 +835,13 @@ def build_yearly_table_data(
                 {"value": "Total", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
-                {"value": max_month, "class": None},
-                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
-                {"value": min_month, "class": None},
+                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
+                {"value": max_month, "class": "muted"},
+                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
+                {"value": min_month, "class": "muted"},
                 {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                 {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
-                {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                 {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
             ],
         })
@@ -596,12 +875,12 @@ def build_yearly_table_data(
                     {"value": calendar.month_abbr[monthly.month], "class": None},
                     {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
-                    {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": None},
-                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
-                    {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": None},
+                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
+                    {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": "muted"},
+                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
+                    {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": "muted"},
                     {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
-                    {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                     {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
                 ],
             })
@@ -623,12 +902,12 @@ def build_yearly_table_data(
                 {"value": "Total", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": None},
-                {"value": max_month, "class": None},
-                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": None},
-                {"value": min_month, "class": None},
+                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
+                {"value": max_month, "class": "muted"},
+                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
+                {"value": min_month, "class": "muted"},
                 {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
-                {"value": f"{rx.total:,}" if rx.total else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                 {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
             ],
         })
@@ -664,26 +943,32 @@ def render_report_page(
     now = datetime.now()
 
     if report_type == "monthly":
-        report_title = f"Monthly Report - {calendar.month_name[agg.month]} {agg.year}"
+        report_title = calendar.month_name[agg.month] + " " + str(agg.year)
+        report_subtitle = f"Monthly report for {node_name}"
         download_prefix = f"{agg.role}-{agg.year}-{agg.month:02d}"
+        month_name = calendar.month_name[agg.month]
         headers, rows = build_monthly_table_data(agg, agg.role)
     else:
-        report_title = f"Yearly Report - {agg.year}"
+        report_title = str(agg.year)
+        report_subtitle = f"Yearly report for {node_name}"
         download_prefix = f"{agg.role}-{agg.year}"
+        month_name = None
         headers, rows = build_yearly_table_data(agg, agg.role)
+
+    # Calculate CSS path depth for reports (always /reports/{role}/{year}/ or /reports/{role}/{year}/{month}/)
+    css_path = "../../../../" if report_type == "monthly" else "../../../"
 
     context = {
         "title": report_title,
         "meta_description": f"MeshCore {report_type} report for {node_name}",
-        "page_type": "reports",
-        "node_name": node_name,
+        "css_path": css_path,
+        "report_type": report_type,
         "role": agg.role,
-        "base_path": "",
-        "status_class": "online",
-        "status_text": "Report",
-        "pubkey_pre": None,
-        "last_updated": None,
+        "year": agg.year,
+        "month_name": month_name,
         "report_title": report_title,
+        "report_subtitle": report_subtitle,
+        "node_name": node_name,
         "location_name": cfg.report_location_name,
         "lat_str": lat_str,
         "lon_str": lon_str,
@@ -693,6 +978,7 @@ def render_report_page(
         "download_prefix": download_prefix,
         "table_headers": headers,
         "table_rows": rows,
+        "col_groups": None,  # Could add column group headers if desired
         "prev_report": prev_report,
         "next_report": next_report,
     }
@@ -714,18 +1000,24 @@ def render_reports_index(report_sections: list[dict]) -> str:
     cfg = get_config()
     env = get_jinja_env()
 
+    # Add descriptions to sections
+    descriptions = {
+        "repeater": f"{cfg.repeater_display_name} — Solar-powered remote node in Oosterhout, NL",
+        "companion": f"{cfg.companion_display_name} — Local USB-connected node",
+    }
+
+    for section in report_sections:
+        section["description"] = descriptions.get(section["role"], "")
+
+    # Month abbreviations for template
+    month_abbrs = {i: calendar.month_abbr[i] for i in range(1, 13)}
+
     context = {
-        "title": "Reports",
+        "title": "Reports Archive",
         "meta_description": "Monthly and yearly statistics reports for MeshCore nodes",
-        "page_type": "reports",
-        "node_name": "Reports",
-        "role": None,
-        "base_path": "",
-        "status_class": "online",
-        "status_text": "Reports",
-        "pubkey_pre": None,
-        "last_updated": None,
+        "css_path": "../",
         "report_sections": report_sections,
+        "month_abbrs": month_abbrs,
     }
 
     template = env.get_template("report_index.html")
