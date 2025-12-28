@@ -24,7 +24,7 @@ This project monitors a MeshCore LoRa mesh network consisting of:
   - Location: **Oosterhout, The Netherlands**
   - Preset: **MeshCore EU/UK Narrow** (869.618 MHz, 62.5 kHz BW, SF8, CR8)
 
-The system collects metrics, stores them in RRD databases, and generates a static HTML dashboard with charts.
+The system collects metrics, stores them as JSON snapshots, and generates a static HTML dashboard with SVG charts.
 
 ## Architecture
 
@@ -43,9 +43,8 @@ The system collects metrics, stores them in RRD databases, and generates a stati
 
 Data Flow:
 Phase 1: Collect → JSON snapshots
-Phase 2: Update  → RRD databases
-         Render  → PNG charts
-Phase 3: Render  → Static HTML site
+Phase 2: Render  → SVG charts (from snapshots, using matplotlib)
+Phase 3: Render  → Static HTML site (inline SVG)
 Phase 4: Render  → Reports (monthly/yearly statistics)
 ```
 
@@ -61,26 +60,22 @@ meshcore-stats/
 │   ├── jsondump.py        # Snapshot JSON writer
 │   ├── extract.py         # Metric extraction from snapshots
 │   ├── retry.py           # Retry logic & circuit breaker
-│   ├── rrd.py             # RRD database operations
-│   ├── html.py            # HTML/chart generation
+│   ├── charts.py          # SVG chart rendering (matplotlib)
+│   ├── html.py            # HTML site generation
+│   ├── metrics.py         # Metric type definitions (counter vs gauge)
+│   ├── snapshot.py        # Snapshot data merging/derived fields
 │   └── reports.py         # Report generation (WeeWX-style)
 ├── scripts/               # Executable scripts (cron-friendly)
 │   ├── phase1_collect_companion.py
 │   ├── phase1_collect_repeater.py
-│   ├── phase2_rrd_update_companion.py
-│   ├── phase2_rrd_update_repeater.py
-│   ├── phase2_render_charts.py
+│   ├── phase2_render_charts.py   # Generate SVG charts from snapshots
 │   ├── phase3_render_site.py
 │   ├── phase4_render_reports.py  # Monthly/yearly reports
-│   ├── backfill_rrd.py    # Rebuild RRD from historical snapshots
 │   └── rsync_output.sh    # Deploy to web server
 ├── data/
 │   ├── snapshots/         # JSON snapshots by date
 │   │   ├── companion/YYYY/MM/DD/HHMMSS.json
 │   │   └── repeater/YYYY/MM/DD/HHMMSS.json
-│   ├── rrd/               # RRD database files
-│   │   ├── companion.rrd
-│   │   └── repeater.rrd
 │   └── state/             # Persistent state (circuit breaker)
 │       └── repeater_circuit.json
 ├── out/                   # Generated static site
@@ -89,10 +84,12 @@ meshcore-stats/
 │   ├── month.html
 │   ├── year.html
 │   ├── .htaccess          # Apache config (DirectoryIndex, cache control)
+│   ├── styles.css         # CSS stylesheet
+│   ├── chart-tooltip.js   # Progressive enhancement for chart tooltips
 │   ├── companion/         # Companion pages (day/week/month/year.html)
-│   ├── assets/            # PNG chart images
-│   │   ├── companion/
-│   │   └── repeater/
+│   ├── assets/            # SVG chart files and statistics
+│   │   ├── companion/     # {metric}_{period}_{theme}.svg, chart_stats.json
+│   │   └── repeater/      # {metric}_{period}_{theme}.svg, chart_stats.json
 │   └── reports/           # Monthly/yearly statistics reports
 │       ├── index.html     # Reports listing page
 │       ├── repeater/      # Repeater reports by year/month
@@ -127,8 +124,8 @@ All configuration via environment variables (see `.envrc`):
 - `REMOTE_CB_COOLDOWN_S`: Circuit breaker cooldown (default: 3600)
 
 ### Intervals
-- `COMPANION_STEP`: RRD step for companion (default: 60s)
-- `REPEATER_STEP`: RRD step for repeater (default: 900s / 15min)
+- `COMPANION_STEP`: Collection interval for companion (default: 60s)
+- `REPEATER_STEP`: Collection interval for repeater (default: 900s / 15min)
 
 ### Report Location Metadata
 - `REPORT_LOCATION_NAME`: Location name for report headers (default: "Oosterhout, The Netherlands")
@@ -156,25 +153,26 @@ REPEATER_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,rx=derived.rx,tx=d
   - Commands accessed via `mc.commands.method_name()`
   - Contacts returned as dict keyed by public key
   - Binary request `req_status_sync` returns payload directly
-- **rrdtool-bindings**: RRD database operations
+- **matplotlib**: SVG chart generation
+- **jinja2**: HTML template rendering
 
-## RRD Data Source Types
+## Metric Types
 
-The RRD uses different data source types depending on the metric:
+Metrics are classified as either **gauge** or **counter** in `src/meshmon/metrics.py`:
 
 - **GAUGE**: Instantaneous values (bat_v, bat_pct, contacts, neigh, rssi, snr, uptime, noise, txq)
-- **DERIVE**: Counter values that show rate of change - stored as per-second rate, displayed as per-minute:
+- **COUNTER**: Cumulative values that show rate of change - displayed as per-minute:
   - `rx`, `tx` - Total packet counters
   - `airtime`, `rx_air` - TX/RX airtime in seconds
   - `fl_dups`, `di_dups` - Duplicate packet counters (flood/direct)
   - `fl_tx`, `fl_rx` - Flood packet counters
   - `di_tx`, `di_rx` - Direct packet counters
 
-When changing DS types or adding new metrics, you must delete the RRD files and recreate them.
+Counter metrics are converted to rates during chart rendering by calculating deltas between consecutive snapshots.
 
 ## Derived Fields
 
-The phase2 update scripts calculate derived fields that aren't directly in the snapshots:
+The snapshot module (`src/meshmon/snapshot.py`) calculates derived fields that aren't directly in the raw snapshots:
 
 ### Battery Voltage (`derived.bat_v`)
 - Companion: `stats.core.battery_mv / 1000` or `bat.level / 1000`
@@ -283,18 +281,14 @@ python scripts/phase1_collect_companion.py
 python scripts/phase1_collect_repeater.py
 ```
 
-### Phase 2: RRD Update & Chart Rendering
+### Phase 2: Chart Rendering
 
 ```bash
-# Update companion RRD from latest snapshot
-python scripts/phase2_rrd_update_companion.py
-
-# Update repeater RRD from latest snapshot
-python scripts/phase2_rrd_update_repeater.py
-
-# Render all charts (day/week/month/year for all metrics)
+# Render all SVG charts from snapshots (day/week/month/year for all metrics)
 python scripts/phase2_render_charts.py
 ```
+
+Charts are rendered using matplotlib, reading directly from JSON snapshots. Each chart is generated in both light and dark theme variants.
 
 ### Phase 3: HTML Generation
 
@@ -318,22 +312,6 @@ Reports are generated for all available months/years based on snapshot data. Out
 - `/reports/{role}/{year}/{month}/` - Monthly report (HTML, TXT, JSON)
 
 Counter metrics (rx, tx, airtime) are aggregated from absolute counter values in snapshots, with proper handling of device reboots (negative deltas).
-
-### Backfill Historical Data
-
-After recreating RRD files (e.g., after changing metrics), use backfill to import historical snapshots:
-
-```bash
-# Delete existing RRD files
-rm data/rrd/*.rrd
-
-# Backfill from all historical snapshots
-python scripts/backfill_rrd.py all
-
-# Or just one role
-python scripts/backfill_rrd.py companion
-python scripts/backfill_rrd.py repeater
-```
 
 ### Deploy to Web Server
 
@@ -364,10 +342,11 @@ Color-coded based on data freshness:
 - **Yellow (stale)**: Data 30 minutes to 2 hours old
 - **Red (offline)**: Data more than 2 hours old
 
-### Tooltips
-- CSS-only tooltips using `data-tooltip` attribute
-- Work on desktop (hover) and mobile (tap via `tabindex="0"` + `:focus`)
-- Show descriptions for technical metrics (RSSI, SNR, etc.)
+### Chart Tooltips
+- Progressive enhancement via `chart-tooltip.js`
+- Shows datetime and value when hovering over chart data
+- Works without JavaScript (charts still display, just no tooltips)
+- Uses `data-points`, `data-x-start`, `data-x-end` attributes embedded in SVG
 
 ### Social Sharing
 Open Graph and Twitter Card meta tags for link previews:
@@ -394,46 +373,63 @@ Open Graph and Twitter Card meta tags for link previews:
 
 ## Chart Configuration
 
-Charts are generated at 800x280 pixels with the following features:
+Charts are generated as inline SVGs using matplotlib (`src/meshmon/charts.py`).
+
+### Rendering
+- **Output**: SVG files at 800x280 pixels
+- **Themes**: Light and dark variants (CSS `prefers-color-scheme` switches between them)
+- **Inline**: SVGs are embedded directly in HTML for zero additional requests
+- **Tooltips**: Data points embedded as JSON in SVG `data-points` attribute
+
+### Time Aggregation (Binning)
+Data points are aggregated into bins to keep chart file sizes reasonable and lines clean:
+
+| Period | Bin Size | ~Data Points | Pixels/Point |
+|--------|----------|--------------|--------------|
+| Day | Raw (no binning) | ~96 | ~6.7px |
+| Week | 30 minutes | ~336 | ~2px |
+| Month | 2 hours | ~372 | ~1.7px |
+| Year | 1 day | ~365 | ~1.8px |
+
+### Visual Style
 - 2 charts per row on desktop, 1 on mobile (< 900px)
-- Design system colors matching the UI (primary blue #2563eb)
+- Amber/orange line color (#b45309 light, #f59e0b dark)
 - Semi-transparent area fill with solid line on top
-- Min/Avg/Max/Current statistics displayed below each chart
-- Larger fonts (12-14pt) for readability when scaled down
-- White background, no borders, slope mode for smooth lines
+- Min/Avg/Max statistics displayed in chart footer
+- Current value displayed in chart header
 
 ### Repeater Metrics Summary
 
-| Metric | Source | RRD Type | Display Unit | Description |
-|--------|--------|----------|--------------|-------------|
-| `bat_v` | `derived.bat_v` | GAUGE | Voltage (V) | Battery voltage |
-| `bat_pct` | `derived.bat_pct` | GAUGE | Battery (%) | Battery percentage |
-| `rx` | `derived.rx` | DERIVE | Packets/min | Total packets received |
-| `tx` | `derived.tx` | DERIVE | Packets/min | Total packets transmitted |
-| `rssi` | `derived.rssi` | GAUGE | RSSI (dBm) | Signal strength of last packet |
-| `snr` | `derived.snr` | GAUGE | SNR (dB) | Signal-to-noise ratio |
-| `uptime` | `status.uptime` | GAUGE | Days | Time since reboot (seconds ÷ 86400) |
-| `noise` | `status.noise_floor` | GAUGE | dBm | Background RF noise |
-| `airtime` | `status.airtime` | DERIVE | Seconds/min | TX airtime rate |
-| `rx_air` | `status.rx_airtime` | DERIVE | Seconds/min | RX airtime rate |
-| `fl_dups` | `status.flood_dups` | DERIVE | Packets/min | Flood duplicate packets |
-| `di_dups` | `status.direct_dups` | DERIVE | Packets/min | Direct duplicate packets |
-| `fl_tx` | `status.sent_flood` | DERIVE | Packets/min | Flood packets transmitted |
-| `fl_rx` | `status.recv_flood` | DERIVE | Packets/min | Flood packets received |
-| `di_tx` | `status.sent_direct` | DERIVE | Packets/min | Direct packets transmitted |
-| `di_rx` | `status.recv_direct` | DERIVE | Packets/min | Direct packets received |
-| `txq` | `status.tx_queue_len` | GAUGE | Queue depth | TX queue length |
+| Metric | Source | Type | Display Unit | Description |
+|--------|--------|------|--------------|-------------|
+| `bat_v` | `derived.bat_v` | gauge | Voltage (V) | Battery voltage |
+| `bat_pct` | `derived.bat_pct` | gauge | Battery (%) | Battery percentage |
+| `rx` | `derived.rx` | counter | Packets/min | Total packets received |
+| `tx` | `derived.tx` | counter | Packets/min | Total packets transmitted |
+| `rssi` | `derived.rssi` | gauge | RSSI (dBm) | Signal strength of last packet |
+| `snr` | `derived.snr` | gauge | SNR (dB) | Signal-to-noise ratio |
+| `uptime` | `status.uptime` | gauge | Days | Time since reboot (seconds ÷ 86400) |
+| `noise` | `status.noise_floor` | gauge | dBm | Background RF noise |
+| `airtime` | `status.airtime` | counter | Seconds/min | TX airtime rate |
+| `rx_air` | `status.rx_airtime` | counter | Seconds/min | RX airtime rate |
+| `fl_dups` | `status.flood_dups` | counter | Packets/min | Flood duplicate packets |
+| `di_dups` | `status.direct_dups` | counter | Packets/min | Direct duplicate packets |
+| `fl_tx` | `status.sent_flood` | counter | Packets/min | Flood packets transmitted |
+| `fl_rx` | `status.recv_flood` | counter | Packets/min | Flood packets received |
+| `di_tx` | `status.sent_direct` | counter | Packets/min | Direct packets transmitted |
+| `di_rx` | `status.recv_direct` | counter | Packets/min | Direct packets received |
+| `txq` | `status.tx_queue_len` | gauge | Queue depth | TX queue length |
 
 ### Companion Metrics Summary
 
-| Metric | Source | RRD Type | Display Unit | Description |
-|--------|--------|----------|--------------|-------------|
-| `bat_v` | `derived.bat_v` | GAUGE | Voltage (V) | Battery voltage |
-| `bat_pct` | `derived.bat_pct` | GAUGE | Battery (%) | Battery percentage |
-| `contacts` | `derived.contacts_count` | GAUGE | Count | Known mesh nodes |
-| `rx` | `stats.packets.recv` | DERIVE | Packets/min | Total packets received |
-| `tx` | `stats.packets.sent` | DERIVE | Packets/min | Total packets transmitted |
-| `uptime` | `stats.core.uptime_secs` | GAUGE | Days | Time since reboot (seconds ÷ 86400) |
+| Metric | Source | Type | Display Unit | Description |
+|--------|--------|------|--------------|-------------|
+| `bat_v` | `derived.bat_v` | gauge | Voltage (V) | Battery voltage |
+| `bat_pct` | `derived.bat_pct` | gauge | Battery (%) | Battery percentage |
+| `contacts` | `derived.contacts_count` | gauge | Count | Known mesh nodes |
+| `rx` | `stats.packets.recv` | counter | Packets/min | Total packets received |
+| `tx` | `stats.packets.sent` | counter | Packets/min | Total packets transmitted |
+| `uptime` | `stats.core.uptime_secs` | gauge | Days | Time since reboot (seconds ÷ 86400) |
 
 ## Circuit Breaker
 
@@ -456,15 +452,6 @@ Check circuit breaker state:
 cat data/state/repeater_circuit.json
 ```
 
-Check RRD data:
-```bash
-# View RRD info
-rrdtool info data/rrd/companion.rrd
-
-# Fetch recent data
-rrdtool fetch data/rrd/companion.rrd AVERAGE --start -1h
-```
-
 Test with meshcore-cli:
 ```bash
 meshcore-cli -s /dev/ttyACM0 contacts
@@ -482,11 +469,7 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 2. **Environment variables not loaded**: Scripts must be run with direnv active or manually source `.envrc`
 
-3. **RRD update errors**:
-   - "not a simple signed integer" - DERIVE data sources require integer values for counter metrics
-   - "illegal attempt to update" - timestamps must be strictly increasing; wait at least 1 second between updates
-
-4. **Empty charts**: Need at least 2 data points for RRD to calculate averages. Use backfill script to populate historical data.
+3. **Empty charts**: Need at least 2 data points (snapshots) to display meaningful data.
 
 ## Cron Setup (Example)
 
@@ -494,12 +477,12 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 ```cron
 # Companion: every minute at :00
-* * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_companion.py && .direnv/python-3.12.3/bin/python scripts/phase2_rrd_update_companion.py
+* * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_companion.py
 
 # Repeater: every 15 minutes at :01, :16, :31, :46 (offset by 1 min to avoid USB conflict)
-1,16,31,46 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_repeater.py && .direnv/python-3.12.3/bin/python scripts/phase2_rrd_update_repeater.py
+1,16,31,46 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_repeater.py
 
-# Charts: every 5 minutes
+# Charts: every 5 minutes (generates SVG charts from snapshots)
 */5 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase2_render_charts.py
 
 # HTML: every 5 minutes
@@ -515,23 +498,21 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 ## Adding New Metrics
 
 1. Add the metric to `COMPANION_METRICS` or `REPEATER_METRICS` in `.envrc`
-2. If the metric needs calculation, add it to `build_merged_view()` in the corresponding phase2 update script and backfill script
-3. Delete existing RRD files: `rm data/rrd/*.rrd`
-4. Reload direnv: `direnv allow`
-5. Backfill historical data: `python scripts/backfill_rrd.py all`
-6. Add label in `render_all_charts()` in `src/meshmon/rrd.py`
-7. Regenerate charts and site
+2. If the metric needs calculation, add it to `build_merged_view()` in `src/meshmon/snapshot.py`
+3. If it's a counter metric (rate of change), add it to `COUNTER_METRICS` in `src/meshmon/metrics.py`
+4. Add a label in `METRIC_LABELS` in `src/meshmon/charts.py`
+5. Reload direnv: `direnv allow`
+6. Regenerate charts and site
 
-## Changing RRD Data Source Types
+## Changing Metric Types
 
 Metric type configuration is centralized in `src/meshmon/metrics.py`:
 
-- `COUNTER_METRICS`: Set of metrics that use DERIVE (rate of change)
-- `GRAPH_SCALING`: Dict of metric → scale factor for display
+- `COUNTER_METRICS`: Set of metrics that show rate of change (displayed as per-minute)
+- `GRAPH_SCALING`: Dict of metric → scale factor for display (e.g., ×60 for per-minute)
 
-If you need to change a metric from GAUGE to DERIVE (or vice versa):
+If you need to change a metric from gauge to counter (or vice versa):
 
 1. Update `COUNTER_METRICS` in `src/meshmon/metrics.py`
-2. Update `GRAPH_SCALING` if the metric needs display scaling (e.g., ×60 for per-minute)
-3. Delete existing RRD files: `rm data/rrd/*.rrd`
-4. Backfill: `python scripts/backfill_rrd.py all`
+2. Update `GRAPH_SCALING` if the metric needs display scaling
+3. Regenerate charts: `python scripts/phase2_render_charts.py`

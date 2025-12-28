@@ -119,17 +119,24 @@
       <h2 class="chart-group-title">{{ group.title }}</h2>
       <div class="charts-grid">
         {% for chart in group.charts %}
-        <article class="chart-card">
+        <article class="chart-card" data-metric="{{ chart.metric }}">
           <header class="chart-header">
             <h3 class="chart-title">{{ chart.label }}</h3>
 {% if chart.current %}
             <span class="chart-current">{{ chart.current }}</span>
 {% endif %}
           </header>
+{% if chart.use_svg %}
+          <div class="chart-svg-container">
+            <div class="chart-svg light-theme">{{ chart.svg_light | safe }}</div>
+            <div class="chart-svg dark-theme">{{ chart.svg_dark | safe }}</div>
+          </div>
+{% else %}
           <picture>
             <source srcset="{{ chart.src_dark }}" media="(prefers-color-scheme: dark)">
             <img src="{{ chart.src_light }}" alt="{{ chart.label }} over the past {{ period }}" class="chart-image" loading="lazy">
           </picture>
+{% endif %}
           {% if chart.stats %}
           <footer class="chart-footer">
             {% for stat in chart.stats %}

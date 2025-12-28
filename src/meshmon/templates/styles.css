@@ -557,6 +557,73 @@ h4 { font-size: var(--text-lg); }
   height: auto;
 }
 
+/* SVG chart container and theme switching */
+.chart-svg-container {
+  position: relative;
+  width: 100%;
+}
+
+.chart-svg {
+  width: 100%;
+}
+
+.chart-svg svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+/* Light mode: show light theme, hide dark */
+.chart-svg.dark-theme {
+  display: none;
+}
+
+.chart-svg.light-theme {
+  display: block;
+}
+
+/* Dark mode: show dark theme, hide light */
+@media (prefers-color-scheme: dark) {
+  .chart-svg.light-theme {
+    display: none;
+  }
+
+  .chart-svg.dark-theme {
+    display: block;
+  }
+}
+
+/* Chart tooltip (for future JS enhancement) */
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--border-radius);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-xs);
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.chart-tooltip.visible {
+  opacity: 1;
+}
+
+.chart-tooltip .tooltip-time {
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-xs);
+}
+
+.chart-tooltip .tooltip-value {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
 .chart-footer {
   padding: var(--space-sm) var(--space-lg);
   background: var(--bg-secondary);
