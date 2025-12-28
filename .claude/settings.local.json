@@ -18,7 +18,9 @@
       "Bash(git commit:*)",
       "Bash(git push)",
       "Bash(find:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Skill(frontend-design:frontend-design)",
+      "Skill(frontend-design:frontend-design:*)"
     ]
   }
 }

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repeater — Month — MeshCore Stats</title>
+  <meta name="description" content="LoRa mesh network monitoring for jorijn.com Repeater N — solar-powered node in Oosterhout, Netherlands">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="MeshCore Stats — Repeater">
+  <meta property="og:description" content="Solar-powered LoRa mesh repeater monitoring — battery, signal quality, and packet statistics">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar - Instrument Panel -->
+    <aside class="sidebar">
+      <header class="site-header">
+        <div class="site-title">MeshCore Stats</div>
+        <div class="site-subtitle">LoRa Mesh Observatory</div>
+      </header>
+
+      <!-- Node Selector -->
+      <nav class="node-selector">
+        <a href="day.html" class="active">Repeater</a>
+        <a href="companion/day.html">Companion</a>
+      </nav>
+
+      <!-- Node Info Card -->
+      <div class="node-info">
+        <div class="node-header">
+          <div>
+            <div class="node-name">jorijn.com Repeater N</div>
+            <div class="node-id">4a84535b9e5f</div>
+          </div>
+          <span class="status-badge online">Online</span>
+        </div>
+
+        <!-- Critical Metrics -->
+        <div class="critical-metrics">
+          <div class="metric">
+            <div class="metric-value">4.08<span class="unit">V</span></div>
+            <div class="metric-label">Battery</div>
+            <div class="battery-bar">
+              <div class="battery-bar-fill" style="width: 85%"></div>
+            </div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">85<span class="unit">%</span></div>
+            <div class="metric-label">Charge</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">-80<span class="unit">dBm</span></div>
+            <div class="metric-label">RSSI</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">12.25<span class="unit">dB</span></div>
+            <div class="metric-label">SNR</div>
+          </div>
+        </div>
+
+        <!-- Secondary Metrics -->
+        <div class="secondary-metrics">
+          <div class="secondary-metric">
+            <span class="label">Uptime</span>
+            <span class="value">11.6 days</span>
+          </div>
+          <div class="secondary-metric">
+            <span class="label">Noise Floor</span>
+            <span class="value">-120 dBm</span>
+          </div>
+          <div class="secondary-metric">
+            <span class="label">TX Queue</span>
+            <span class="value">0</span>
+          </div>
+        </div>
+
+        <!-- Traffic Metrics -->
+        <div class="traffic-metrics">
+          <div class="traffic-metric">
+            <span class="label">RX</span>
+            <span class="value">134,378</span>
+          </div>
+          <div class="traffic-metric">
+            <span class="label">TX</span>
+            <span class="value">58,404</span>
+          </div>
+          <div class="traffic-metric">
+            <span class="label">Flood RX</span>
+            <span class="value">132,167</span>
+          </div>
+          <div class="traffic-metric">
+            <span class="label">Flood TX</span>
+            <span class="value">57,549</span>
+          </div>
+          <div class="traffic-metric">
+            <span class="label">Direct RX</span>
+            <span class="value">2,196</span>
+          </div>
+          <div class="traffic-metric">
+            <span class="label">Direct TX</span>
+            <span class="value">855</span>
+          </div>
+          <div class="traffic-metric">
+            <span class="label">Airtime TX</span>
+            <span class="value">40,868s</span>
+          </div>
+          <div class="traffic-metric">
+            <span class="label">Airtime RX</span>
+            <span class="value">91,727s</span>
+          </div>
+        </div>
+
+        <!-- Node Details -->
+        <div class="node-details">
+          <div class="node-details-row">
+            <span class="label">Location</span>
+            <span class="value">Oosterhout, NL</span>
+          </div>
+          <div class="node-details-row">
+            <span class="label">Coordinates</span>
+            <span class="value">51.6674°N, 4.8597°E</span>
+          </div>
+          <div class="node-details-row">
+            <span class="label">Elevation</span>
+            <span class="value">10m</span>
+          </div>
+          <div class="node-details-row">
+            <span class="label">Hardware</span>
+            <span class="value">SenseCAP P1-Pro</span>
+          </div>
+        </div>
+
+        <!-- Radio Config -->
+        <dl class="radio-config">
+          <dt>Frequency</dt>
+          <dd>869.618 MHz</dd>
+          <dt>Bandwidth</dt>
+          <dd>62.5 kHz</dd>
+          <dt>Spread Factor</dt>
+          <dd>SF8</dd>
+          <dt>Coding Rate</dt>
+          <dd>CR8</dd>
+        </dl>
+      </div>
+
+      <!-- Last Updated -->
+      <div class="last-updated">
+        Last observation
+        <time datetime="2025-12-24T12:01:01Z">Dec 24, 2025 at 12:01 UTC</time>
+      </div>
+
+      <!-- Footer -->
+      <footer class="site-footer">
+        <a href="reports/">View Reports Archive</a>
+      </footer>
+    </aside>
+
+    <!-- Main Content - Charts -->
+    <main class="main-content">
+      <!-- Period Navigation -->
+      <nav class="period-nav">
+        <a href="day.html">Day</a>
+        <a href="week.html">Week</a>
+        <a href="month.html" class="active">Month</a>
+        <a href="year.html">Year</a>
+      </nav>
+
+      <header class="page-header">
+        <h1 class="page-title">31-Day Observations</h1>
+        <p class="page-subtitle">Radio telemetry from the past month</p>
+      </header>
+
+      <!-- Power Group -->
+      <section class="chart-group">
+        <h2 class="chart-group-title">Power</h2>
+        <div class="charts-grid">
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Battery Voltage</h3>
+              <span class="chart-current">4.08 V</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/bat_v_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/bat_v_month_light.png" alt="Battery voltage over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">3.72 V</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">3.98 V</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">4.20 V</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Battery Percentage</h3>
+              <span class="chart-current">85%</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/bat_pct_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/bat_pct_month_light.png" alt="Battery percentage over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">25%</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">72%</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">100%</span></span>
+            </footer>
+          </article>
+        </div>
+      </section>
+
+      <!-- Signal Group -->
+      <section class="chart-group">
+        <h2 class="chart-group-title">Signal Quality</h2>
+        <div class="charts-grid">
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">RSSI</h3>
+              <span class="chart-current">-80 dBm</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/rssi_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/rssi_month_light.png" alt="RSSI over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">-105 dBm</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">-74 dBm</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">-55 dBm</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Signal-to-Noise Ratio</h3>
+              <span class="chart-current">12.25 dB</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/snr_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/snr_month_light.png" alt="SNR over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">4.0 dB</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">10.5 dB</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">15.0 dB</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Noise Floor</h3>
+              <span class="chart-current">-120 dBm</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/noise_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/noise_month_light.png" alt="Noise floor over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">-126 dBm</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">-117 dBm</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">-108 dBm</span></span>
+            </footer>
+          </article>
+        </div>
+      </section>
+
+      <!-- Traffic Group -->
+      <section class="chart-group">
+        <h2 class="chart-group-title">Packet Traffic</h2>
+        <div class="charts-grid">
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Packets Received</h3>
+              <span class="chart-current">2.3/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/rx_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/rx_month_light.png" alt="Packets received over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.1/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">1.2/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">6.0/min</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Packets Transmitted</h3>
+              <span class="chart-current">1.1/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/tx_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/tx_month_light.png" alt="Packets transmitted over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.0/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">0.6/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">3.5/min</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Flood RX</h3>
+              <span class="chart-current">2.1/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/fl_rx_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/fl_rx_month_light.png" alt="Flood packets received over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.1/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">1.0/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">5.5/min</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Flood TX</h3>
+              <span class="chart-current">1.0/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/fl_tx_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/fl_tx_month_light.png" alt="Flood packets transmitted over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.0/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">0.5/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">3.2/min</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Direct RX</h3>
+              <span class="chart-current">0.15/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/di_rx_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/di_rx_month_light.png" alt="Direct packets received over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.0/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">0.06/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">0.8/min</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Direct TX</h3>
+              <span class="chart-current">0.06/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/di_tx_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/di_tx_month_light.png" alt="Direct packets transmitted over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.0/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">0.03/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">0.4/min</span></span>
+            </footer>
+          </article>
+        </div>
+      </section>
+
+      <!-- Airtime Group -->
+      <section class="chart-group">
+        <h2 class="chart-group-title">Airtime</h2>
+        <div class="charts-grid">
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">TX Airtime</h3>
+              <span class="chart-current">0.8 s/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/airtime_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/airtime_month_light.png" alt="TX airtime over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.0 s/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">0.4 s/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">2.5 s/min</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">RX Airtime</h3>
+              <span class="chart-current">1.9 s/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/rx_air_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/rx_air_month_light.png" alt="RX airtime over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.1 s/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">1.0 s/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">4.8 s/min</span></span>
+            </footer>
+          </article>
+        </div>
+      </section>
+
+      <!-- Duplicates & Queue Group -->
+      <section class="chart-group">
+        <h2 class="chart-group-title">Duplicates & Queue</h2>
+        <div class="charts-grid">
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Flood Duplicates</h3>
+              <span class="chart-current">0.15/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/fl_dups_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/fl_dups_month_light.png" alt="Flood duplicates over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.0/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">0.06/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">0.7/min</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Direct Duplicates</h3>
+              <span class="chart-current">0.01/min</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/di_dups_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/di_dups_month_light.png" alt="Direct duplicates over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.0/min</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">0.0/min</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">0.2/min</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">TX Queue Length</h3>
+              <span class="chart-current">0</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/txq_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/txq_month_light.png" alt="TX queue length over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">0</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">5</span></span>
+            </footer>
+          </article>
+
+          <article class="chart-card">
+            <header class="chart-header">
+              <h3 class="chart-title">Uptime</h3>
+              <span class="chart-current">11.6 days</span>
+            </header>
+            <picture>
+              <source srcset="assets/repeater/uptime_month_dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/repeater/uptime_month_light.png" alt="Uptime over the past month" class="chart-image" loading="lazy">
+            </picture>
+            <footer class="chart-footer">
+              <span class="chart-stat"><span class="label">Min</span> <span class="value">0.0 d</span></span>
+              <span class="chart-stat"><span class="label">Avg</span> <span class="value">8.5 d</span></span>
+              <span class="chart-stat"><span class="label">Max</span> <span class="value">25.0 d</span></span>
+            </footer>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
