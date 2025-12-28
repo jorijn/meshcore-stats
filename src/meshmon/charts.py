@@ -391,6 +391,8 @@ def render_chart_svg(
 ) -> str:
     """Render time series as SVG using matplotlib.
 
+    Uses bar charts for counter metrics (rate-based) and line charts for gauges.
+
     Args:
         ts: Time series data to render
         theme: Color theme to apply
@@ -410,6 +412,9 @@ def render_chart_svg(
     fig_height = height / dpi
 
     fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=dpi)
+
+    # Determine if this is a counter metric (use bar chart)
+    use_bar_chart = is_counter_metric(ts.metric)
 
     try:
         # Apply theme colors
@@ -442,12 +447,31 @@ def render_chart_svg(
             timestamps = ts.timestamps
             values = ts.values
 
-            # Plot area fill
-            area_color = _hex_to_rgba(theme.area)
-            ax.fill_between(timestamps, values, alpha=area_color[3], color=f"#{theme.line}")
+            if use_bar_chart:
+                # Bar chart for counter metrics (rate-based)
+                # Calculate bar width based on time period
+                if len(timestamps) > 1:
+                    # Use average time delta between points
+                    time_deltas = [(timestamps[i+1] - timestamps[i]).total_seconds()
+                                   for i in range(len(timestamps) - 1)]
+                    avg_delta_seconds = sum(time_deltas) / len(time_deltas)
+                    # Convert to matplotlib date units (days) and use 80% of interval for bar width
+                    bar_width = (avg_delta_seconds / 86400) * 0.8
+                else:
+                    # Single point - use default width
+                    bar_width = 0.04  # ~1 hour in days
 
-            # Plot line
-            ax.plot(timestamps, values, color=f"#{theme.line}", linewidth=2)
+                # Plot bars
+                ax.bar(timestamps, values, width=bar_width,
+                       color=f"#{theme.line}", alpha=0.9, edgecolor='none')
+            else:
+                # Line chart for gauge metrics
+                # Plot area fill
+                area_color = _hex_to_rgba(theme.area)
+                ax.fill_between(timestamps, values, alpha=area_color[3], color=f"#{theme.line}")
+
+                # Plot line
+                ax.plot(timestamps, values, color=f"#{theme.line}", linewidth=2)
 
             # Set Y-axis limits and track actual values used
             if y_min is not None and y_max is not None:
@@ -523,7 +547,7 @@ def _inject_data_attributes(
 
     Adds:
     - data-metric, data-period, data-theme, data-x-start, data-x-end, data-y-min, data-y-max to root <svg>
-    - data-points JSON array to the chart path element
+    - data-points JSON array to the chart element (path for line charts, first rect for bar charts)
 
     Args:
         svg: Raw SVG string
@@ -565,17 +589,32 @@ def _inject_data_attributes(
         count=1
     )
 
-    # Add data-points to the main path element (the line, not the fill)
-    # Look for the second path element (first is usually the fill area)
-    path_count = 0
-    def add_data_to_path(match):
-        nonlocal path_count
-        path_count += 1
-        if path_count == 2:  # The line path
-            return f'<path data-points="{data_points_attr}"'
-        return match.group(0)
+    # Check if this is a counter metric (bar chart)
+    use_bar_chart = is_counter_metric(ts.metric)
 
-    svg = re.sub(r'<path\b', add_data_to_path, svg)
+    if use_bar_chart:
+        # Add data-points to the first rect element (bar chart)
+        rect_count = 0
+        def add_data_to_rect(match):
+            nonlocal rect_count
+            rect_count += 1
+            if rect_count == 1:  # First bar
+                return f'<rect data-points="{data_points_attr}"'
+            return match.group(0)
+
+        svg = re.sub(r'<rect\b', add_data_to_rect, svg)
+    else:
+        # Add data-points to the main path element (the line, not the fill)
+        # Look for the second path element (first is usually the fill area)
+        path_count = 0
+        def add_data_to_path(match):
+            nonlocal path_count
+            path_count += 1
+            if path_count == 2:  # The line path
+                return f'<path data-points="{data_points_attr}"'
+            return match.group(0)
+
+        svg = re.sub(r'<path\b', add_data_to_path, svg)
 
     return svg
 
