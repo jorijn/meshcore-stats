@@ -2,6 +2,19 @@
 
 > **Maintenance Note**: This file should always reflect the current state of the project. When making changes to the codebase (adding features, changing architecture, modifying configuration), update this document accordingly. Keep it accurate and comprehensive for future reference.
 
+## Running Commands
+
+**IMPORTANT**: Always use `direnv exec .` to run Python scripts in this project. This ensures the correct virtualenv and environment variables are loaded.
+
+```bash
+# Correct way to run scripts
+direnv exec . python scripts/phase3_render_site.py
+
+# NEVER use these (virtualenv won't be loaded correctly):
+# source .envrc && python ...
+# .direnv/python-3.12/bin/python ...
+```
+
 ## Project Overview
 
 This project monitors a MeshCore LoRa mesh network consisting of:

@@ -29,30 +29,33 @@ class ChartTheme:
     area: str  # Includes alpha, e.g., "2563eb40"
 
 
+# Radio Observatory design theme
+# Light: Warm cream paper background with solar amber accent
+# Dark: Deep observatory night sky with amber accent
 CHART_THEMES: dict[ThemeName, ChartTheme] = {
     "light": ChartTheme(
-        back="ffffff",
+        back="faf8f5",      # Warm cream paper
         canvas="ffffff",
-        font="1e293b",
-        axis="64748b",
-        frame="e2e8f0",
-        arrow="64748b",
-        grid="e2e8f0",
-        mgrid="cbd5e1",
-        line="2563eb",
-        area="2563eb40",
+        font="1a1915",      # Charcoal text
+        axis="8a857a",      # Muted axis labels
+        frame="e8e4dc",     # Subtle border
+        arrow="8a857a",
+        grid="e8e4dc",
+        mgrid="d4cfc4",
+        line="b45309",      # Solar amber / burnt orange
+        area="b4530926",    # 15% opacity amber fill
     ),
     "dark": ChartTheme(
-        back="1e293b",
-        canvas="1e293b",
-        font="f1f5f9",
-        axis="94a3b8",
-        frame="334155",
-        arrow="94a3b8",
-        grid="334155",
-        mgrid="475569",
-        line="3b82f6",
-        area="3b82f640",
+        back="0f1114",      # Deep observatory night
+        canvas="161a1e",
+        font="f0efe8",      # Light text
+        axis="706d62",      # Muted axis labels
+        frame="252a30",     # Subtle border
+        arrow="706d62",
+        grid="252a30",
+        mgrid="2d333a",
+        line="f59e0b",      # Bright amber
+        area="f59e0b33",    # 20% opacity amber fill
     ),
 }
 
