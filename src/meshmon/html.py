@@ -18,7 +18,7 @@ from .formatters import (
     format_duration,
     format_uptime,
 )
-from .rrd import load_chart_stats
+from .charts import load_chart_stats
 from . import log
 
 
@@ -407,6 +407,25 @@ def _format_stat_value(value: Optional[float], metric: str) -> str:
         return f"{value:.2f}"
 
 
+def _load_svg_content(path: Path) -> Optional[str]:
+    """Load SVG file content for inline embedding.
+
+    Args:
+        path: Path to SVG file
+
+    Returns:
+        SVG content string, or None if file doesn't exist
+    """
+    if not path.exists():
+        return None
+
+    try:
+        return path.read_text()
+    except Exception as e:
+        log.debug(f"Failed to load SVG {path}: {e}")
+        return None
+
+
 def build_chart_groups(
     role: str,
     period: str,
@@ -416,6 +435,7 @@ def build_chart_groups(
     """Build chart groups for template.
 
     Each group contains title and list of charts with their data.
+    SVG content is loaded and included for inline embedding.
 
     Args:
         role: "companion" or "repeater"
@@ -436,9 +456,16 @@ def build_chart_groups(
             if metric not in metrics:
                 continue
 
-            # Check if chart exists
-            chart_path = cfg.out_dir / "assets" / role / f"{metric}_{period}_light.png"
-            if not chart_path.exists():
+            # Try SVG first (new format), fall back to PNG (legacy)
+            svg_light_path = cfg.out_dir / "assets" / role / f"{metric}_{period}_light.svg"
+            svg_dark_path = cfg.out_dir / "assets" / role / f"{metric}_{period}_dark.svg"
+            png_light_path = cfg.out_dir / "assets" / role / f"{metric}_{period}_light.png"
+
+            svg_light = _load_svg_content(svg_light_path)
+            svg_dark = _load_svg_content(svg_dark_path)
+
+            # Skip if neither SVG nor PNG exists
+            if svg_light is None and not png_light_path.exists():
                 continue
 
             # Get stats for this metric/period
@@ -460,13 +487,25 @@ def build_chart_groups(
                     {"label": "Max", "value": _format_stat_value(max_val, metric)},
                 ]
 
-            charts.append({
+            chart_data = {
                 "label": CHART_LABELS.get(metric, metric),
-                "src_light": f"/assets/{role}/{metric}_{period}_light.png",
-                "src_dark": f"/assets/{role}/{metric}_{period}_dark.png",
+                "metric": metric,
                 "current": current_formatted,
                 "stats": stats_list,
-            })
+            }
+
+            # Include SVG content if available (for inline embedding)
+            if svg_light is not None:
+                chart_data["svg_light"] = svg_light
+                chart_data["svg_dark"] = svg_dark
+                chart_data["use_svg"] = True
+            else:
+                # Fallback to PNG paths
+                chart_data["src_light"] = f"/assets/{role}/{metric}_{period}_light.png"
+                chart_data["src_dark"] = f"/assets/{role}/{metric}_{period}_dark.png"
+                chart_data["use_svg"] = False
+
+            charts.append(chart_data)
 
         if charts:
             groups.append({
@@ -605,18 +644,23 @@ def render_node_page(
     return template.render(**context)
 
 
-def copy_styles():
-    """Copy styles.css to output directory."""
+def copy_static_assets():
+    """Copy static assets (CSS, JS) to output directory."""
     cfg = get_config()
-    # styles.css lives alongside templates in src/meshmon/templates/
-    src = Path(__file__).parent / "templates" / "styles.css"
-    dst = cfg.out_dir / "styles.css"
+    templates_dir = Path(__file__).parent / "templates"
 
-    if src.exists():
-        shutil.copy2(src, dst)
-        log.debug(f"Copied {src} to {dst}")
-    else:
-        log.warn(f"styles.css not found at {src}")
+    # Files to copy from templates/ to out/
+    static_files = ["styles.css", "chart-tooltip.js"]
+
+    for filename in static_files:
+        src = templates_dir / filename
+        dst = cfg.out_dir / filename
+
+        if src.exists():
+            shutil.copy2(src, dst)
+            log.debug(f"Copied {src} to {dst}")
+        else:
+            log.warn(f"Static asset not found: {src}")
 
 
 def write_site(
@@ -639,8 +683,8 @@ def write_site(
     (cfg.out_dir / "assets" / "repeater").mkdir(parents=True, exist_ok=True)
     (cfg.out_dir / "assets" / "companion").mkdir(parents=True, exist_ok=True)
 
-    # Copy styles.css
-    copy_styles()
+    # Copy static assets (CSS, JS)
+    copy_static_assets()
 
     # Repeater pages at root level
     for period in ["day", "week", "month", "year"]:
