@@ -20,7 +20,8 @@
       "Bash(find:*)",
       "Bash(tree:*)",
       "Skill(frontend-design:frontend-design)",
-      "Skill(frontend-design:frontend-design:*)"
+      "Skill(frontend-design:frontend-design:*)",
+      "Bash(direnv exec:*)"
     ]
   }
 }
