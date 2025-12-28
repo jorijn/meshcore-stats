@@ -1,8 +1,9 @@
 """RRD create, update, and graph helpers."""
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from .env import get_config
 from .extract import format_rrd_value
@@ -211,6 +212,93 @@ def update_rrd(
         return False
 
 
+def fetch_chart_stats(
+    role: str,
+    ds_name: str,
+    period: str,
+) -> Optional[dict[str, Any]]:
+    """
+    Fetch min/avg/max/current statistics for a metric from RRD.
+
+    Args:
+        role: "companion" or "repeater"
+        ds_name: Data source name
+        period: Time period ("day", "week", "month", "year")
+
+    Returns:
+        Dict with 'min', 'avg', 'max', 'current' keys, or None on error
+    """
+    if not RRDTOOL_AVAILABLE:
+        return None
+
+    rrd_path = get_rrd_path(role)
+    if not rrd_path.exists():
+        return None
+
+    # Map period to rrdtool time spec
+    period_map = {
+        "day": "-1d",
+        "week": "-1w",
+        "month": "-1m",
+        "year": "-1y",
+    }
+    start = period_map.get(period, "-1d")
+
+    # Get scaling factor for display
+    scale = get_graph_scale(ds_name)
+
+    try:
+        # Use rrdtool graph with PRINT to extract stats (writes to /dev/null)
+        # This is more reliable than parsing fetch output
+        args = [
+            "/dev/null",  # Don't actually create a graph
+            "--start", start,
+            "--end", "now",
+            f"DEF:raw={rrd_path}:{ds_name}:AVERAGE",
+        ]
+
+        # Apply scaling
+        if scale == 1.0:
+            args.append("CDEF:scaled=raw")
+        elif scale > 1:
+            args.append(f"CDEF:scaled=raw,{int(scale)},*")
+        else:
+            divisor = int(1 / scale)
+            args.append(f"CDEF:scaled=raw,{divisor},/")
+
+        # Add PRINT statements to extract stats
+        args.extend([
+            "VDEF:vmin=scaled,MINIMUM",
+            "VDEF:vavg=scaled,AVERAGE",
+            "VDEF:vmax=scaled,MAXIMUM",
+            "VDEF:vlast=scaled,LAST",
+            "PRINT:vmin:%lf",
+            "PRINT:vavg:%lf",
+            "PRINT:vmax:%lf",
+            "PRINT:vlast:%lf",
+        ])
+
+        result = rrdtool.graphv(*args)
+        # result is a dict with 'print[0]', 'print[1]', etc.
+        stats = {
+            "min": float(result.get("print[0]", "nan")),
+            "avg": float(result.get("print[1]", "nan")),
+            "max": float(result.get("print[2]", "nan")),
+            "current": float(result.get("print[3]", "nan")),
+        }
+
+        # Filter out NaN values
+        for key in stats:
+            if stats[key] != stats[key]:  # NaN check
+                stats[key] = None
+
+        return stats
+
+    except Exception as e:
+        log.debug(f"Failed to fetch stats for {ds_name}: {e}")
+        return None
+
+
 def graph_rrd(
     role: str,
     ds_name: str,
@@ -319,13 +407,7 @@ def graph_rrd(
 
     # Area fill with semi-transparent primary color, then line on top
     args.append(f"AREA:{ds_name}#{colors.area}")
-    args.append(f"LINE2:{ds_name}#{colors.line}:  ")  # Label with spacing
-
-    # Add statistics (min/avg/max/current) below the chart
-    args.append(f"GPRINT:{ds_name}:MIN:Min\\: %6.2lf%s")
-    args.append(f"GPRINT:{ds_name}:AVERAGE:Avg\\: %6.2lf%s")
-    args.append(f"GPRINT:{ds_name}:MAX:Max\\: %6.2lf%s")
-    args.append(f"GPRINT:{ds_name}:LAST:Current\\: %6.2lf%s\\n")
+    args.append(f"LINE2:{ds_name}#{colors.line}")
 
     try:
         log.debug(f"Generating graph: {output_path}")
@@ -336,16 +418,22 @@ def graph_rrd(
         return False
 
 
-def render_all_charts(role: str, metrics: dict[str, str]) -> list[Path]:
+def render_all_charts(
+    role: str,
+    metrics: dict[str, str],
+) -> tuple[list[Path], dict[str, dict[str, dict[str, Any]]]]:
     """
     Render all charts for a role in both light and dark themes.
+
+    Also collects min/avg/max/current statistics for each metric/period.
 
     Args:
         role: "companion" or "repeater"
         metrics: Metrics config
 
     Returns:
-        List of generated chart paths
+        Tuple of (list of generated chart paths, stats dict)
+        Stats dict structure: {metric_name: {period: {min, avg, max, current}}}
     """
     cfg = get_config()
     charts_dir = cfg.out_dir / "assets" / role
@@ -353,6 +441,7 @@ def render_all_charts(role: str, metrics: dict[str, str]) -> list[Path]:
     themes: list[ThemeName] = ["light", "dark"]
 
     generated = []
+    all_stats: dict[str, dict[str, dict[str, Any]]] = {}
 
     # Define labels for known metrics
     labels = {
@@ -378,7 +467,14 @@ def render_all_charts(role: str, metrics: dict[str, str]) -> list[Path]:
     }
 
     for ds_name in sorted(metrics.keys()):
+        all_stats[ds_name] = {}
+
         for period in periods:
+            # Fetch stats once per metric/period (not per theme)
+            stats = fetch_chart_stats(role, ds_name, period)
+            if stats:
+                all_stats[ds_name][period] = stats
+
             for theme in themes:
                 output_path = charts_dir / f"{ds_name}_{period}_{theme}.png"
                 vlabel = labels.get(ds_name, "Value")
@@ -393,4 +489,50 @@ def render_all_charts(role: str, metrics: dict[str, str]) -> list[Path]:
                 ):
                     generated.append(output_path)
 
-    return generated
+    return generated, all_stats
+
+
+def save_chart_stats(role: str, stats: dict[str, dict[str, dict[str, Any]]]) -> Path:
+    """
+    Save chart statistics to a JSON file.
+
+    Args:
+        role: "companion" or "repeater"
+        stats: Stats dict from render_all_charts
+
+    Returns:
+        Path to the saved JSON file
+    """
+    cfg = get_config()
+    stats_path = cfg.out_dir / "assets" / role / "chart_stats.json"
+    stats_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(stats_path, "w") as f:
+        json.dump(stats, f, indent=2)
+
+    log.debug(f"Saved chart stats to {stats_path}")
+    return stats_path
+
+
+def load_chart_stats(role: str) -> dict[str, dict[str, dict[str, Any]]]:
+    """
+    Load chart statistics from JSON file.
+
+    Args:
+        role: "companion" or "repeater"
+
+    Returns:
+        Stats dict, or empty dict if file doesn't exist
+    """
+    cfg = get_config()
+    stats_path = cfg.out_dir / "assets" / role / "chart_stats.json"
+
+    if not stats_path.exists():
+        return {}
+
+    try:
+        with open(stats_path) as f:
+            return json.load(f)
+    except Exception as e:
+        log.debug(f"Failed to load chart stats: {e}")
+        return {}

@@ -13,11 +13,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from meshmon.env import get_config
 from meshmon import log
-from meshmon.rrd import render_all_charts, get_rrd_path
+from meshmon.rrd import render_all_charts, get_rrd_path, save_chart_stats
 
 
 def main():
-    """Render all charts."""
+    """Render all charts and save statistics."""
     cfg = get_config()
 
     log.info("Rendering charts...")
@@ -25,7 +25,8 @@ def main():
     # Companion charts
     companion_rrd = get_rrd_path("companion")
     if companion_rrd.exists():
-        charts = render_all_charts("companion", cfg.companion_metrics)
+        charts, stats = render_all_charts("companion", cfg.companion_metrics)
+        save_chart_stats("companion", stats)
         log.info(f"Rendered {len(charts)} companion charts")
     else:
         log.warn(f"Companion RRD not found: {companion_rrd}")
@@ -33,7 +34,8 @@ def main():
     # Repeater charts
     repeater_rrd = get_rrd_path("repeater")
     if repeater_rrd.exists():
-        charts = render_all_charts("repeater", cfg.repeater_metrics)
+        charts, stats = render_all_charts("repeater", cfg.repeater_metrics)
+        save_chart_stats("repeater", stats)
         log.info(f"Rendered {len(charts)} repeater charts")
     else:
         log.warn(f"Repeater RRD not found: {repeater_rrd}")

@@ -18,6 +18,7 @@ from .formatters import (
     format_duration,
     format_uptime,
 )
+from .rrd import load_chart_stats
 from . import log
 
 
@@ -372,17 +373,61 @@ def build_radio_config(snapshot: Optional[dict]) -> list[dict]:
     return config
 
 
+def _format_stat_value(value: Optional[float], metric: str) -> str:
+    """Format a statistic value for display in chart footer.
+
+    Args:
+        value: The numeric value (or None)
+        metric: Metric name to determine formatting
+
+    Returns:
+        Formatted string like "4.08 V", "85%", "2.3/min"
+    """
+    if value is None:
+        return "-"
+
+    # Determine format and suffix based on metric
+    if metric == "bat_v":
+        return f"{value:.2f} V"
+    elif metric == "bat_pct":
+        return f"{value:.0f}%"
+    elif metric in ("rssi", "noise"):
+        return f"{value:.0f} dBm"
+    elif metric == "snr":
+        return f"{value:.1f} dB"
+    elif metric in ("contacts", "txq"):
+        return f"{value:.0f}"
+    elif metric == "uptime":
+        return f"{value:.1f} d"
+    elif metric in ("rx", "tx", "fl_rx", "fl_tx", "di_rx", "di_tx", "fl_dups", "di_dups"):
+        return f"{value:.1f}/min"
+    elif metric in ("airtime", "rx_air"):
+        return f"{value:.1f} s/min"
+    else:
+        return f"{value:.2f}"
+
+
 def build_chart_groups(
     role: str,
     period: str,
     metrics: dict[str, str],
+    chart_stats: Optional[dict] = None,
 ) -> list[dict]:
     """Build chart groups for template.
 
     Each group contains title and list of charts with their data.
+
+    Args:
+        role: "companion" or "repeater"
+        period: Time period ("day", "week", etc.)
+        metrics: Metrics config
+        chart_stats: Stats dict from chart_stats.json (optional)
     """
     cfg = get_config()
     groups_config = REPEATER_CHART_GROUPS if role == "repeater" else COMPANION_CHART_GROUPS
+
+    if chart_stats is None:
+        chart_stats = {}
 
     groups = []
     for group in groups_config:
@@ -396,12 +441,31 @@ def build_chart_groups(
             if not chart_path.exists():
                 continue
 
+            # Get stats for this metric/period
+            metric_stats = chart_stats.get(metric, {}).get(period, {})
+            current_val = metric_stats.get("current")
+            min_val = metric_stats.get("min")
+            avg_val = metric_stats.get("avg")
+            max_val = metric_stats.get("max")
+
+            # Format current value for header
+            current_formatted = _format_stat_value(current_val, metric) if current_val is not None else None
+
+            # Build stats list for footer
+            stats_list = None
+            if any(v is not None for v in [min_val, avg_val, max_val]):
+                stats_list = [
+                    {"label": "Min", "value": _format_stat_value(min_val, metric)},
+                    {"label": "Avg", "value": _format_stat_value(avg_val, metric)},
+                    {"label": "Max", "value": _format_stat_value(max_val, metric)},
+                ]
+
             charts.append({
                 "label": CHART_LABELS.get(metric, metric),
                 "src_light": f"/assets/{role}/{metric}_{period}_light.png",
                 "src_dark": f"/assets/{role}/{metric}_{period}_dark.png",
-                "current": None,  # Could be populated from RRD if needed
-                "stats": None,    # Could be populated from RRD if needed
+                "current": current_formatted,
+                "stats": stats_list,
             })
 
         if charts:
@@ -461,8 +525,9 @@ def build_page_context(
     # Radio config
     radio_config = build_radio_config(snapshot)
 
-    # Chart groups
-    chart_groups = build_chart_groups(role, period, metrics)
+    # Load chart stats and build chart groups
+    chart_stats = load_chart_stats(role)
+    chart_groups = build_chart_groups(role, period, metrics, chart_stats)
 
     # Period config
     page_title, page_subtitle = PERIOD_CONFIG.get(period, ("Observations", "Radio telemetry"))
@@ -614,12 +679,19 @@ def _fmt_val_time(value: float | None, time_obj, fmt: str = ".2f", time_fmt: str
 
 
 def _fmt_val_day(value: float | None, time_obj, fmt: str = ".2f") -> str:
-    """Format a value with day number in <small> tag, for summary rows."""
+    """Format a value with day number in <small> tag, for yearly data rows."""
     if value is None:
         return "-"
     day_str = f"{time_obj.day:02d}" if time_obj else ""
     if day_str:
         return f"{value:{fmt}} <small>{day_str}</small>"
+    return f"{value:{fmt}}"
+
+
+def _fmt_val_plain(value: float | None, fmt: str = ".2f") -> str:
+    """Format a value without any suffix, for tfoot summary rows."""
+    if value is None:
+        return "-"
     return f"{value:{fmt}}"
 
 
@@ -707,8 +779,8 @@ def build_monthly_table_data(
                 {"value": "Avg", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": _fmt_val_day(bat_v.min_value, bat_v.min_time), "class": "muted"},
-                {"value": _fmt_val_day(bat_v.max_value, bat_v.max_time), "class": "muted"},
+                {"value": _fmt_val_plain(bat_v.min_value), "class": "muted"},
+                {"value": _fmt_val_plain(bat_v.max_value), "class": "muted"},
                 {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                 {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                 {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
@@ -774,8 +846,8 @@ def build_monthly_table_data(
                 {"value": "Avg", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": _fmt_val_day(bat_v.min_value, bat_v.min_time), "class": "muted"},
-                {"value": _fmt_val_day(bat_v.max_value, bat_v.max_time), "class": "muted"},
+                {"value": _fmt_val_plain(bat_v.min_value), "class": "muted"},
+                {"value": _fmt_val_plain(bat_v.max_value), "class": "muted"},
                 {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
                 {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                 {"value": f"{tx.total:,}" if tx.total else "-", "class": None},

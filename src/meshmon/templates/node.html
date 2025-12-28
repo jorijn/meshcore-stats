@@ -10,8 +10,8 @@
 
     <!-- Node Selector -->
     <nav class="node-selector">
-      <a href="{{ repeater_link }}" {% if role == 'repeater' %}class="active"{% endif %}>Repeater</a>
-      <a href="{{ companion_link }}" {% if role == 'companion' %}class="active"{% endif %}>Companion</a>
+      <a href="{{ repeater_link }}"{% if role == 'repeater' %} class="active"{% endif %}>Repeater</a>
+      <a href="{{ companion_link }}"{% if role == 'companion' %} class="active"{% endif %}>Companion</a>
     </nav>
 
     <!-- Node Info Card -->
@@ -19,7 +19,9 @@
       <div class="node-header">
         <div>
           <div class="node-name">{{ node_name }}</div>
-          {% if pubkey_pre %}<div class="node-id">{{ pubkey_pre }}</div>{% endif %}
+{% if pubkey_pre %}
+          <div class="node-id">{{ pubkey_pre }}</div>
+{% endif %}
         </div>
         <span class="status-badge {{ status_class }}">{{ status_text }}</span>
       </div>
@@ -84,7 +86,11 @@
     <!-- Last Updated -->
     <div class="last-updated">
       Last observation
-      {% if last_updated %}<time datetime="{{ last_updated_iso }}">{{ last_updated }}</time>{% else %}<time>N/A</time>{% endif %}
+{% if last_updated %}
+      <time datetime="{{ last_updated_iso }}">{{ last_updated }}</time>
+{% else %}
+      <time>N/A</time>
+{% endif %}
     </div>
 
     <!-- Footer -->
@@ -97,10 +103,10 @@
   <main class="main-content">
     <!-- Period Navigation -->
     <nav class="period-nav">
-      <a href="{{ base_path }}/day.html" {% if period == 'day' %}class="active"{% endif %}>Day</a>
-      <a href="{{ base_path }}/week.html" {% if period == 'week' %}class="active"{% endif %}>Week</a>
-      <a href="{{ base_path }}/month.html" {% if period == 'month' %}class="active"{% endif %}>Month</a>
-      <a href="{{ base_path }}/year.html" {% if period == 'year' %}class="active"{% endif %}>Year</a>
+      <a href="{{ base_path }}/day.html"{% if period == 'day' %} class="active"{% endif %}>Day</a>
+      <a href="{{ base_path }}/week.html"{% if period == 'week' %} class="active"{% endif %}>Week</a>
+      <a href="{{ base_path }}/month.html"{% if period == 'month' %} class="active"{% endif %}>Month</a>
+      <a href="{{ base_path }}/year.html"{% if period == 'year' %} class="active"{% endif %}>Year</a>
     </nav>
 
     <header class="page-header">
@@ -116,7 +122,9 @@
         <article class="chart-card">
           <header class="chart-header">
             <h3 class="chart-title">{{ chart.label }}</h3>
-            {% if chart.current %}<span class="chart-current">{{ chart.current }}</span>{% endif %}
+{% if chart.current %}
+            <span class="chart-current">{{ chart.current }}</span>
+{% endif %}
           </header>
           <picture>
             <source srcset="{{ chart.src_dark }}" media="(prefers-color-scheme: dark)">
