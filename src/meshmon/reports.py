@@ -528,7 +528,7 @@ def get_available_periods(role: str) -> list[tuple[int, int]]:
 
 
 def format_lat_lon(lat: float, lon: float) -> tuple[str, str]:
-    """Convert decimal degrees to degrees-minutes format.
+    """Convert decimal degrees to degrees-minutes format for TXT reports.
 
     Args:
         lat: Latitude in decimal degrees (positive = North)
@@ -554,6 +554,39 @@ def format_lat_lon(lat: float, lon: float) -> tuple[str, str]:
     return (lat_str, lon_str)
 
 
+def format_lat_lon_dms(lat: float, lon: float) -> str:
+    """Convert decimal degrees to degrees-minutes-seconds format for HTML reports.
+
+    Args:
+        lat: Latitude in decimal degrees (positive = North)
+        lon: Longitude in decimal degrees (positive = East)
+
+    Returns:
+        Combined string in format "DD°MM'SS\"N  DDD°MM'SS\"E"
+    """
+    def to_dms(coord: float, is_lat: bool) -> str:
+        """Convert a single coordinate to DMS format."""
+        if is_lat:
+            direction = "N" if coord >= 0 else "S"
+            deg_width = 2
+        else:
+            direction = "E" if coord >= 0 else "W"
+            deg_width = 3
+
+        coord_abs = abs(coord)
+        degrees = int(coord_abs)
+        minutes_float = (coord_abs - degrees) * 60
+        minutes = int(minutes_float)
+        seconds = int((minutes_float - minutes) * 60)
+
+        return f"{degrees:0{deg_width}d}°{minutes:02d}'{seconds:02d}\"{direction}"
+
+    lat_str = to_dms(lat, is_lat=True)
+    lon_str = to_dms(lon, is_lat=False)
+
+    return f"{lat_str}  {lon_str}"
+
+
 @dataclass
 class LocationInfo:
     """Location metadata for reports."""
@@ -565,10 +598,10 @@ class LocationInfo:
 
     def format_header(self) -> str:
         """Format location header for text reports."""
-        lat_str, lon_str = format_lat_lon(self.lat, self.lon)
+        coords_str = format_lat_lon_dms(self.lat, self.lon)
         return (
             f"NAME: {self.name}\n"
-            f"ELEV: {self.elev:.0f} meters    LAT: {lat_str}    LONG: {lon_str}"
+            f"COORDS: {coords_str}    ELEV: {self.elev:.0f} meters"
         )
 
 

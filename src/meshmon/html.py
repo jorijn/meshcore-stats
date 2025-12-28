@@ -603,35 +603,62 @@ def write_site(
 # =============================================================================
 
 
+def _fmt_val_time(value: float | None, time_obj, fmt: str = ".2f", time_fmt: str = "%H:%M") -> str:
+    """Format a value with time in <small> tag, matching redesign format."""
+    if value is None:
+        return "-"
+    time_str = time_obj.strftime(time_fmt) if time_obj else ""
+    if time_str:
+        return f"{value:{fmt}} <small>{time_str}</small>"
+    return f"{value:{fmt}}"
+
+
+def _fmt_val_day(value: float | None, time_obj, fmt: str = ".2f") -> str:
+    """Format a value with day number in <small> tag, for summary rows."""
+    if value is None:
+        return "-"
+    day_str = f"{time_obj.day:02d}" if time_obj else ""
+    if day_str:
+        return f"{value:{fmt}} <small>{day_str}</small>"
+    return f"{value:{fmt}}"
+
+
 def build_monthly_table_data(
     agg: "MonthlyAggregate", role: str
-) -> tuple[list[dict], list[dict]]:
-    """Build table headers and rows for a monthly report.
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Build table column groups, headers and rows for a monthly report.
 
     Args:
         agg: Monthly aggregate data
         role: "companion" or "repeater"
 
     Returns:
-        (headers, rows) where each header/cell is a dict with label/value/tooltip/class
+        (col_groups, headers, rows) where each is a list of dicts
     """
     from .reports import MetricStats
 
     if role == "repeater":
+        # Column groups matching redesign/reports/monthly.html
+        col_groups = [
+            {"label": "", "colspan": 1},
+            {"label": "Battery", "colspan": 4},
+            {"label": "Signal", "colspan": 3},
+            {"label": "Packets", "colspan": 2},
+            {"label": "Air", "colspan": 1},
+        ]
+
         headers = [
             {"label": "Day", "tooltip": None},
-            {"label": "V (avg)", "tooltip": "Average battery voltage"},
-            {"label": "% (avg)", "tooltip": "Average battery percentage"},
-            {"label": "V (min)", "tooltip": "Minimum battery voltage"},
-            {"label": "Time", "tooltip": "Time of minimum voltage"},
-            {"label": "V (max)", "tooltip": "Maximum battery voltage"},
-            {"label": "Time", "tooltip": "Time of maximum voltage"},
+            {"label": "Avg V", "tooltip": "Average battery voltage"},
+            {"label": "Avg %", "tooltip": "Average battery percentage"},
+            {"label": "Min V", "tooltip": "Minimum battery voltage with time"},
+            {"label": "Max V", "tooltip": "Maximum battery voltage with time"},
             {"label": "RSSI", "tooltip": "Average signal strength (dBm)"},
             {"label": "SNR", "tooltip": "Average signal-to-noise ratio (dB)"},
             {"label": "Noise", "tooltip": "Average noise floor (dBm)"},
             {"label": "RX", "tooltip": "Total packets received"},
             {"label": "TX", "tooltip": "Total packets transmitted"},
-            {"label": "Air", "tooltip": "Total TX airtime (seconds)"},
+            {"label": "Secs", "tooltip": "Total TX airtime (seconds)"},
         ]
 
         rows = []
@@ -652,10 +679,8 @@ def build_monthly_table_data(
                     {"value": f"{daily.date.day:02d}", "class": None},
                     {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
-                    {"value": bat_v.min_time.strftime("%H:%M") if bat_v.min_time else "-", "class": "muted"},
-                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
-                    {"value": bat_v.max_time.strftime("%H:%M") if bat_v.max_time else "-", "class": "muted"},
+                    {"value": _fmt_val_time(bat_v.min_value, bat_v.min_time), "class": "muted"},
+                    {"value": _fmt_val_time(bat_v.max_value, bat_v.max_time), "class": "muted"},
                     {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                     {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                     {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
@@ -682,10 +707,8 @@ def build_monthly_table_data(
                 {"value": "Avg", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
-                {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": "muted"},
-                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
-                {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": "muted"},
+                {"value": _fmt_val_day(bat_v.min_value, bat_v.min_time), "class": "muted"},
+                {"value": _fmt_val_day(bat_v.max_value, bat_v.max_time), "class": "muted"},
                 {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                 {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                 {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
@@ -696,14 +719,19 @@ def build_monthly_table_data(
         })
 
     else:  # companion
+        col_groups = [
+            {"label": "", "colspan": 1},
+            {"label": "Battery", "colspan": 4},
+            {"label": "Network", "colspan": 1},
+            {"label": "Packets", "colspan": 2},
+        ]
+
         headers = [
             {"label": "Day", "tooltip": None},
-            {"label": "V (avg)", "tooltip": "Average battery voltage"},
-            {"label": "% (avg)", "tooltip": "Average battery percentage"},
-            {"label": "V (min)", "tooltip": "Minimum battery voltage"},
-            {"label": "Time", "tooltip": "Time of minimum voltage"},
-            {"label": "V (max)", "tooltip": "Maximum battery voltage"},
-            {"label": "Time", "tooltip": "Time of maximum voltage"},
+            {"label": "Avg V", "tooltip": "Average battery voltage"},
+            {"label": "Avg %", "tooltip": "Average battery percentage"},
+            {"label": "Min V", "tooltip": "Minimum battery voltage with time"},
+            {"label": "Max V", "tooltip": "Maximum battery voltage with time"},
             {"label": "Contacts", "tooltip": "Average number of mesh contacts"},
             {"label": "RX", "tooltip": "Total packets received"},
             {"label": "TX", "tooltip": "Total packets transmitted"},
@@ -724,10 +752,8 @@ def build_monthly_table_data(
                     {"value": f"{daily.date.day:02d}", "class": None},
                     {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
-                    {"value": bat_v.min_time.strftime("%H:%M") if bat_v.min_time else "-", "class": "muted"},
-                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
-                    {"value": bat_v.max_time.strftime("%H:%M") if bat_v.max_time else "-", "class": "muted"},
+                    {"value": _fmt_val_time(bat_v.min_value, bat_v.min_time), "class": "muted"},
+                    {"value": _fmt_val_time(bat_v.max_value, bat_v.max_time), "class": "muted"},
                     {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
                     {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                     {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
@@ -748,42 +774,57 @@ def build_monthly_table_data(
                 {"value": "Avg", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
-                {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": "muted"},
-                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
-                {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": "muted"},
+                {"value": _fmt_val_day(bat_v.min_value, bat_v.min_time), "class": "muted"},
+                {"value": _fmt_val_day(bat_v.max_value, bat_v.max_time), "class": "muted"},
                 {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
                 {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                 {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
             ],
         })
 
-    return headers, rows
+    return col_groups, headers, rows
+
+
+def _fmt_val_month(value: float | None, time_obj, fmt: str = ".2f") -> str:
+    """Format a value with month abbr in <small> tag, for yearly summary rows."""
+    if value is None:
+        return "-"
+    month_str = calendar.month_abbr[time_obj.month] if time_obj else ""
+    if month_str:
+        return f"{value:{fmt}} <small>{month_str}</small>"
+    return f"{value:{fmt}}"
 
 
 def build_yearly_table_data(
     agg: "YearlyAggregate", role: str
-) -> tuple[list[dict], list[dict]]:
-    """Build table headers and rows for a yearly report.
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Build table column groups, headers and rows for a yearly report.
 
     Args:
         agg: Yearly aggregate data
         role: "companion" or "repeater"
 
     Returns:
-        (headers, rows) where each header/cell is a dict with label/value/tooltip/class
+        (col_groups, headers, rows) where each is a list of dicts
     """
     from .reports import MetricStats
 
     if role == "repeater":
+        # Column groups matching redesign/reports/yearly.html
+        col_groups = [
+            {"label": "", "colspan": 2},
+            {"label": "Battery", "colspan": 4},
+            {"label": "Signal", "colspan": 2},
+            {"label": "Packets", "colspan": 2},
+        ]
+
         headers = [
-            {"label": "Month", "tooltip": None},
-            {"label": "V (avg)", "tooltip": "Average battery voltage"},
-            {"label": "% (avg)", "tooltip": "Average battery percentage"},
-            {"label": "V (max)", "tooltip": "Maximum battery voltage"},
-            {"label": "Day", "tooltip": "Day of maximum voltage"},
-            {"label": "V (min)", "tooltip": "Minimum battery voltage"},
-            {"label": "Day", "tooltip": "Day of minimum voltage"},
+            {"label": "Year", "tooltip": None},
+            {"label": "Mo", "tooltip": None},
+            {"label": "Volt", "tooltip": "Average battery voltage"},
+            {"label": "%", "tooltip": "Average battery percentage"},
+            {"label": "High", "tooltip": "Maximum battery voltage with day"},
+            {"label": "Low", "tooltip": "Minimum battery voltage with day"},
             {"label": "RSSI", "tooltip": "Average signal strength (dBm)"},
             {"label": "SNR", "tooltip": "Average signal-to-noise ratio (dB)"},
             {"label": "RX", "tooltip": "Total packets received"},
@@ -803,13 +844,12 @@ def build_yearly_table_data(
             rows.append({
                 "is_summary": False,
                 "cells": [
-                    {"value": calendar.month_abbr[monthly.month], "class": None},
+                    {"value": str(agg.year), "class": None},
+                    {"value": f"{monthly.month:02d}", "class": None},
                     {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
-                    {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": "muted"},
-                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
-                    {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": "muted"},
+                    {"value": _fmt_val_day(bat_v.max_value, bat_v.max_time), "class": "muted"},
+                    {"value": _fmt_val_day(bat_v.min_value, bat_v.min_time), "class": "muted"},
                     {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                     {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                     {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
@@ -826,19 +866,15 @@ def build_yearly_table_data(
         rx = s.get("rx", MetricStats())
         tx = s.get("tx", MetricStats())
 
-        max_month = calendar.month_abbr[bat_v.max_time.month] if bat_v.max_time else "-"
-        min_month = calendar.month_abbr[bat_v.min_time.month] if bat_v.min_time else "-"
-
         rows.append({
             "is_summary": True,
             "cells": [
-                {"value": "Total", "class": None},
+                {"value": "", "class": None},
+                {"value": "Avg", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
-                {"value": max_month, "class": "muted"},
-                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
-                {"value": min_month, "class": "muted"},
+                {"value": _fmt_val_month(bat_v.max_value, bat_v.max_time), "class": "muted"},
+                {"value": _fmt_val_month(bat_v.min_value, bat_v.min_time), "class": "muted"},
                 {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                 {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                 {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
@@ -847,14 +883,20 @@ def build_yearly_table_data(
         })
 
     else:  # companion
+        col_groups = [
+            {"label": "", "colspan": 2},
+            {"label": "Battery", "colspan": 4},
+            {"label": "Network", "colspan": 1},
+            {"label": "Packets", "colspan": 2},
+        ]
+
         headers = [
-            {"label": "Month", "tooltip": None},
-            {"label": "V (avg)", "tooltip": "Average battery voltage"},
-            {"label": "% (avg)", "tooltip": "Average battery percentage"},
-            {"label": "V (max)", "tooltip": "Maximum battery voltage"},
-            {"label": "Day", "tooltip": "Day of maximum voltage"},
-            {"label": "V (min)", "tooltip": "Minimum battery voltage"},
-            {"label": "Day", "tooltip": "Day of minimum voltage"},
+            {"label": "Year", "tooltip": None},
+            {"label": "Mo", "tooltip": None},
+            {"label": "Volt", "tooltip": "Average battery voltage"},
+            {"label": "%", "tooltip": "Average battery percentage"},
+            {"label": "High", "tooltip": "Maximum battery voltage with day"},
+            {"label": "Low", "tooltip": "Minimum battery voltage with day"},
             {"label": "Contacts", "tooltip": "Average number of mesh contacts"},
             {"label": "RX", "tooltip": "Total packets received"},
             {"label": "TX", "tooltip": "Total packets transmitted"},
@@ -872,13 +914,12 @@ def build_yearly_table_data(
             rows.append({
                 "is_summary": False,
                 "cells": [
-                    {"value": calendar.month_abbr[monthly.month], "class": None},
+                    {"value": str(agg.year), "class": None},
+                    {"value": f"{monthly.month:02d}", "class": None},
                     {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
-                    {"value": f"{bat_v.max_time.day:02d}" if bat_v.max_time else "-", "class": "muted"},
-                    {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
-                    {"value": f"{bat_v.min_time.day:02d}" if bat_v.min_time else "-", "class": "muted"},
+                    {"value": _fmt_val_day(bat_v.max_value, bat_v.max_time), "class": "muted"},
+                    {"value": _fmt_val_day(bat_v.min_value, bat_v.min_time), "class": "muted"},
                     {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
                     {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                     {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
@@ -893,26 +934,22 @@ def build_yearly_table_data(
         rx = s.get("rx", MetricStats())
         tx = s.get("tx", MetricStats())
 
-        max_month = calendar.month_abbr[bat_v.max_time.month] if bat_v.max_time else "-"
-        min_month = calendar.month_abbr[bat_v.min_time.month] if bat_v.min_time else "-"
-
         rows.append({
             "is_summary": True,
             "cells": [
-                {"value": "Total", "class": None},
+                {"value": "", "class": None},
+                {"value": "Avg", "class": None},
                 {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": f"{bat_v.max_value:.2f}" if bat_v.max_value else "-", "class": "muted"},
-                {"value": max_month, "class": "muted"},
-                {"value": f"{bat_v.min_value:.2f}" if bat_v.min_value else "-", "class": "muted"},
-                {"value": min_month, "class": "muted"},
+                {"value": _fmt_val_month(bat_v.max_value, bat_v.max_time), "class": "muted"},
+                {"value": _fmt_val_month(bat_v.min_value, bat_v.min_time), "class": "muted"},
                 {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
                 {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                 {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
             ],
         })
 
-    return headers, rows
+    return col_groups, headers, rows
 
 
 def render_report_page(
@@ -934,26 +971,34 @@ def render_report_page(
     Returns:
         Rendered HTML string
     """
-    from .reports import format_lat_lon
+    from .reports import format_lat_lon_dms
 
     cfg = get_config()
     env = get_jinja_env()
 
-    lat_str, lon_str = format_lat_lon(cfg.report_lat, cfg.report_lon)
+    coords_str = format_lat_lon_dms(cfg.report_lat, cfg.report_lon)
     now = datetime.now()
 
+    monthly_links = None
     if report_type == "monthly":
         report_title = calendar.month_name[agg.month] + " " + str(agg.year)
         report_subtitle = f"Monthly report for {node_name}"
         download_prefix = f"{agg.role}-{agg.year}-{agg.month:02d}"
         month_name = calendar.month_name[agg.month]
-        headers, rows = build_monthly_table_data(agg, agg.role)
+        col_groups, headers, rows = build_monthly_table_data(agg, agg.role)
     else:
         report_title = str(agg.year)
         report_subtitle = f"Yearly report for {node_name}"
         download_prefix = f"{agg.role}-{agg.year}"
         month_name = None
-        headers, rows = build_yearly_table_data(agg, agg.role)
+        col_groups, headers, rows = build_yearly_table_data(agg, agg.role)
+        # Build monthly links for yearly reports
+        monthly_links = []
+        for monthly in agg.monthly:
+            monthly_links.append({
+                "url": f"{monthly.month:02d}/",
+                "label": calendar.month_abbr[monthly.month],
+            })
 
     # Calculate CSS path depth for reports (always /reports/{role}/{year}/ or /reports/{role}/{year}/{month}/)
     css_path = "../../../../" if report_type == "monthly" else "../../../"
@@ -970,15 +1015,15 @@ def render_report_page(
         "report_subtitle": report_subtitle,
         "node_name": node_name,
         "location_name": cfg.report_location_name,
-        "lat_str": lat_str,
-        "lon_str": lon_str,
+        "coords_str": coords_str,
         "elev": f"{cfg.report_elev:.0f}",
         "generated_at": now.strftime("%Y-%m-%d %H:%M"),
         "generated_iso": now.isoformat(),
         "download_prefix": download_prefix,
         "table_headers": headers,
         "table_rows": rows,
-        "col_groups": None,  # Could add column group headers if desired
+        "col_groups": col_groups,
+        "monthly_links": monthly_links,
         "prev_report": prev_report,
         "next_report": next_report,
     }

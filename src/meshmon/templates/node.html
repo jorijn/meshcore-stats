@@ -30,11 +30,6 @@
         <div class="metric">
           <div class="metric-value">{{ m.value }}{% if m.unit %}<span class="unit">{{ m.unit }}</span>{% endif %}</div>
           <div class="metric-label">{{ m.label }}</div>
-          {% if m.bar_pct is defined %}
-          <div class="battery-bar">
-            <div class="battery-bar-fill{% if m.bar_pct < 20 %} low{% elif m.bar_pct < 40 %} medium{% endif %}" style="width: {{ m.bar_pct }}%"></div>
-          </div>
-          {% endif %}
         </div>
         {% endfor %}
       </div>

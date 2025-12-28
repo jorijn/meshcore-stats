@@ -26,7 +26,7 @@
     <dt>Location</dt>
     <dd>{{ location_name }}</dd>
     <dt>Coordinates</dt>
-    <dd>{{ lat_str }}, {{ lon_str }} • Elevation {{ elev }}m</dd>
+    <dd>{{ coords_str }}  •  Elevation {{ elev }}m</dd>
   </dl>
 
   <!-- Data Table -->
@@ -51,7 +51,7 @@
         {% if not row.is_summary %}
         <tr>
           {% for cell in row.cells %}
-          <td{% if cell.class %} class="{{ cell.class }}"{% endif %}>{{ cell.value }}</td>
+          <td{% if cell.class %} class="{{ cell.class }}"{% endif %}>{{ cell.value|safe }}</td>
           {% endfor %}
         </tr>
         {% endif %}
@@ -62,7 +62,7 @@
         {% if row.is_summary %}
         <tr>
           {% for cell in row.cells %}
-          <td{% if cell.class %} class="{{ cell.class }}"{% endif %}>{{ cell.value }}</td>
+          <td{% if cell.class %} class="{{ cell.class }}"{% endif %}>{{ cell.value|safe }}</td>
           {% endfor %}
         </tr>
         {% endif %}
@@ -71,28 +71,23 @@
     </table>
   </div>
 
+  {% if report_type == 'yearly' and monthly_links %}
+  <!-- Monthly links -->
+  <section style="margin-top: var(--space-2xl);">
+    <h3 style="font-size: var(--text-sm); font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--space-md);">Monthly Reports</h3>
+    <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
+      {% for link in monthly_links %}
+      <a href="{{ link.url }}" class="archive-month">{{ link.label }}</a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <!-- Download links -->
   <div style="margin-top: var(--space-xl); display: flex; gap: var(--space-lg); font-size: var(--text-sm);">
     <a href="report.txt" style="color: var(--text-secondary); text-decoration: none;" download="{{ download_prefix }}.txt">Download TXT</a>
     <a href="report.json" style="color: var(--text-secondary); text-decoration: none;" download="{{ download_prefix }}.json">Download JSON</a>
   </div>
-
-  <!-- Pagination -->
-  <nav style="margin-top: var(--space-xl); display: flex; justify-content: space-between; align-items: center; font-size: var(--text-sm);">
-    {% if prev_report %}
-    <a href="{{ prev_report.url }}" style="color: var(--text-secondary); text-decoration: none;">&larr; {{ prev_report.label }}</a>
-    {% else %}
-    <span style="color: var(--text-muted);">&larr; Previous</span>
-    {% endif %}
-
-    <a href="{{ css_path }}reports/" style="color: var(--accent-primary); text-decoration: none; font-weight: 500;">All Reports</a>
-
-    {% if next_report %}
-    <a href="{{ next_report.url }}" style="color: var(--text-secondary); text-decoration: none;">{{ next_report.label }} &rarr;</a>
-    {% else %}
-    <span style="color: var(--text-muted);">Next &rarr;</span>
-    {% endif %}
-  </nav>
 
   <footer class="site-footer" style="margin-top: var(--space-3xl);">
     <a href="{{ css_path }}reports/">Back to Reports Archive</a>
