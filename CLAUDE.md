@@ -507,3 +507,23 @@ This will:
 1. Scan all JSON snapshots in `data/snapshots/`
 2. Extract metrics and compute derived fields (bat_pct)
 3. Insert into the SQLite database with duplicate handling
+
+## Database Maintenance
+
+The SQLite database benefits from periodic maintenance to reclaim space and update query statistics. A maintenance script is provided:
+
+```bash
+# Run database maintenance (VACUUM + ANALYZE)
+./scripts/db_maintenance.sh
+```
+
+The script uses `flock` to ensure exclusive access during maintenance. Other cron jobs will wait (up to the `busy_timeout` of 5 seconds) for maintenance to complete.
+
+### Recommended Cron Entry
+
+Add to your crontab for monthly maintenance at 3 AM on the 1st:
+
+```cron
+# Database maintenance: monthly at 3 AM on the 1st
+0 3 1 * * cd /home/jorijn/apps/meshcore-stats && ./scripts/db_maintenance.sh >> /var/log/meshcore-stats-maintenance.log 2>&1
+```

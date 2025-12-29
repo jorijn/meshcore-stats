@@ -30,6 +30,26 @@ from . import log
 # Path to migrations directory (relative to this file)
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
+# Valid role values (used to prevent SQL injection)
+VALID_ROLES = ("companion", "repeater")
+
+
+def _validate_role(role: str) -> str:
+    """Validate role parameter to prevent SQL injection.
+
+    Args:
+        role: Role name to validate
+
+    Returns:
+        The validated role string
+
+    Raises:
+        ValueError: If role is not valid
+    """
+    if role not in VALID_ROLES:
+        raise ValueError(f"Invalid role: {role!r}. Must be one of {VALID_ROLES}")
+    return role
+
 
 # =============================================================================
 # File-based Migration System
@@ -207,6 +227,8 @@ def get_connection(
         conn = sqlite3.connect(db_path)
 
     conn.row_factory = sqlite3.Row
+    # Wait up to 5 seconds if database is locked
+    conn.execute("PRAGMA busy_timeout=5000")
 
     try:
         yield conn
@@ -259,9 +281,11 @@ def insert_companion_metrics(
                 (ts, bat_v, bat_pct, contacts, uptime, rx, tx)
             )
         return True
-    except sqlite3.IntegrityError:
-        log.debug(f"Duplicate companion timestamp: {ts}")
-        return False
+    except sqlite3.IntegrityError as e:
+        if "UNIQUE constraint failed" in str(e) or "PRIMARY KEY" in str(e):
+            log.debug(f"Duplicate companion timestamp: {ts}")
+            return False
+        raise  # Re-raise other integrity errors
 
 
 def insert_repeater_metrics(
@@ -329,9 +353,11 @@ def insert_repeater_metrics(
                  fl_tx, fl_rx, di_tx, di_rx)
             )
         return True
-    except sqlite3.IntegrityError:
-        log.debug(f"Duplicate repeater timestamp: {ts}")
-        return False
+    except sqlite3.IntegrityError as e:
+        if "UNIQUE constraint failed" in str(e) or "PRIMARY KEY" in str(e):
+            log.debug(f"Duplicate repeater timestamp: {ts}")
+            return False
+        raise  # Re-raise other integrity errors
 
 
 def get_metrics_for_period(
@@ -350,7 +376,11 @@ def get_metrics_for_period(
 
     Returns:
         List of metric rows as dicts
+
+    Raises:
+        ValueError: If role is not valid
     """
+    role = _validate_role(role)
     table = f"{role}_metrics"
 
     with get_connection(db_path, readonly=True) as conn:
@@ -377,7 +407,11 @@ def get_latest_metrics(
 
     Returns:
         Most recent row as dict, or None if no data
+
+    Raises:
+        ValueError: If role is not valid
     """
+    role = _validate_role(role)
     table = f"{role}_metrics"
 
     with get_connection(db_path, readonly=True) as conn:
@@ -400,7 +434,11 @@ def get_metric_count(
 
     Returns:
         Number of rows
+
+    Raises:
+        ValueError: If role is not valid
     """
+    role = _validate_role(role)
     table = f"{role}_metrics"
 
     with get_connection(db_path, readonly=True) as conn:

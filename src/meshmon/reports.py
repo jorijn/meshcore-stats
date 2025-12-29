@@ -16,10 +16,17 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
-from .db import get_connection, get_metrics_for_period
+from .db import get_connection, get_metrics_for_period, VALID_ROLES
 from .env import get_config
 from .metrics import is_counter_metric
 from . import log
+
+
+def _validate_role(role: str) -> str:
+    """Validate role parameter to prevent SQL injection."""
+    if role not in VALID_ROLES:
+        raise ValueError(f"Invalid role: {role!r}. Must be one of {VALID_ROLES}")
+    return role
 
 
 # Hardcoded metric names (matches database columns)
@@ -469,7 +476,11 @@ def get_available_periods(role: str) -> list[tuple[int, int]]:
 
     Returns:
         Sorted list of (year, month) tuples
+
+    Raises:
+        ValueError: If role is not valid
     """
+    role = _validate_role(role)
     table = f"{role}_metrics"
 
     with get_connection(readonly=True) as conn:

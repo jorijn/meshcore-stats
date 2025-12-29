@@ -207,7 +207,18 @@ def main():
     cfg = get_config()
     db_path = get_db_path()
 
-    log.info(f"Initializing database at {db_path}")
+    # Startup messages
+    log.info("=" * 60)
+    log.info("JSON to SQLite Migration")
+    log.info("=" * 60)
+    log.info("")
+    log.info("This is a one-time migration script.")
+    log.info("JSON snapshots will NOT be deleted (read-only operation).")
+    log.info(f"Database will be created/updated at: {db_path}")
+    log.info(f"Reading snapshots from: {cfg.snapshot_dir}")
+    log.info("")
+
+    log.info("Initializing database...")
     init_db()
 
     log.info("Starting migration from JSON snapshots...")
