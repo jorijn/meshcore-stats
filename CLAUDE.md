@@ -517,7 +517,7 @@ The SQLite database benefits from periodic maintenance to reclaim space and upda
 ./scripts/db_maintenance.sh
 ```
 
-The script uses `flock` to ensure exclusive access during maintenance. Other cron jobs will wait (up to the `busy_timeout` of 5 seconds) for maintenance to complete.
+SQLite's VACUUM command acquires an exclusive lock internally. Other processes with `busy_timeout` configured will wait for maintenance to complete.
 
 ### Recommended Cron Entry
 
