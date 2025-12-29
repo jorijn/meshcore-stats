@@ -32,6 +32,10 @@ export REPEATER_PASSWORD="your-password"   # Admin password for repeater login
 export REPEATER_DISPLAY_NAME="My Repeater"
 export COMPANION_DISPLAY_NAME="My Companion"
 
+# Public key prefixes (shown below node name in sidebar, e.g., "!a1b2c3d4")
+# export REPEATER_PUBKEY_PREFIX="!a1b2c3d4"
+# export COMPANION_PUBKEY_PREFIX="!e5f6g7h8"
+
 # =============================================================================
 # Location Metadata (for reports and sidebar display)
 # =============================================================================

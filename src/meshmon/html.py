@@ -504,8 +504,11 @@ def build_page_context(
     else:
         node_name = cfg.companion_display_name
 
-    # Pubkey prefix is not stored in db, use placeholder
-    pubkey_pre = None
+    # Pubkey prefix from config
+    if role == "repeater":
+        pubkey_pre = cfg.repeater_pubkey_prefix
+    else:
+        pubkey_pre = cfg.companion_pubkey_prefix
 
     # Status based on timestamp
     ts = row.get("ts") if row else None

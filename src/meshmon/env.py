@@ -99,6 +99,10 @@ class Config:
             "COMPANION_DISPLAY_NAME", "Companion Node"
         )
 
+        # Public key prefixes for display (e.g., "!a1b2c3d4")
+        self.repeater_pubkey_prefix = get_str("REPEATER_PUBKEY_PREFIX")
+        self.companion_pubkey_prefix = get_str("COMPANION_PUBKEY_PREFIX")
+
         # Hardware info for sidebar
         self.repeater_hardware = get_str("REPEATER_HARDWARE", "LoRa Repeater")
         self.companion_hardware = get_str("COMPANION_HARDWARE", "LoRa Node")
