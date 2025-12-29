@@ -1,8 +1,7 @@
-"""Matplotlib-based chart generation from JSON snapshots.
+"""Matplotlib-based chart generation from SQLite database.
 
-This module replaces RRDtool chart generation with matplotlib, reading
-directly from JSON snapshots and generating SVG charts with CSS variable
-support for theming.
+This module generates SVG charts with CSS variable support for theming,
+reading metrics directly from the SQLite database for fast performance.
 """
 
 import io
@@ -17,13 +16,10 @@ import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for server-side rendering
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.figure import Figure
 
+from .db import get_connection, get_metrics_for_period
 from .env import get_config
-from .extract import get_by_path
-from .jsondump import load_snapshot
 from .metrics import is_counter_metric, get_graph_scale
-from .snapshot import build_companion_merged_view, build_repeater_merged_view
 from . import log
 
 
@@ -148,13 +144,6 @@ class ChartStatistics:
         }
 
 
-# Role-specific merged view builders
-ROLE_BUILDERS = {
-    "companion": build_companion_merged_view,
-    "repeater": build_repeater_merged_view,
-}
-
-
 def _hex_to_rgba(hex_color: str) -> tuple[float, float, float, float]:
     """Convert hex color (without #) to RGBA tuple (0-1 range).
 
@@ -167,107 +156,49 @@ def _hex_to_rgba(hex_color: str) -> tuple[float, float, float, float]:
     return (r, g, b, a)
 
 
-def load_snapshots_for_period(
-    role: str,
-    end_time: datetime,
-    lookback: timedelta,
-) -> list[tuple[Path, dict[str, Any]]]:
-    """Load all snapshots for a role within a time period.
-
-    Args:
-        role: "companion" or "repeater"
-        end_time: End of the time range (typically now)
-        lookback: How far back to look
-
-    Returns:
-        List of (path, snapshot_data) tuples, sorted by timestamp
-    """
-    cfg = get_config()
-    start_time = end_time - lookback
-    base_dir = cfg.snapshot_dir / role
-
-    if not base_dir.exists():
-        return []
-
-    snapshots = []
-
-    # Iterate through date directories
-    current_date = start_time.date()
-    end_date = end_time.date()
-
-    while current_date <= end_date:
-        day_dir = (
-            base_dir
-            / str(current_date.year)
-            / f"{current_date.month:02d}"
-            / f"{current_date.day:02d}"
-        )
-
-        if day_dir.exists():
-            for json_file in sorted(day_dir.glob("*.json")):
-                data = load_snapshot(json_file)
-                if data is None:
-                    continue
-                if data.get("skip_reason"):
-                    # Circuit breaker skip - expected, don't include
-                    continue
-
-                ts = data.get("ts")
-                if ts is None:
-                    continue
-
-                # Check if within time range
-                snapshot_time = datetime.fromtimestamp(ts)
-                if start_time <= snapshot_time <= end_time:
-                    snapshots.append((json_file, data))
-
-        current_date += timedelta(days=1)
-
-    # Sort by timestamp
-    snapshots.sort(key=lambda x: x[1].get("ts", 0))
-    return snapshots
-
-
-def extract_timeseries(
-    snapshots: list[tuple[Path, dict[str, Any]]],
+def load_timeseries_from_db(
     role: str,
     metric: str,
-    metric_path: str,
+    end_time: datetime,
+    lookback: timedelta,
     period: str,
 ) -> TimeSeries:
-    """Extract time series data from snapshots for a single metric.
+    """Load time series data from SQLite database.
 
-    Handles both gauge and counter metrics. For counters, calculates
-    the rate of change (with reboot detection).
+    Fetches the metric column directly, handles counter-to-rate conversion,
+    and applies time binning as needed.
 
     Args:
-        snapshots: List of (path, raw_snapshot) tuples
         role: "companion" or "repeater"
         metric: Metric name (e.g., "bat_v", "rx")
-        metric_path: Dotted path to value (e.g., "derived.bat_v")
-        period: Time period for aggregation config
+        end_time: End of the time range (typically now)
+        lookback: How far back to look
+        period: Period name for binning config ("day", "week", etc.)
 
     Returns:
         TimeSeries with extracted data points
     """
-    if role not in ROLE_BUILDERS:
-        raise ValueError(f"Unknown role: {role}")
+    start_time = end_time - lookback
+    start_ts = int(start_time.timestamp())
+    end_ts = int(end_time.timestamp())
 
-    build_fn = ROLE_BUILDERS[role]
+    # Fetch rows from database
+    rows = get_metrics_for_period(role, start_ts, end_ts)
+
+    if not rows:
+        return TimeSeries(metric=metric, role=role, period=period)
+
     is_counter = is_counter_metric(metric)
     scale = get_graph_scale(metric)
 
-    # Extract raw values from snapshots
+    # Extract raw values
     raw_points: list[tuple[datetime, float]] = []
 
-    for path, raw_data in snapshots:
-        merged = build_fn(raw_data)
-        ts = merged.get("ts")
-        if ts is None:
-            continue
+    for row in rows:
+        ts = row.get("ts")
+        value = row.get(metric)
 
-        value = get_by_path(merged, metric_path)
-        if value is None:
+        if ts is None or value is None:
             continue
 
         try:
@@ -279,12 +210,7 @@ def extract_timeseries(
     if not raw_points:
         return TimeSeries(metric=metric, role=role, period=period)
 
-    # Sort by timestamp
-    raw_points.sort(key=lambda x: x[0])
-
-    # For counter metrics, calculate rate of change.
-    # Note: This requires two points to compute a rate, so the first snapshot
-    # is used only as a baseline and doesn't produce a data point itself.
+    # For counter metrics, calculate rate of change
     if is_counter:
         rate_points: list[tuple[datetime, float]] = []
 
@@ -303,7 +229,7 @@ def extract_timeseries(
                 log.debug(f"Counter reset detected for {metric} at {curr_ts}")
                 continue
 
-            # Calculate per-second rate, then apply scaling (typically ×60 for per-minute)
+            # Calculate per-second rate, then apply scaling (typically x60 for per-minute)
             rate = (delta_val / delta_secs) * scale
             rate_points.append((curr_ts, rate))
 
@@ -416,6 +342,10 @@ def render_chart_svg(
     fig_height = height / dpi
 
     fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=dpi)
+
+    # Track actual Y-axis values for tooltip injection
+    actual_y_min = y_min
+    actual_y_max = y_max
 
     try:
         # Apply theme colors
@@ -586,9 +516,57 @@ def _inject_data_attributes(
     return svg
 
 
+# Hardcoded metric configurations (previously from environment variables)
+COMPANION_METRICS = {
+    "bat_v": "bat_v",
+    "bat_pct": "bat_pct",
+    "contacts": "contacts",
+    "rx": "rx",
+    "tx": "tx",
+    "uptime": "uptime",
+}
+
+REPEATER_METRICS = {
+    "bat_v": "bat_v",
+    "bat_pct": "bat_pct",
+    "rx": "rx",
+    "tx": "tx",
+    "rssi": "rssi",
+    "snr": "snr",
+    "uptime": "uptime",
+    "noise": "noise",
+    "airtime": "airtime",
+    "rx_air": "rx_air",
+    "fl_dups": "fl_dups",
+    "di_dups": "di_dups",
+    "fl_tx": "fl_tx",
+    "fl_rx": "fl_rx",
+    "di_tx": "di_tx",
+    "di_rx": "di_rx",
+    "txq": "txq",
+}
+
+
+def get_metrics_for_role(role: str) -> dict[str, str]:
+    """Get metric name to column mapping for a role.
+
+    Args:
+        role: "companion" or "repeater"
+
+    Returns:
+        Dict mapping metric names to database columns
+    """
+    if role == "companion":
+        return COMPANION_METRICS
+    elif role == "repeater":
+        return REPEATER_METRICS
+    else:
+        raise ValueError(f"Unknown role: {role}")
+
+
 def render_all_charts(
     role: str,
-    metrics: dict[str, str],
+    metrics: Optional[dict[str, str]] = None,
 ) -> tuple[list[Path], dict[str, dict[str, dict[str, Any]]]]:
     """Render all charts for a role in both light and dark themes.
 
@@ -596,12 +574,15 @@ def render_all_charts(
 
     Args:
         role: "companion" or "repeater"
-        metrics: Metrics config (ds_name -> dotted_path)
+        metrics: Optional override for metrics config (for testing)
 
     Returns:
         Tuple of (list of generated chart paths, stats dict)
         Stats dict structure: {metric_name: {period: {min, avg, max, current}}}
     """
+    if metrics is None:
+        metrics = get_metrics_for_role(role)
+
     cfg = get_config()
     charts_dir = cfg.out_dir / "assets" / role
     charts_dir.mkdir(parents=True, exist_ok=True)
@@ -615,54 +596,24 @@ def render_all_charts(
     # Current time for all lookbacks
     now = datetime.now()
 
-    # Labels for Y-axis (matching existing rrd.py)
-    labels = {
-        "bat_v": "Voltage (V)",
-        "bat_pct": "Battery (%)",
-        "contacts": "Count",
-        "neigh": "Count",
-        "rx": "Packets/min",
-        "tx": "Packets/min",
-        "rssi": "RSSI (dBm)",
-        "snr": "SNR (dB)",
-        "uptime": "Days",
-        "noise": "dBm",
-        "airtime": "Seconds/min",
-        "rx_air": "Seconds/min",
-        "fl_dups": "Packets/min",
-        "di_dups": "Packets/min",
-        "fl_tx": "Packets/min",
-        "fl_rx": "Packets/min",
-        "di_tx": "Packets/min",
-        "di_rx": "Packets/min",
-        "txq": "Queue depth",
-    }
-
     # Fixed Y-axis ranges for battery metrics
     y_ranges = {
         "bat_v": (3.0, 4.2),
         "bat_pct": (0, 100),
     }
 
-    for metric, metric_path in sorted(metrics.items()):
+    for metric in sorted(metrics.keys()):
         all_stats[metric] = {}
 
         for period in periods:
             period_cfg = PERIOD_CONFIG[period]
 
-            # Load snapshots for this period
-            snapshots = load_snapshots_for_period(
-                role=role,
-                end_time=now,
-                lookback=period_cfg["lookback"],
-            )
-
-            # Extract time series
-            ts = extract_timeseries(
-                snapshots=snapshots,
+            # Load time series from database
+            ts = load_timeseries_from_db(
                 role=role,
                 metric=metric,
-                metric_path=metric_path,
+                end_time=now,
+                lookback=period_cfg["lookback"],
                 period=period,
             )
 

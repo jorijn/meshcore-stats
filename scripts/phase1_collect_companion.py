@@ -12,7 +12,7 @@ Connects to the local companion node via serial and collects:
 
 Outputs:
 - Concise summary to stdout
-- Full JSON snapshot to disk
+- Metrics written to SQLite database
 """
 
 import asyncio
@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from meshmon.env import get_config
 from meshmon import log
 from meshmon.meshcore_client import connect_from_env, run_command
-from meshmon.jsondump import write_snapshot
+from meshmon.db import init_db, insert_companion_metrics
 
 
 async def collect_companion() -> int:
@@ -201,17 +201,22 @@ async def collect_companion() -> int:
             except Exception:
                 pass
 
-    # Print summary
+    # Extract metrics for database
     bat_mv = None
+    uptime = None
     if snapshot.get("stats") and snapshot["stats"].get("core"):
         bat_mv = snapshot["stats"]["core"].get("battery_mv")
+        uptime = snapshot["stats"]["core"].get("uptime_secs")
+
+    bat_v = bat_mv / 1000.0 if bat_mv is not None else None
     contacts_count = snapshot["derived"].get("contacts_count", 0)
     rx = snapshot["derived"].get("rx_packets")
     tx = snapshot["derived"].get("tx_packets")
 
+    # Print summary
     summary_parts = [f"ts={ts}"]
-    if bat_mv is not None:
-        summary_parts.append(f"bat={bat_mv/1000:.2f}V")
+    if bat_v is not None:
+        summary_parts.append(f"bat={bat_v:.2f}V")
     summary_parts.append(f"contacts={contacts_count}")
     if rx is not None:
         summary_parts.append(f"rx={rx}")
@@ -220,10 +225,21 @@ async def collect_companion() -> int:
 
     log.info(f"Companion: {', '.join(summary_parts)}")
 
-    # Write snapshot
+    # Write metrics to database
     if commands_succeeded > 0:
-        path = write_snapshot("companion", ts, snapshot)
-        log.info(f"Snapshot written to {path}")
+        try:
+            insert_companion_metrics(
+                ts=ts,
+                bat_v=bat_v,
+                contacts=contacts_count,
+                uptime=uptime,
+                rx=rx,
+                tx=tx,
+            )
+            log.debug(f"Metrics written to database (ts={ts})")
+        except Exception as e:
+            log.error(f"Failed to write metrics to database: {e}")
+            return 1
         return 0
     else:
         log.error("No commands succeeded")
@@ -232,6 +248,9 @@ async def collect_companion() -> int:
 
 def main():
     """Entry point."""
+    # Ensure database is initialized
+    init_db()
+
     exit_code = asyncio.run(collect_companion())
     sys.exit(exit_code)
 

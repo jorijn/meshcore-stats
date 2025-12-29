@@ -9,8 +9,6 @@ from typing import Any, Optional
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from .env import get_config
-from .extract import get_by_path
-from .battery import voltage_to_percentage
 from .formatters import (
     format_time,
     format_value,
@@ -18,7 +16,7 @@ from .formatters import (
     format_duration,
     format_uptime,
 )
-from .charts import load_chart_stats
+from .charts import load_chart_stats, get_metrics_for_role
 from . import log
 
 
@@ -148,42 +146,42 @@ def get_status(ts: Optional[int]) -> tuple[str, str]:
         return ("offline", "Offline")
 
 
-def build_repeater_metrics(snapshot: Optional[dict]) -> dict:
-    """Build metrics data from repeater snapshot.
+def build_repeater_metrics(row: Optional[dict]) -> dict:
+    """Build metrics data from repeater database row.
+
+    Args:
+        row: Database row dict with flat column names (bat_v, rssi, snr, etc.)
 
     Returns dict with critical_metrics, secondary_metrics, traffic_metrics.
     """
-    if not snapshot:
+    if not row:
         return {
             "critical_metrics": [],
             "secondary_metrics": [],
             "traffic_metrics": [],
         }
 
-    status = snapshot.get("status", {})
-
-    # Battery
-    bat_mv = status.get("bat")
-    bat_v = bat_mv / 1000 if bat_mv else None
-    bat_pct = voltage_to_percentage(bat_v) if bat_v else None
+    # Battery (already in volts from db)
+    bat_v = row.get("bat_v")
+    bat_pct = row.get("bat_pct")
 
     # Critical metrics (top 4 in sidebar)
     critical_metrics = []
-    if bat_v:
+    if bat_v is not None:
         critical_metrics.append({
             "value": f"{bat_v:.2f}",
             "unit": "V",
             "label": "Battery",
             "bar_pct": int(bat_pct) if bat_pct else 0,
         })
-    if bat_pct:
+    if bat_pct is not None:
         critical_metrics.append({
             "value": f"{bat_pct:.0f}",
             "unit": "%",
             "label": "Charge",
         })
 
-    rssi = status.get("last_rssi")
+    rssi = row.get("rssi")
     if rssi is not None:
         critical_metrics.append({
             "value": str(rssi),
@@ -191,7 +189,7 @@ def build_repeater_metrics(snapshot: Optional[dict]) -> dict:
             "label": "RSSI",
         })
 
-    snr = status.get("last_snr")
+    snr = row.get("snr")
     if snr is not None:
         critical_metrics.append({
             "value": f"{snr:.2f}",
@@ -201,43 +199,43 @@ def build_repeater_metrics(snapshot: Optional[dict]) -> dict:
 
     # Secondary metrics
     secondary_metrics = []
-    uptime = status.get("uptime")
+    uptime = row.get("uptime")
     if uptime is not None:
         secondary_metrics.append({
             "label": "Uptime",
             "value": format_uptime(uptime),
         })
 
-    noise = status.get("noise_floor")
+    noise = row.get("noise")
     if noise is not None:
         secondary_metrics.append({
             "label": "Noise Floor",
             "value": f"{noise} dBm",
         })
 
-    txq = status.get("tx_queue_len")
+    txq = row.get("txq")
     if txq is not None:
         secondary_metrics.append({
             "label": "TX Queue",
             "value": str(txq),
         })
 
-    # Traffic metrics
+    # Traffic metrics (from db columns)
     traffic_metrics = []
     traffic_fields = [
-        ("RX", "nb_recv"),
-        ("TX", "nb_sent"),
-        ("Flood RX", "recv_flood"),
-        ("Flood TX", "sent_flood"),
-        ("Direct RX", "recv_direct"),
-        ("Direct TX", "sent_direct"),
+        ("RX", "rx"),
+        ("TX", "tx"),
+        ("Flood RX", "fl_rx"),
+        ("Flood TX", "fl_tx"),
+        ("Direct RX", "di_rx"),
+        ("Direct TX", "di_tx"),
         ("Airtime TX", "airtime"),
-        ("Airtime RX", "rx_airtime"),
+        ("Airtime RX", "rx_air"),
     ]
     for label, key in traffic_fields:
-        val = status.get(key)
+        val = row.get(key)
         if val is not None:
-            if "airtime" in key.lower():
+            if "airtime" in key.lower() or key == "rx_air":
                 traffic_metrics.append({"label": label, "value": f"{val:,}s"})
             else:
                 traffic_metrics.append({"label": label, "value": f"{val:,}"})
@@ -249,46 +247,42 @@ def build_repeater_metrics(snapshot: Optional[dict]) -> dict:
     }
 
 
-def build_companion_metrics(snapshot: Optional[dict]) -> dict:
-    """Build metrics data from companion snapshot.
+def build_companion_metrics(row: Optional[dict]) -> dict:
+    """Build metrics data from companion database row.
 
-    Returns dict with critical_metrics, secondary_metrics.
+    Args:
+        row: Database row dict with flat column names (bat_v, contacts, etc.)
+
+    Returns dict with critical_metrics, secondary_metrics, traffic_metrics.
     """
-    if not snapshot:
+    if not row:
         return {
             "critical_metrics": [],
             "secondary_metrics": [],
             "traffic_metrics": [],
         }
 
-    stats = snapshot.get("stats", {}).get("core", {})
-    packets = snapshot.get("stats", {}).get("packets", {})
-    derived = snapshot.get("derived", {})
-
-    # Battery
-    bat_mv = stats.get("battery_mv")
-    if not bat_mv:
-        bat_mv = get_by_path(snapshot, "bat.level")
-    bat_v = bat_mv / 1000 if bat_mv else None
-    bat_pct = voltage_to_percentage(bat_v) if bat_v else None
+    # Battery (already in volts from db)
+    bat_v = row.get("bat_v")
+    bat_pct = row.get("bat_pct")
 
     # Critical metrics
     critical_metrics = []
-    if bat_v:
+    if bat_v is not None:
         critical_metrics.append({
             "value": f"{bat_v:.2f}",
             "unit": "V",
             "label": "Battery",
             "bar_pct": int(bat_pct) if bat_pct else 0,
         })
-    if bat_pct:
+    if bat_pct is not None:
         critical_metrics.append({
             "value": f"{bat_pct:.0f}",
             "unit": "%",
             "label": "Charge",
         })
 
-    contacts = derived.get("contacts_count")
+    contacts = row.get("contacts")
     if contacts is not None:
         critical_metrics.append({
             "value": str(contacts),
@@ -296,7 +290,7 @@ def build_companion_metrics(snapshot: Optional[dict]) -> dict:
             "label": "Contacts",
         })
 
-    uptime = stats.get("uptime_secs")
+    uptime = row.get("uptime")
     if uptime is not None:
         critical_metrics.append({
             "value": format_uptime(uptime),
@@ -306,10 +300,10 @@ def build_companion_metrics(snapshot: Optional[dict]) -> dict:
 
     # Secondary metrics
     secondary_metrics = []
-    rx = packets.get("recv")
+    rx = row.get("rx")
     if rx is not None:
         secondary_metrics.append({"label": "Packets RX", "value": f"{rx:,}"})
-    tx = packets.get("sent")
+    tx = row.get("tx")
     if tx is not None:
         secondary_metrics.append({"label": "Packets TX", "value": f"{tx:,}"})
 
@@ -320,8 +314,11 @@ def build_companion_metrics(snapshot: Optional[dict]) -> dict:
     }
 
 
-def build_node_details(role: str, snapshot: Optional[dict]) -> list[dict]:
-    """Build node details for sidebar."""
+def build_node_details(role: str) -> list[dict]:
+    """Build node details for sidebar.
+
+    Uses hardcoded values since device info doesn't change often.
+    """
     cfg = get_config()
     details = []
 
@@ -330,47 +327,25 @@ def build_node_details(role: str, snapshot: Optional[dict]) -> list[dict]:
         details.append({"label": "Coordinates", "value": f"{cfg.report_lat:.4f}°N, {cfg.report_lon:.4f}°E"})
         details.append({"label": "Elevation", "value": f"{cfg.report_elev:.0f}m"})
         details.append({"label": "Hardware", "value": "SenseCAP P1-Pro"})
-    elif role == "companion" and snapshot:
-        device_info = snapshot.get("device_info", {})
-        model = device_info.get("model", "Unknown")
-        ver = device_info.get("ver", "Unknown")
-        details.append({"label": "Model", "value": model})
-        details.append({"label": "Firmware", "value": ver})
+    elif role == "companion":
+        details.append({"label": "Model", "value": "Elecrow ThinkNode-M1"})
+        details.append({"label": "Firmware", "value": "v1.11.0"})
         details.append({"label": "Connection", "value": "USB Serial"})
 
     return details
 
 
-def build_radio_config(snapshot: Optional[dict]) -> list[dict]:
-    """Build radio config for sidebar."""
-    if not snapshot:
-        return []
+def build_radio_config() -> list[dict]:
+    """Build radio config for sidebar.
 
-    self_info = snapshot.get("self_info", {})
-    if not self_info:
-        # For repeater, we might not have self_info, use defaults
-        return [
-            {"label": "Frequency", "value": "869.618 MHz"},
-            {"label": "Bandwidth", "value": "62.5 kHz"},
-            {"label": "Spread Factor", "value": "SF8"},
-            {"label": "Coding Rate", "value": "CR8"},
-        ]
-
-    config = []
-    freq = self_info.get("radio_freq")
-    if freq:
-        config.append({"label": "Frequency", "value": f"{freq} MHz"})
-    bw = self_info.get("radio_bw")
-    if bw:
-        config.append({"label": "Bandwidth", "value": f"{bw} kHz"})
-    sf = self_info.get("radio_sf")
-    if sf:
-        config.append({"label": "Spread Factor", "value": f"SF{sf}"})
-    cr = self_info.get("radio_cr")
-    if cr:
-        config.append({"label": "Coding Rate", "value": f"CR{cr}"})
-
-    return config
+    Uses hardcoded values matching the MeshCore EU/UK Narrow preset.
+    """
+    return [
+        {"label": "Frequency", "value": "869.618 MHz"},
+        {"label": "Bandwidth", "value": "62.5 kHz"},
+        {"label": "Spread Factor", "value": "SF8"},
+        {"label": "Coding Rate", "value": "CR8"},
+    ]
 
 
 def _format_stat_value(value: Optional[float], metric: str) -> str:
@@ -429,7 +404,6 @@ def _load_svg_content(path: Path) -> Optional[str]:
 def build_chart_groups(
     role: str,
     period: str,
-    metrics: dict[str, str],
     chart_stats: Optional[dict] = None,
 ) -> list[dict]:
     """Build chart groups for template.
@@ -440,11 +414,11 @@ def build_chart_groups(
     Args:
         role: "companion" or "repeater"
         period: Time period ("day", "week", etc.)
-        metrics: Metrics config
         chart_stats: Stats dict from chart_stats.json (optional)
     """
     cfg = get_config()
     groups_config = REPEATER_CHART_GROUPS if role == "repeater" else COMPANION_CHART_GROUPS
+    metrics = get_metrics_for_role(role)
 
     if chart_stats is None:
         chart_stats = {}
@@ -519,29 +493,30 @@ def build_chart_groups(
 def build_page_context(
     role: str,
     period: str,
-    snapshot: Optional[dict],
-    metrics: dict[str, str],
+    row: Optional[dict],
     at_root: bool,
 ) -> dict[str, Any]:
-    """Build template context dictionary for node pages."""
+    """Build template context dictionary for node pages.
+
+    Args:
+        role: "companion" or "repeater"
+        period: "day", "week", "month", or "year"
+        row: Latest metrics row from database (or None)
+        at_root: Whether page is at site root (vs /companion/)
+    """
     cfg = get_config()
 
-    # Get node name
-    node_name = role.capitalize()
-    pubkey_pre = None
-    if snapshot:
-        node_name = (
-            get_by_path(snapshot, "node.name")
-            or get_by_path(snapshot, "self_info.name")
-            or (cfg.repeater_display_name if role == "repeater" else cfg.companion_display_name)
-        )
-        pubkey_pre = (
-            get_by_path(snapshot, "status.pubkey_pre")
-            or get_by_path(snapshot, "self_telemetry.pubkey_pre")
-        )
+    # Get node name from config
+    if role == "repeater":
+        node_name = cfg.repeater_display_name
+    else:
+        node_name = cfg.companion_display_name
 
-    # Status
-    ts = snapshot.get("ts") if snapshot else None
+    # Pubkey prefix is not stored in db, use placeholder
+    pubkey_pre = None
+
+    # Status based on timestamp
+    ts = row.get("ts") if row else None
     status_class, status_text = get_status(ts)
 
     # Last updated
@@ -554,19 +529,19 @@ def build_page_context(
 
     # Build metrics for sidebar
     if role == "repeater":
-        metrics_data = build_repeater_metrics(snapshot)
+        metrics_data = build_repeater_metrics(row)
     else:
-        metrics_data = build_companion_metrics(snapshot)
+        metrics_data = build_companion_metrics(row)
 
     # Node details
-    node_details = build_node_details(role, snapshot)
+    node_details = build_node_details(role)
 
     # Radio config
-    radio_config = build_radio_config(snapshot)
+    radio_config = build_radio_config()
 
     # Load chart stats and build chart groups
     chart_stats = load_chart_stats(role)
-    chart_groups = build_chart_groups(role, period, metrics, chart_stats)
+    chart_groups = build_chart_groups(role, period, chart_stats)
 
     # Period config
     page_title, page_subtitle = PERIOD_CONFIG.get(period, ("Observations", "Radio telemetry"))
@@ -633,13 +608,19 @@ def build_page_context(
 def render_node_page(
     role: str,
     period: str,
-    snapshot: Optional[dict],
-    metrics: dict[str, str],
+    row: Optional[dict],
     at_root: bool = False,
 ) -> str:
-    """Render a node page (companion or repeater)."""
+    """Render a node page (companion or repeater).
+
+    Args:
+        role: "companion" or "repeater"
+        period: "day", "week", "month", or "year"
+        row: Latest metrics row from database (or None)
+        at_root: Whether page is at site root (vs /companion/)
+    """
     env = get_jinja_env()
-    context = build_page_context(role, period, snapshot, metrics, at_root)
+    context = build_page_context(role, period, row, at_root)
     template = env.get_template("node.html")
     return template.render(**context)
 
@@ -664,14 +645,18 @@ def copy_static_assets():
 
 
 def write_site(
-    companion_snapshot: Optional[dict],
-    repeater_snapshot: Optional[dict],
+    companion_row: Optional[dict],
+    repeater_row: Optional[dict],
 ) -> list[Path]:
     """
     Write all static site pages.
 
     Repeater pages are rendered at the site root (day.html, week.html, etc.).
     Companion pages are rendered under /companion/.
+
+    Args:
+        companion_row: Latest companion metrics row from database (or None)
+        repeater_row: Latest repeater metrics row from database (or None)
 
     Returns list of written paths.
     """
@@ -690,7 +675,7 @@ def write_site(
     for period in ["day", "week", "month", "year"]:
         page_path = cfg.out_dir / f"{period}.html"
         page_path.write_text(
-            render_node_page("repeater", period, repeater_snapshot, cfg.repeater_metrics, at_root=True)
+            render_node_page("repeater", period, repeater_row, at_root=True)
         )
         written.append(page_path)
         log.debug(f"Wrote {page_path}")
@@ -699,7 +684,7 @@ def write_site(
     for period in ["day", "week", "month", "year"]:
         page_path = cfg.out_dir / "companion" / f"{period}.html"
         page_path.write_text(
-            render_node_page("companion", period, companion_snapshot, cfg.companion_metrics)
+            render_node_page("companion", period, companion_row)
         )
         written.append(page_path)
         log.debug(f"Wrote {page_path}")

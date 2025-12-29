@@ -12,7 +12,7 @@ Features:
 
 Outputs:
 - Concise summary to stdout
-- Full JSON snapshot to disk
+- Metrics written to SQLite database
 """
 
 import asyncio
@@ -34,7 +34,7 @@ from meshmon.meshcore_client import (
     extract_contact_info,
     list_contacts_summary,
 )
-from meshmon.jsondump import write_snapshot
+from meshmon.db import init_db, insert_repeater_metrics
 from meshmon.retry import get_repeater_circuit_breaker, with_retries
 
 
@@ -158,18 +158,7 @@ async def collect_repeater() -> int:
     if cb.is_open():
         remaining = cb.cooldown_remaining()
         log.warn(f"Circuit breaker open, cooldown active ({remaining}s remaining)")
-
-        # Write a skip snapshot
-        snapshot = {
-            "ts": ts,
-            "node": {"role": "repeater", "name": cfg.repeater_name},
-            "skip_reason": f"Circuit breaker cooldown ({remaining}s remaining)",
-            "circuit_breaker": cb.to_dict(),
-            "status": None,
-            "telemetry": None,
-            "derived": {},
-        }
-        write_snapshot("repeater", ts, snapshot)
+        # Skip collection - no metrics to write
         return 0
 
     # Connect to companion
@@ -284,18 +273,45 @@ async def collect_repeater() -> int:
             except Exception:
                 pass
 
-    # Print summary
+    # Extract metrics and print summary
     summary_parts = [f"ts={ts}"]
+    node_name = snapshot["node"].get("name", "unknown")
+
+    # Extract all metrics from status
+    bat_v = None
+    rssi = None
+    snr = None
+    uptime = None
+    noise = None
+    txq = None
+    rx = None
+    tx = None
+    airtime = None
+    rx_air = None
+    fl_dups = None
+    di_dups = None
+    fl_tx = None
+    fl_rx = None
+    di_tx = None
+    di_rx = None
 
     if snapshot["status"]:
         status = snapshot["status"]
         if isinstance(status, dict):
             bat = status.get("bat")
             if bat is not None:
-                summary_parts.append(f"bat={bat / 1000:.2f}V")
+                bat_v = bat / 1000.0
+                summary_parts.append(f"bat={bat_v:.2f}V")
+
             uptime = status.get("uptime")
             if uptime is not None:
                 summary_parts.append(f"uptime={uptime // 86400}d")
+
+            rssi = status.get("last_rssi")
+            snr = status.get("last_snr")
+            noise = status.get("noise_floor")
+            txq = status.get("tx_queue_len")
+
             rx = status.get("nb_recv")
             tx = status.get("nb_sent")
             if rx is not None:
@@ -303,17 +319,52 @@ async def collect_repeater() -> int:
             if tx is not None:
                 summary_parts.append(f"tx={tx}")
 
-    log.info(f"Repeater ({snapshot['node'].get('name', 'unknown')}): {', '.join(summary_parts)}")
+            airtime = status.get("airtime")
+            rx_air = status.get("rx_airtime")
+            fl_dups = status.get("flood_dups")
+            di_dups = status.get("direct_dups")
+            fl_tx = status.get("sent_flood")
+            fl_rx = status.get("recv_flood")
+            di_tx = status.get("sent_direct")
+            di_rx = status.get("recv_direct")
 
-    # Write snapshot
-    path = write_snapshot("repeater", ts, snapshot)
-    log.info(f"Snapshot written to {path}")
+    log.info(f"Repeater ({node_name}): {', '.join(summary_parts)}")
+
+    # Write metrics to database
+    if status_ok:
+        try:
+            insert_repeater_metrics(
+                ts=ts,
+                bat_v=bat_v,
+                rssi=rssi,
+                snr=snr,
+                uptime=uptime,
+                noise=noise,
+                txq=txq,
+                rx=rx,
+                tx=tx,
+                airtime=airtime,
+                rx_air=rx_air,
+                fl_dups=fl_dups,
+                di_dups=di_dups,
+                fl_tx=fl_tx,
+                fl_rx=fl_rx,
+                di_tx=di_tx,
+                di_rx=di_rx,
+            )
+            log.debug(f"Metrics written to database (ts={ts})")
+        except Exception as e:
+            log.error(f"Failed to write metrics to database: {e}")
+            return 1
 
     return 0 if status_ok else 1
 
 
 def main():
     """Entry point."""
+    # Ensure database is initialized
+    init_db()
+
     exit_code = asyncio.run(collect_repeater())
     sys.exit(exit_code)
 

@@ -1,11 +1,11 @@
 # MeshCore Stats
 
-A Python-based monitoring system for MeshCore networks. Collects metrics from companion and repeater nodes, stores them as JSON snapshots, and generates a static website with interactive SVG charts and statistics.
+A Python-based monitoring system for MeshCore networks. Collects metrics from companion and repeater nodes, stores them in a SQLite database, and generates a static website with interactive SVG charts and statistics.
 
 ## Features
 
 - **Phase 1: Data Collection** - Collect metrics from companion (local) and repeater (remote) nodes
-- **Phase 2: Chart Rendering** - Generate interactive SVG charts from snapshot data using matplotlib
+- **Phase 2: Chart Rendering** - Generate interactive SVG charts from database using matplotlib
 - **Phase 3: Static Site** - Generate a static HTML website with day/week/month/year views
 - **Phase 4: Reports** - Generate monthly and yearly statistics reports
 
@@ -58,13 +58,9 @@ export REMOTE_CB_FAILS=6
 export REMOTE_CB_COOLDOWN_S=3600
 
 # Paths (relative to project root)
-export SNAPSHOT_DIR=./data/snapshots
+export DATA_DIR=./data
 export STATE_DIR=./data/state
 export OUT_DIR=./out
-
-# Metric mappings (ds_name=dotted.path)
-export COMPANION_METRICS="bat_v=bat.voltage_v,contacts=derived.contacts_count,rx=stats.rx_packets,tx=stats.tx_packets"
-export REPEATER_METRICS="bat_v=telemetry.bat,bat_pct=telemetry.bat_pct,neigh=derived.neighbours_count,rx=telemetry.rx_packets,tx=telemetry.tx_packets,rssi=status.rssi,snr=status.snr"
 
 # Optional: fetch ACL from repeater
 export REPEATER_FETCH_ACL=0
@@ -139,23 +135,24 @@ meshcore-stats/
 │   ├── env.py                  # Environment variable parsing
 │   ├── log.py                  # Logging helper
 │   ├── meshcore_client.py      # MeshCore connection and commands
-│   ├── jsondump.py             # JSON snapshot I/O
+│   ├── db.py                   # SQLite database module
 │   ├── retry.py                # Retry logic and circuit breaker
-│   ├── extract.py              # Metric extraction from payloads
 │   ├── charts.py               # Matplotlib SVG chart generation
 │   ├── html.py                 # HTML rendering
 │   ├── reports.py              # Report generation
+│   ├── migrations/             # SQL schema migrations
+│   │   └── 001_initial_schema.sql
 │   └── templates/              # Jinja2 HTML templates
 ├── scripts/
 │   ├── phase1_collect_companion.py
 │   ├── phase1_collect_repeater.py
+│   ├── phase2_render_charts.py
 │   ├── phase3_render_site.py
-│   └── phase4_render_reports.py
+│   ├── phase4_render_reports.py
+│   └── migrate_json_to_db.py   # One-time migration from JSON
 ├── data/
-│   ├── snapshots/
-│   │   ├── companion/          # YYYY/MM/DD/HHMMSS.json
-│   │   └── repeater/
 │   └── state/
+│       ├── metrics.db          # SQLite database (WAL mode)
 │       └── repeater_circuit.json
 └── out/                        # Generated site
     ├── day.html                # Repeater pages (entry point)
@@ -252,11 +249,9 @@ If repeater collection shows "cooldown active":
 | `REMOTE_RETRY_BACKOFF_S` | 4 | Retry backoff delay |
 | `REMOTE_CB_FAILS` | 6 | Failures before circuit opens |
 | `REMOTE_CB_COOLDOWN_S` | 3600 | Circuit breaker cooldown |
-| `SNAPSHOT_DIR` | ./data/snapshots | Snapshot storage path |
+| `DATA_DIR` | ./data | Data directory (contains metrics.db) |
 | `STATE_DIR` | ./data/state | State file path |
 | `OUT_DIR` | ./out | Output site path |
-| `COMPANION_METRICS` | (see code) | Companion metric mappings |
-| `REPEATER_METRICS` | (see code) | Repeater metric mappings |
 
 ## Metrics Reference
 
@@ -297,6 +292,24 @@ If repeater collection shows "cooldown active":
 
 - **Gauge**: Instantaneous values stored as-is (battery voltage, RSSI, queue depth)
 - **Counter**: Cumulative values where the rate of change is calculated (packets, airtime). Charts display per-minute rates.
+
+## Database
+
+Metrics are stored in a SQLite database at `data/state/metrics.db` with WAL mode enabled for concurrent read/write access.
+
+### Schema Migrations
+
+Database migrations are stored as SQL files in `src/meshmon/migrations/` and are applied automatically when the database is initialized. Migration files follow the naming convention `NNN_description.sql` (e.g., `001_initial_schema.sql`).
+
+### Migrating from JSON Snapshots
+
+If you have existing JSON snapshots, you can migrate them to the SQLite database:
+
+```bash
+python scripts/migrate_json_to_db.py
+```
+
+This will scan all JSON snapshots in `data/snapshots/` and import them into the database, computing derived fields (like battery percentage) along the way.
 
 ## License
 

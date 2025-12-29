@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Phase 4: Render reports.
+Phase 4: Render reports from SQLite database.
 
 Generates monthly and yearly statistics reports in HTML, TXT, and JSON
 formats for both repeater and companion nodes.
@@ -30,6 +30,7 @@ from typing import Optional
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from meshmon.db import init_db
 from meshmon.env import get_config
 from meshmon import log
 
@@ -48,12 +49,12 @@ def safe_write(path: Path, content: str) -> bool:
         path.write_text(content)
         return True
     except IOError as e:
-        log.err(f"Failed to write {path}: {e}")
+        log.error(f"Failed to write {path}: {e}")
         return False
+
+
 from meshmon.reports import (
     LocationInfo,
-    MonthlyAggregate,
-    YearlyAggregate,
     aggregate_monthly,
     aggregate_yearly,
     format_monthly_txt,
@@ -86,14 +87,6 @@ def get_location() -> LocationInfo:
     )
 
 
-def get_metrics_config(role: str) -> dict[str, str]:
-    """Get metrics configuration for a role."""
-    cfg = get_config()
-    if role == "repeater":
-        return cfg.repeater_metrics
-    return cfg.companion_metrics
-
-
 def render_monthly_report(
     role: str,
     year: int,
@@ -111,12 +104,11 @@ def render_monthly_report(
         next_period: (year, month) of next report, or None
     """
     cfg = get_config()
-    metrics = get_metrics_config(role)
     node_name = get_node_name(role)
     location = get_location()
 
     log.info(f"Aggregating {role} monthly report for {year}-{month:02d}...")
-    agg = aggregate_monthly(role, year, month, metrics)
+    agg = aggregate_monthly(role, year, month)
 
     if not agg.daily:
         log.warn(f"No data for {role} {year}-{month:02d}, skipping")
@@ -172,12 +164,11 @@ def render_yearly_report(
         next_year: Next year with data, or None
     """
     cfg = get_config()
-    metrics = get_metrics_config(role)
     node_name = get_node_name(role)
     location = get_location()
 
     log.info(f"Aggregating {role} yearly report for {year}...")
-    agg = aggregate_yearly(role, year, metrics)
+    agg = aggregate_yearly(role, year)
 
     if not agg.monthly:
         log.warn(f"No data for {role} {year}, skipping")
@@ -255,9 +246,12 @@ def build_reports_index_data() -> list[dict]:
 
 def main():
     """Generate all statistics reports."""
+    # Ensure database is initialized
+    init_db()
+
     cfg = get_config()
 
-    log.info("Generating reports...")
+    log.info("Generating reports from database...")
 
     # Ensure base reports directory exists
     (cfg.out_dir / "reports").mkdir(parents=True, exist_ok=True)
@@ -268,7 +262,7 @@ def main():
     for role in ["repeater", "companion"]:
         periods = get_available_periods(role)
         if not periods:
-            log.info(f"No snapshot data found for {role}")
+            log.info(f"No data found for {role}")
             continue
 
         log.info(f"Found {len(periods)} months of data for {role}")

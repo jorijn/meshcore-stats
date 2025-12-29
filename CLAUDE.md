@@ -24,7 +24,7 @@ This project monitors a MeshCore LoRa mesh network consisting of:
   - Location: **Oosterhout, The Netherlands**
   - Preset: **MeshCore EU/UK Narrow** (869.618 MHz, 62.5 kHz BW, SF8, CR8)
 
-The system collects metrics, stores them as JSON snapshots, and generates a static HTML dashboard with SVG charts.
+The system collects metrics, stores them in a SQLite database, and generates a static HTML dashboard with SVG charts.
 
 ## Architecture
 
@@ -42,8 +42,8 @@ The system collects metrics, stores them as JSON snapshots, and generates a stat
 └─────────────────┘
 
 Data Flow:
-Phase 1: Collect → JSON snapshots
-Phase 2: Render  → SVG charts (from snapshots, using matplotlib)
+Phase 1: Collect → SQLite database
+Phase 2: Render  → SVG charts (from database, using matplotlib)
 Phase 3: Render  → Static HTML site (inline SVG)
 Phase 4: Render  → Reports (monthly/yearly statistics)
 ```
@@ -57,26 +57,31 @@ meshcore-stats/
 │   ├── env.py             # Environment config parsing
 │   ├── log.py             # Logging utilities
 │   ├── meshcore_client.py # MeshCore connection wrapper
-│   ├── jsondump.py        # Snapshot JSON writer
-│   ├── extract.py         # Metric extraction from snapshots
+│   ├── db.py              # SQLite database module
 │   ├── retry.py           # Retry logic & circuit breaker
 │   ├── charts.py          # SVG chart rendering (matplotlib)
 │   ├── html.py            # HTML site generation
 │   ├── metrics.py         # Metric type definitions (counter vs gauge)
-│   ├── snapshot.py        # Snapshot data merging/derived fields
-│   └── reports.py         # Report generation (WeeWX-style)
+│   ├── reports.py         # Report generation (WeeWX-style)
+│   ├── migrations/        # SQL schema migrations
+│   │   └── 001_initial_schema.sql
+│   ├── jsondump.py        # (Legacy) JSON snapshot writer - used by migration
+│   ├── extract.py         # (Legacy) Metric extraction - used by migration
+│   └── snapshot.py        # (Legacy) Snapshot processing - used by migration
 ├── scripts/               # Executable scripts (cron-friendly)
 │   ├── phase1_collect_companion.py
 │   ├── phase1_collect_repeater.py
-│   ├── phase2_render_charts.py   # Generate SVG charts from snapshots
+│   ├── phase2_render_charts.py   # Generate SVG charts from database
 │   ├── phase3_render_site.py
 │   ├── phase4_render_reports.py  # Monthly/yearly reports
+│   ├── migrate_json_to_db.py     # One-time migration from JSON to SQLite
 │   └── rsync_output.sh    # Deploy to web server
 ├── data/
-│   ├── snapshots/         # JSON snapshots by date
+│   ├── snapshots/         # (Legacy) JSON snapshots by date
 │   │   ├── companion/YYYY/MM/DD/HHMMSS.json
 │   │   └── repeater/YYYY/MM/DD/HHMMSS.json
-│   └── state/             # Persistent state (circuit breaker)
+│   └── state/             # Persistent state
+│       ├── metrics.db     # SQLite database (WAL mode)
 │       └── repeater_circuit.json
 ├── out/                   # Generated static site
 │   ├── day.html           # Repeater pages at root (entry point)
@@ -133,19 +138,11 @@ All configuration via environment variables (see `.envrc`):
 - `REPORT_LON`: Longitude in decimal degrees (default: 4.8596901)
 - `REPORT_ELEV`: Elevation in meters (default: 10.0)
 
-### Metric Mappings
+### Metrics (Hardcoded)
 
-Format: `ds_name=dotted.path,ds_name2=other.path`
+Metrics are now hardcoded in the codebase rather than configurable via environment variables. This simplifies the system and ensures consistency between the database schema and the code.
 
-- `COMPANION_METRICS`: Metrics to extract from companion snapshots
-- `REPEATER_METRICS`: Metrics to extract from repeater snapshots
-
-**Current configuration:**
-```bash
-COMPANION_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,contacts=derived.contacts_count,rx=stats.packets.recv,tx=stats.packets.sent,uptime=stats.core.uptime_secs"
-
-REPEATER_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,rx=derived.rx,tx=derived.tx,rssi=derived.rssi,snr=derived.snr,uptime=status.uptime,noise=status.noise_floor,airtime=status.airtime,rx_air=status.rx_airtime,fl_dups=status.flood_dups,di_dups=status.direct_dups,fl_tx=status.sent_flood,fl_rx=status.recv_flood,di_tx=status.sent_direct,di_rx=status.recv_direct,txq=status.tx_queue_len"
-```
+See the "Metrics Reference" sections below for the full list of companion and repeater metrics.
 
 ## Key Dependencies
 
@@ -168,18 +165,52 @@ Metrics are classified as either **gauge** or **counter** in `src/meshmon/metric
   - `fl_tx`, `fl_rx` - Flood packet counters
   - `di_tx`, `di_rx` - Direct packet counters
 
-Counter metrics are converted to rates during chart rendering by calculating deltas between consecutive snapshots.
+Counter metrics are converted to rates during chart rendering by calculating deltas between consecutive readings.
 
-## Derived Fields
+## Database Schema
 
-The snapshot module (`src/meshmon/snapshot.py`) calculates derived fields that aren't directly in the raw snapshots:
+Metrics are stored in a SQLite database at `data/state/metrics.db` with WAL mode enabled for concurrent access.
 
-### Battery Voltage (`derived.bat_v`)
-- Companion: `stats.core.battery_mv / 1000` or `bat.level / 1000`
-- Repeater: `status.bat / 1000`
+### Companion Metrics Table
+```sql
+CREATE TABLE companion_metrics (
+    ts INTEGER PRIMARY KEY NOT NULL,   -- Unix timestamp
+    bat_v REAL,                        -- Battery voltage (V)
+    bat_pct REAL,                      -- Battery percentage (%)
+    contacts INTEGER,                  -- Number of known contacts
+    uptime INTEGER,                    -- Uptime in seconds
+    rx INTEGER,                        -- Total packets received (counter)
+    tx INTEGER                         -- Total packets transmitted (counter)
+) STRICT, WITHOUT ROWID;
+```
 
-### Battery Percentage (`derived.bat_pct`)
-Calculated from voltage using 18650 Li-ion discharge curve:
+### Repeater Metrics Table
+```sql
+CREATE TABLE repeater_metrics (
+    ts INTEGER PRIMARY KEY NOT NULL,   -- Unix timestamp
+    bat_v REAL,                        -- Battery voltage (V)
+    bat_pct REAL,                      -- Battery percentage (%)
+    rssi INTEGER,                      -- Last RSSI (dBm)
+    snr REAL,                          -- Last SNR (dB)
+    uptime INTEGER,                    -- Uptime in seconds
+    noise INTEGER,                     -- Noise floor (dBm)
+    txq INTEGER,                       -- TX queue length
+    rx INTEGER,                        -- Total packets received (counter)
+    tx INTEGER,                        -- Total packets transmitted (counter)
+    airtime INTEGER,                   -- TX airtime in seconds (counter)
+    rx_air INTEGER,                    -- RX airtime in seconds (counter)
+    fl_dups INTEGER,                   -- Flood duplicate packets (counter)
+    di_dups INTEGER,                   -- Direct duplicate packets (counter)
+    fl_tx INTEGER,                     -- Flood packets transmitted (counter)
+    fl_rx INTEGER,                     -- Flood packets received (counter)
+    di_tx INTEGER,                     -- Direct packets transmitted (counter)
+    di_rx INTEGER                      -- Direct packets received (counter)
+) STRICT, WITHOUT ROWID;
+```
+
+### Derived Fields (Pre-computed at Insert)
+
+Battery percentage (`bat_pct`) is calculated from voltage using the 18650 Li-ion discharge curve at insert time:
 
 | Voltage | Percentage |
 |---------|------------|
@@ -198,66 +229,9 @@ Calculated from voltage using 18650 Li-ion discharge curve:
 
 Uses piecewise linear interpolation between points.
 
-### Repeater-specific derived fields
-- `derived.rssi`: from `status.last_rssi`
-- `derived.snr`: from `status.last_snr`
-- `derived.rx`: from `status.nb_recv`
-- `derived.tx`: from `status.nb_sent`
+### Migration System
 
-## Data Paths in Snapshots
-
-### Companion Snapshot Structure
-```json
-{
-  "ts": 1766397234,
-  "node": {"role": "companion"},
-  "device_info": {...},
-  "self_info": {
-    "radio_freq": 869.618,
-    "radio_bw": 62.5,
-    "radio_sf": 8,
-    "tx_power": 22,
-    "name": "..."
-  },
-  "bat": {
-    "level": 4145  // millivolts
-  },
-  "stats": {
-    "core": {
-      "battery_mv": 4148,
-      "uptime_secs": 1776
-    },
-    "packets": {
-      "recv": 160,
-      "sent": 0
-    }
-  },
-  "derived": {
-    "contacts_count": 3
-  }
-}
-```
-
-### Repeater Snapshot Structure
-```json
-{
-  "ts": 1766410160,
-  "node": {"role": "repeater", "name": "..."},
-  "status": {
-    "bat": 4049,           // millivolts
-    "noise_floor": -116,
-    "last_rssi": -30,
-    "last_snr": 12.0,
-    "nb_recv": 104945,
-    "nb_sent": 46697,
-    "uptime": 842491,
-    "airtime": 32817
-  },
-  "telemetry": null,       // No longer fetched (all data comes from status)
-  "acl": null,
-  "derived": {}
-}
-```
+Database migrations are stored as SQL files in `src/meshmon/migrations/` with naming convention `NNN_description.sql`. Migrations are applied automatically on database initialization.
 
 ## Running the Scripts
 
@@ -284,11 +258,11 @@ python scripts/phase1_collect_repeater.py
 ### Phase 2: Chart Rendering
 
 ```bash
-# Render all SVG charts from snapshots (day/week/month/year for all metrics)
+# Render all SVG charts from database (day/week/month/year for all metrics)
 python scripts/phase2_render_charts.py
 ```
 
-Charts are rendered using matplotlib, reading directly from JSON snapshots. Each chart is generated in both light and dark theme variants.
+Charts are rendered using matplotlib, reading directly from the SQLite database. Each chart is generated in both light and dark theme variants.
 
 ### Phase 3: HTML Generation
 
@@ -306,12 +280,12 @@ Generates monthly and yearly statistics reports in HTML, TXT (WeeWX-style ASCII)
 python scripts/phase4_render_reports.py
 ```
 
-Reports are generated for all available months/years based on snapshot data. Output structure:
+Reports are generated for all available months/years based on database data. Output structure:
 - `/reports/` - Index page listing all available reports
 - `/reports/{role}/{year}/` - Yearly report (HTML, TXT, JSON)
 - `/reports/{role}/{year}/{month}/` - Monthly report (HTML, TXT, JSON)
 
-Counter metrics (rx, tx, airtime) are aggregated from absolute counter values in snapshots, with proper handling of device reboots (negative deltas).
+Counter metrics (rx, tx, airtime) are aggregated from absolute counter values in the database, with proper handling of device reboots (negative deltas).
 
 ### Deploy to Web Server
 
@@ -482,7 +456,7 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 # Repeater: every 15 minutes at :01, :16, :31, :46 (offset by 1 min to avoid USB conflict)
 1,16,31,46 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_repeater.py
 
-# Charts: every 5 minutes (generates SVG charts from snapshots)
+# Charts: every 5 minutes (generates SVG charts from database)
 */5 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase2_render_charts.py
 
 # HTML: every 5 minutes
@@ -497,12 +471,15 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 ## Adding New Metrics
 
-1. Add the metric to `COMPANION_METRICS` or `REPEATER_METRICS` in `.envrc`
-2. If the metric needs calculation, add it to `build_merged_view()` in `src/meshmon/snapshot.py`
-3. If it's a counter metric (rate of change), add it to `COUNTER_METRICS` in `src/meshmon/metrics.py`
-4. Add a label in `METRIC_LABELS` in `src/meshmon/charts.py`
-5. Reload direnv: `direnv allow`
-6. Regenerate charts and site
+1. Create a new migration file in `src/meshmon/migrations/` (e.g., `002_add_new_metric.sql`)
+2. Add ALTER TABLE statement to add the column to the appropriate table
+3. Update the `insert_*_metrics()` function in `src/meshmon/db.py`
+4. Update the phase1 collector script to extract and insert the metric
+5. Update `COMPANION_METRICS` or `REPEATER_METRICS` dict in `src/meshmon/charts.py`
+6. If it's a counter metric (rate of change), add it to `COUNTER_METRICS` in `src/meshmon/metrics.py`
+7. Add a label in `CHART_LABELS` in `src/meshmon/html.py`
+8. Run the phase1 collector to apply the migration and start collecting
+9. Regenerate charts and site
 
 ## Changing Metric Types
 
@@ -516,3 +493,37 @@ If you need to change a metric from gauge to counter (or vice versa):
 1. Update `COUNTER_METRICS` in `src/meshmon/metrics.py`
 2. Update `GRAPH_SCALING` if the metric needs display scaling
 3. Regenerate charts: `python scripts/phase2_render_charts.py`
+
+## Migrating from JSON Snapshots
+
+If you have existing JSON snapshots that need to be migrated to the SQLite database:
+
+```bash
+# One-time migration (run once after upgrading)
+python scripts/migrate_json_to_db.py
+```
+
+This will:
+1. Scan all JSON snapshots in `data/snapshots/`
+2. Extract metrics and compute derived fields (bat_pct)
+3. Insert into the SQLite database with duplicate handling
+
+## Database Maintenance
+
+The SQLite database benefits from periodic maintenance to reclaim space and update query statistics. A maintenance script is provided:
+
+```bash
+# Run database maintenance (VACUUM + ANALYZE)
+./scripts/db_maintenance.sh
+```
+
+SQLite's VACUUM command acquires an exclusive lock internally. Other processes with `busy_timeout` configured will wait for maintenance to complete.
+
+### Recommended Cron Entry
+
+Add to your crontab for monthly maintenance at 3 AM on the 1st:
+
+```cron
+# Database maintenance: monthly at 3 AM on the 1st
+0 3 1 * * cd /home/jorijn/apps/meshcore-stats && ./scripts/db_maintenance.sh >> /var/log/meshcore-stats-maintenance.log 2>&1
+```
