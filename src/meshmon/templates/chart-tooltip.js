@@ -20,26 +20,33 @@
   let currentIndicator = null;
   let currentSvg = null;
 
-  // Metric display labels and units
+  // Metric display labels and units (using firmware field names)
   const metricLabels = {
-    'bat_v': { label: 'Voltage', unit: 'V', decimals: 2 },
-    'bat_pct': { label: 'Battery', unit: '%', decimals: 0 },
-    'rssi': { label: 'RSSI', unit: 'dBm', decimals: 0 },
-    'snr': { label: 'SNR', unit: 'dB', decimals: 1 },
-    'rx': { label: 'RX', unit: '/min', decimals: 1 },
-    'tx': { label: 'TX', unit: '/min', decimals: 1 },
-    'uptime': { label: 'Uptime', unit: 'days', decimals: 2 },
-    'noise': { label: 'Noise', unit: 'dBm', decimals: 0 },
-    'airtime': { label: 'Airtime', unit: 's/min', decimals: 2 },
-    'rx_air': { label: 'RX Air', unit: 's/min', decimals: 2 },
+    // Companion metrics
+    'battery_mv': { label: 'Voltage', unit: 'V', decimals: 2 },
+    'uptime_secs': { label: 'Uptime', unit: 'days', decimals: 2 },
     'contacts': { label: 'Contacts', unit: '', decimals: 0 },
-    'txq': { label: 'TX Queue', unit: '', decimals: 0 },
-    'fl_dups': { label: 'Flood Dups', unit: '/min', decimals: 1 },
-    'di_dups': { label: 'Direct Dups', unit: '/min', decimals: 1 },
-    'fl_tx': { label: 'Flood TX', unit: '/min', decimals: 1 },
-    'fl_rx': { label: 'Flood RX', unit: '/min', decimals: 1 },
-    'di_tx': { label: 'Direct TX', unit: '/min', decimals: 1 },
-    'di_rx': { label: 'Direct RX', unit: '/min', decimals: 1 },
+    'recv': { label: 'RX', unit: '/min', decimals: 1 },
+    'sent': { label: 'TX', unit: '/min', decimals: 1 },
+
+    // Repeater metrics
+    'bat': { label: 'Voltage', unit: 'V', decimals: 2 },
+    'bat_pct': { label: 'Battery', unit: '%', decimals: 0 },
+    'uptime': { label: 'Uptime', unit: 'days', decimals: 2 },
+    'last_rssi': { label: 'RSSI', unit: 'dBm', decimals: 0 },
+    'last_snr': { label: 'SNR', unit: 'dB', decimals: 1 },
+    'noise_floor': { label: 'Noise', unit: 'dBm', decimals: 0 },
+    'tx_queue_len': { label: 'TX Queue', unit: '', decimals: 0 },
+    'nb_recv': { label: 'RX', unit: '/min', decimals: 1 },
+    'nb_sent': { label: 'TX', unit: '/min', decimals: 1 },
+    'airtime': { label: 'Airtime', unit: 's/min', decimals: 2 },
+    'rx_airtime': { label: 'RX Air', unit: 's/min', decimals: 2 },
+    'flood_dups': { label: 'Flood Dups', unit: '/min', decimals: 1 },
+    'direct_dups': { label: 'Direct Dups', unit: '/min', decimals: 1 },
+    'sent_flood': { label: 'Flood TX', unit: '/min', decimals: 1 },
+    'recv_flood': { label: 'Flood RX', unit: '/min', decimals: 1 },
+    'sent_direct': { label: 'Direct TX', unit: '/min', decimals: 1 },
+    'recv_direct': { label: 'Direct RX', unit: '/min', decimals: 1 },
   };
 
   /**
