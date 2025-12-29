@@ -42,27 +42,27 @@ METRIC_CONFIG: dict[str, MetricConfig] = {
     # Companion metrics (from get_stats_core, get_stats_packets, get_contacts)
     # -------------------------------------------------------------------------
     "battery_mv": MetricConfig(
-        label="Battery",
+        label="Battery Voltage",
         unit="V",
         transform="mv_to_v",
     ),
     "uptime_secs": MetricConfig(
-        label="Uptime",
+        label="System Uptime",
         unit="days",
         scale=1 / 86400,
     ),
     "contacts": MetricConfig(
-        label="Contacts",
+        label="Known Contacts",
         unit="",
     ),
     "recv": MetricConfig(
-        label="Packets RX",
+        label="Total Packets Received",
         unit="/min",
         type="counter",
         scale=60,
     ),
     "sent": MetricConfig(
-        label="Packets TX",
+        label="Total Packets Sent",
         unit="/min",
         type="counter",
         scale=60,
@@ -72,87 +72,87 @@ METRIC_CONFIG: dict[str, MetricConfig] = {
     # Repeater metrics (from req_status_sync)
     # -------------------------------------------------------------------------
     "bat": MetricConfig(
-        label="Battery",
+        label="Battery Voltage",
         unit="V",
         transform="mv_to_v",
     ),
     "uptime": MetricConfig(
-        label="Uptime",
+        label="System Uptime",
         unit="days",
         scale=1 / 86400,
     ),
     "last_rssi": MetricConfig(
-        label="RSSI",
+        label="Signal Strength (RSSI)",
         unit="dBm",
     ),
     "last_snr": MetricConfig(
-        label="SNR",
+        label="Signal-to-Noise Ratio",
         unit="dB",
     ),
     "noise_floor": MetricConfig(
-        label="Noise Floor",
+        label="RF Noise Floor",
         unit="dBm",
     ),
     "tx_queue_len": MetricConfig(
-        label="TX Queue",
+        label="Transmit Queue Depth",
         unit="",
     ),
     "nb_recv": MetricConfig(
-        label="Packets RX",
+        label="Total Packets Received",
         unit="/min",
         type="counter",
         scale=60,
     ),
     "nb_sent": MetricConfig(
-        label="Packets TX",
+        label="Total Packets Sent",
         unit="/min",
         type="counter",
         scale=60,
     ),
     "airtime": MetricConfig(
-        label="TX Airtime",
+        label="Transmit Airtime",
         unit="s/min",
         type="counter",
         scale=60,
     ),
     "rx_airtime": MetricConfig(
-        label="RX Airtime",
+        label="Receive Airtime",
         unit="s/min",
         type="counter",
         scale=60,
     ),
     "flood_dups": MetricConfig(
-        label="Flood Dups",
+        label="Flood Duplicates Dropped",
         unit="/min",
         type="counter",
         scale=60,
     ),
     "direct_dups": MetricConfig(
-        label="Direct Dups",
+        label="Direct Duplicates Dropped",
         unit="/min",
         type="counter",
         scale=60,
     ),
     "sent_flood": MetricConfig(
-        label="Flood TX",
+        label="Flood Packets Sent",
         unit="/min",
         type="counter",
         scale=60,
     ),
     "recv_flood": MetricConfig(
-        label="Flood RX",
+        label="Flood Packets Received",
         unit="/min",
         type="counter",
         scale=60,
     ),
     "sent_direct": MetricConfig(
-        label="Direct TX",
+        label="Direct Packets Sent",
         unit="/min",
         type="counter",
         scale=60,
     ),
     "recv_direct": MetricConfig(
-        label="Direct RX",
+        label="Direct Packets Received",
         unit="/min",
         type="counter",
         scale=60,
@@ -162,7 +162,7 @@ METRIC_CONFIG: dict[str, MetricConfig] = {
     # Derived metrics (computed at query time, not stored in database)
     # -------------------------------------------------------------------------
     "bat_pct": MetricConfig(
-        label="Battery",
+        label="Charge Level",
         unit="%",
     ),
 }
