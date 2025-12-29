@@ -114,6 +114,9 @@ DIRENV=/usr/bin/direnv
 
 # Daily at midnight: generate reports
 0 0 * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/phase4_render_reports.py
+
+# Monthly at 3 AM on the 1st: database maintenance
+0 3 1 * * cd $MESHCORE_STATS && ./scripts/db_maintenance.sh
 ```
 
 ### Serving the Site
