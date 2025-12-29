@@ -1,34 +1,47 @@
 """Report generation (WeeWX-style).
 
 This module provides functionality to generate monthly and yearly
-reports from snapshot data. Reports are generated in TXT (WeeWX-style
+reports from SQLite database metrics. Reports are generated in TXT (WeeWX-style
 ASCII tables), JSON, and HTML formats.
 
 Counter metrics (rx, tx, airtime, etc.) are aggregated using absolute
-counter values from snapshots, summing positive deltas to handle device
+counter values from the database, summing positive deltas to handle device
 reboots gracefully.
 """
 
 import calendar
 import json
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
+from .db import get_connection, get_metrics_for_period
 from .env import get_config
-from .extract import get_by_path
-from .jsondump import load_snapshot
 from .metrics import is_counter_metric
-from .snapshot import build_companion_merged_view, build_repeater_merged_view
 from . import log
 
 
-# Role-specific merged view builders
-ROLE_BUILDERS = {
-    "companion": build_companion_merged_view,
-    "repeater": build_repeater_merged_view,
-}
+# Hardcoded metric names (matches database columns)
+COMPANION_METRICS = [
+    "bat_v", "bat_pct", "contacts", "uptime", "rx", "tx"
+]
+
+REPEATER_METRICS = [
+    "bat_v", "bat_pct", "rssi", "snr", "uptime", "noise", "txq",
+    "rx", "tx", "airtime", "rx_air", "fl_dups", "di_dups",
+    "fl_tx", "fl_rx", "di_tx", "di_rx"
+]
+
+
+def get_metrics_for_role(role: str) -> list[str]:
+    """Get list of metric names for a role."""
+    if role == "companion":
+        return COMPANION_METRICS
+    elif role == "repeater":
+        return REPEATER_METRICS
+    else:
+        raise ValueError(f"Unknown role: {role}")
 
 
 @dataclass
@@ -84,63 +97,23 @@ class YearlyAggregate:
     summary: dict[str, MetricStats] = field(default_factory=dict)
 
 
-def get_merged_view_builder(role: str):
-    """Get the appropriate merged view builder for a role.
+def get_rows_for_date(role: str, d: date) -> list[dict[str, Any]]:
+    """Fetch all metric rows for a specific date from the database.
 
     Args:
         role: "companion" or "repeater"
+        d: The date to load data for
 
     Returns:
-        Function that builds merged view from snapshot
-
-    Raises:
-        ValueError: If role is unknown
+        List of row dicts, sorted by timestamp
     """
-    if role not in ROLE_BUILDERS:
-        raise ValueError(f"Unknown role: {role}")
-    return ROLE_BUILDERS[role]
+    # Calculate timestamp range for the day
+    start_dt = datetime.combine(d, datetime.min.time())
+    end_dt = datetime.combine(d, datetime.max.time())
+    start_ts = int(start_dt.timestamp())
+    end_ts = int(end_dt.timestamp())
 
-
-def get_snapshots_for_date(role: str, d: date) -> list[tuple[Path, dict[str, Any]]]:
-    """Load all valid snapshots for a specific date.
-
-    Skips snapshots with skip_reason (circuit breaker, etc.) and
-    snapshots that fail to load.
-
-    Args:
-        role: "companion" or "repeater"
-        d: The date to load snapshots for
-
-    Returns:
-        List of (path, snapshot_data) tuples, sorted by timestamp
-    """
-    cfg = get_config()
-    day_dir = cfg.snapshot_dir / role / f"{d.year}" / f"{d.month:02d}" / f"{d.day:02d}"
-
-    if not day_dir.exists():
-        return []
-
-    snapshots = []
-    skipped_count = 0
-
-    for json_file in sorted(day_dir.glob("*.json")):
-        data = load_snapshot(json_file)
-        if data is None:
-            skipped_count += 1
-            continue
-        if data.get("skip_reason"):
-            # Circuit breaker skip - expected, don't count as error
-            continue
-        if not data.get("ts"):
-            log.debug(f"Snapshot missing timestamp: {json_file}")
-            skipped_count += 1
-            continue
-        snapshots.append((json_file, data))
-
-    if skipped_count > 0:
-        log.debug(f"Skipped {skipped_count} invalid snapshots for {role}/{d}")
-
-    return snapshots
+    return get_metrics_for_period(role, start_ts, end_ts)
 
 
 def compute_counter_total(
@@ -223,54 +196,49 @@ def _compute_counter_stats(values: list[tuple[datetime, int]]) -> MetricStats:
     )
 
 
-def aggregate_daily(
-    role: str, d: date, metrics_config: dict[str, str]
-) -> DailyAggregate:
-    """Compute daily aggregates from snapshots.
+def aggregate_daily(role: str, d: date) -> DailyAggregate:
+    """Compute daily aggregates from database.
 
     Args:
         role: "companion" or "repeater"
         d: The date to aggregate
-        metrics_config: Mapping of ds_name -> dotted_path
 
     Returns:
         DailyAggregate with statistics for all configured metrics
     """
-    snapshots = get_snapshots_for_date(role, d)
-    agg = DailyAggregate(date=d, snapshot_count=len(snapshots))
+    rows = get_rows_for_date(role, d)
+    agg = DailyAggregate(date=d, snapshot_count=len(rows))
 
-    if not snapshots:
+    if not rows:
         return agg
 
-    # Get the appropriate builder for this role
-    build_fn = get_merged_view_builder(role)
-    merged_snapshots = [(path, build_fn(data)) for path, data in snapshots]
+    metrics = get_metrics_for_role(role)
 
     # Collect values per metric
     metric_values: dict[str, list[tuple[datetime, Any]]] = {
-        ds: [] for ds in metrics_config
+        m: [] for m in metrics
     }
 
-    for path, merged in merged_snapshots:
-        ts = datetime.fromtimestamp(merged["ts"])
-        for ds_name, dotted_path in metrics_config.items():
-            val = get_by_path(merged, dotted_path)
+    for row in rows:
+        ts = datetime.fromtimestamp(row["ts"])
+        for metric in metrics:
+            val = row.get(metric)
             if val is not None:
-                metric_values[ds_name].append((ts, val))
+                metric_values[metric].append((ts, val))
 
     # Compute stats per metric
-    for ds_name, values in metric_values.items():
+    for metric, values in metric_values.items():
         if not values:
             continue
 
-        if is_counter_metric(ds_name):
+        if is_counter_metric(metric):
             # Convert to int for counter processing
             int_values = [(ts, int(v)) for ts, v in values]
-            agg.metrics[ds_name] = _compute_counter_stats(int_values)
+            agg.metrics[metric] = _compute_counter_stats(int_values)
         else:
             # Keep as float for gauge processing
             float_values = [(ts, float(v)) for ts, v in values]
-            agg.metrics[ds_name] = _compute_gauge_stats(float_values)
+            agg.metrics[metric] = _compute_gauge_stats(float_values)
 
     return agg
 
@@ -352,21 +320,19 @@ def _aggregate_daily_counter_to_summary(
     )
 
 
-def aggregate_monthly(
-    role: str, year: int, month: int, metrics_config: dict[str, str]
-) -> MonthlyAggregate:
+def aggregate_monthly(role: str, year: int, month: int) -> MonthlyAggregate:
     """Compute monthly aggregates from daily data.
 
     Args:
         role: "companion" or "repeater"
         year: Year to aggregate
         month: Month to aggregate (1-12)
-        metrics_config: Mapping of ds_name -> dotted_path
 
     Returns:
         MonthlyAggregate with daily data and summary statistics
     """
     agg = MonthlyAggregate(year=year, month=month, role=role)
+    metrics = get_metrics_for_role(role)
 
     # Iterate all days in month
     _, days_in_month = calendar.monthrange(year, month)
@@ -375,18 +341,18 @@ def aggregate_monthly(
         # Don't aggregate future dates
         if d > date.today():
             break
-        daily = aggregate_daily(role, d, metrics_config)
+        daily = aggregate_daily(role, d)
         if daily.snapshot_count > 0:
             agg.daily.append(daily)
 
     # Compute monthly summary from daily data
-    for ds_name in metrics_config:
-        if is_counter_metric(ds_name):
-            agg.summary[ds_name] = _aggregate_daily_counter_to_summary(
-                agg.daily, ds_name
+    for metric in metrics:
+        if is_counter_metric(metric):
+            agg.summary[metric] = _aggregate_daily_counter_to_summary(
+                agg.daily, metric
             )
         else:
-            agg.summary[ds_name] = _aggregate_daily_gauge_to_summary(agg.daily, ds_name)
+            agg.summary[metric] = _aggregate_daily_gauge_to_summary(agg.daily, metric)
 
     return agg
 
@@ -459,46 +425,44 @@ def _aggregate_monthly_counter_to_summary(
     )
 
 
-def aggregate_yearly(
-    role: str, year: int, metrics_config: dict[str, str]
-) -> YearlyAggregate:
+def aggregate_yearly(role: str, year: int) -> YearlyAggregate:
     """Compute yearly aggregates from monthly data.
 
     Args:
         role: "companion" or "repeater"
         year: Year to aggregate
-        metrics_config: Mapping of ds_name -> dotted_path
 
     Returns:
         YearlyAggregate with monthly data and summary statistics
     """
     agg = YearlyAggregate(year=year, role=role)
+    metrics = get_metrics_for_role(role)
 
     # Process month by month to limit memory usage
     for month in range(1, 13):
         # Don't aggregate future months
         if date(year, month, 1) > date.today():
             break
-        monthly = aggregate_monthly(role, year, month, metrics_config)
+        monthly = aggregate_monthly(role, year, month)
         if monthly.daily:  # Has data
             agg.monthly.append(monthly)
 
     # Compute yearly summary from monthly summaries
-    for ds_name in metrics_config:
-        if is_counter_metric(ds_name):
-            agg.summary[ds_name] = _aggregate_monthly_counter_to_summary(
-                agg.monthly, ds_name
+    for metric in metrics:
+        if is_counter_metric(metric):
+            agg.summary[metric] = _aggregate_monthly_counter_to_summary(
+                agg.monthly, metric
             )
         else:
-            agg.summary[ds_name] = _aggregate_monthly_gauge_to_summary(
-                agg.monthly, ds_name
+            agg.summary[metric] = _aggregate_monthly_gauge_to_summary(
+                agg.monthly, metric
             )
 
     return agg
 
 
 def get_available_periods(role: str) -> list[tuple[int, int]]:
-    """Find all year/month combinations with snapshot data.
+    """Find all year/month combinations with data in the database.
 
     Args:
         role: "companion" or "repeater"
@@ -506,25 +470,17 @@ def get_available_periods(role: str) -> list[tuple[int, int]]:
     Returns:
         Sorted list of (year, month) tuples
     """
-    cfg = get_config()
-    base = cfg.snapshot_dir / role
+    table = f"{role}_metrics"
 
-    if not base.exists():
-        return []
-
-    periods = set()
-    for year_dir in base.glob("*"):
-        if not year_dir.is_dir() or not year_dir.name.isdigit():
-            continue
-        year = int(year_dir.name)
-        for month_dir in year_dir.glob("*"):
-            if not month_dir.is_dir() or not month_dir.name.isdigit():
-                continue
-            month = int(month_dir.name)
-            if 1 <= month <= 12:
-                periods.add((year, month))
-
-    return sorted(periods)
+    with get_connection(readonly=True) as conn:
+        cursor = conn.execute(f"""
+            SELECT DISTINCT
+                strftime('%Y', ts, 'unixepoch') as year,
+                strftime('%m', ts, 'unixepoch') as month
+            FROM {table}
+            ORDER BY year, month
+        """)
+        return [(int(row[0]), int(row[1])) for row in cursor.fetchall()]
 
 
 def format_lat_lon(lat: float, lon: float) -> tuple[str, str]:

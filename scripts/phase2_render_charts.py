@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Phase 2: Render charts from snapshot data.
+Phase 2: Render charts from SQLite database.
 
 Generates SVG charts for day/week/month/year for both companion and repeater
-using matplotlib, reading directly from JSON snapshots.
+using matplotlib, reading directly from the SQLite metrics database.
 """
 
 import sys
@@ -12,36 +12,37 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from meshmon.env import get_config
+from meshmon.db import init_db, get_metric_count
 from meshmon import log
 from meshmon.charts import render_all_charts, save_chart_stats
 
 
 def main():
     """Render all charts and save statistics."""
-    cfg = get_config()
+    # Ensure database is initialized
+    init_db()
 
-    log.info("Rendering charts from snapshots...")
+    log.info("Rendering charts from database...")
 
-    # Check if snapshots exist before rendering
-    companion_snapshots = cfg.snapshot_dir / "companion"
-    repeater_snapshots = cfg.snapshot_dir / "repeater"
+    # Check if data exists before rendering
+    companion_count = get_metric_count("companion")
+    repeater_count = get_metric_count("repeater")
 
     # Companion charts
-    if companion_snapshots.exists() and any(companion_snapshots.rglob("*.json")):
-        charts, stats = render_all_charts("companion", cfg.companion_metrics)
+    if companion_count > 0:
+        charts, stats = render_all_charts("companion")
         save_chart_stats("companion", stats)
-        log.info(f"Rendered {len(charts)} companion charts")
+        log.info(f"Rendered {len(charts)} companion charts ({companion_count} data points)")
     else:
-        log.warn(f"No companion snapshots found in {companion_snapshots}")
+        log.warn("No companion metrics in database")
 
     # Repeater charts
-    if repeater_snapshots.exists() and any(repeater_snapshots.rglob("*.json")):
-        charts, stats = render_all_charts("repeater", cfg.repeater_metrics)
+    if repeater_count > 0:
+        charts, stats = render_all_charts("repeater")
         save_chart_stats("repeater", stats)
-        log.info(f"Rendered {len(charts)} repeater charts")
+        log.info(f"Rendered {len(charts)} repeater charts ({repeater_count} data points)")
     else:
-        log.warn(f"No repeater snapshots found in {repeater_snapshots}")
+        log.warn("No repeater metrics in database")
 
     log.info("Chart rendering complete")
 

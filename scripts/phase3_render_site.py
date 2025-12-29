@@ -2,8 +2,9 @@
 """
 Phase 3: Render static HTML site.
 
-Generates static HTML pages using latest snapshots and rendered charts.
-Creates day/week/month/year pages for both companion and repeater nodes.
+Generates static HTML pages using latest metrics from SQLite database
+and rendered charts. Creates day/week/month/year pages for both
+companion and repeater nodes.
 """
 
 import sys
@@ -12,35 +13,36 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from meshmon.db import init_db, get_latest_metrics
 from meshmon.env import get_config
 from meshmon import log
-from meshmon.jsondump import get_latest_snapshot
 from meshmon.html import write_site
 
 
 def main():
     """Render static site."""
+    # Ensure database is initialized
+    init_db()
+
     cfg = get_config()
 
     log.info("Rendering static site...")
 
-    # Load latest snapshots
-    companion_result = get_latest_snapshot("companion")
-    companion_snapshot = companion_result[1] if companion_result else None
-    if companion_snapshot:
-        log.debug(f"Loaded companion snapshot: {companion_result[0]}")
+    # Load latest metrics from database
+    companion_row = get_latest_metrics("companion")
+    if companion_row:
+        log.debug(f"Loaded companion metrics (ts={companion_row.get('ts')})")
     else:
-        log.warn("No companion snapshot found")
+        log.warn("No companion metrics found in database")
 
-    repeater_result = get_latest_snapshot("repeater")
-    repeater_snapshot = repeater_result[1] if repeater_result else None
-    if repeater_snapshot:
-        log.debug(f"Loaded repeater snapshot: {repeater_result[0]}")
+    repeater_row = get_latest_metrics("repeater")
+    if repeater_row:
+        log.debug(f"Loaded repeater metrics (ts={repeater_row.get('ts')})")
     else:
-        log.warn("No repeater snapshot found")
+        log.warn("No repeater metrics found in database")
 
     # Write site
-    pages = write_site(companion_snapshot, repeater_snapshot)
+    pages = write_site(companion_row, repeater_row)
 
     log.info(f"Wrote {len(pages)} pages to {cfg.out_dir}")
     log.info("Site rendering complete")
