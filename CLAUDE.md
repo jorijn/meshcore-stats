@@ -63,23 +63,17 @@ meshcore-stats/
 │   ├── html.py            # HTML site generation
 │   ├── metrics.py         # Metric type definitions (counter vs gauge)
 │   ├── reports.py         # Report generation (WeeWX-style)
-│   ├── migrations/        # SQL schema migrations
-│   │   └── 001_initial_schema.sql
-│   ├── jsondump.py        # (Legacy) JSON snapshot writer - used by migration
-│   ├── extract.py         # (Legacy) Metric extraction - used by migration
-│   └── snapshot.py        # (Legacy) Snapshot processing - used by migration
+│   └── migrations/        # SQL schema migrations
+│       └── 001_initial_schema.sql
 ├── scripts/               # Executable scripts (cron-friendly)
 │   ├── phase1_collect_companion.py
 │   ├── phase1_collect_repeater.py
 │   ├── phase2_render_charts.py   # Generate SVG charts from database
 │   ├── phase3_render_site.py
 │   ├── phase4_render_reports.py  # Monthly/yearly reports
-│   ├── migrate_json_to_db.py     # One-time migration from JSON to SQLite
-│   └── rsync_output.sh    # Deploy to web server
+│   ├── db_maintenance.sh         # Database VACUUM/ANALYZE
+│   └── rsync_output.sh           # Deploy to web server
 ├── data/
-│   ├── snapshots/         # (Legacy) JSON snapshots by date
-│   │   ├── companion/YYYY/MM/DD/HHMMSS.json
-│   │   └── repeater/YYYY/MM/DD/HHMMSS.json
 │   └── state/             # Persistent state
 │       ├── metrics.db     # SQLite database (WAL mode)
 │       └── repeater_circuit.json
@@ -411,7 +405,7 @@ The repeater collector uses a circuit breaker to avoid spamming LoRa when the re
 
 - State stored in `data/state/repeater_circuit.json`
 - After N consecutive failures, enters cooldown
-- During cooldown, writes skip snapshot instead of attempting request
+- During cooldown, skips collection instead of attempting request
 - Resets on successful response
 
 ## Debugging
@@ -443,7 +437,7 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 2. **Environment variables not loaded**: Scripts must be run with direnv active or manually source `.envrc`
 
-3. **Empty charts**: Need at least 2 data points (snapshots) to display meaningful data.
+3. **Empty charts**: Need at least 2 data points to display meaningful data.
 
 ## Cron Setup (Example)
 
@@ -493,20 +487,6 @@ If you need to change a metric from gauge to counter (or vice versa):
 1. Update `COUNTER_METRICS` in `src/meshmon/metrics.py`
 2. Update `GRAPH_SCALING` if the metric needs display scaling
 3. Regenerate charts: `python scripts/phase2_render_charts.py`
-
-## Migrating from JSON Snapshots
-
-If you have existing JSON snapshots that need to be migrated to the SQLite database:
-
-```bash
-# One-time migration (run once after upgrading)
-python scripts/migrate_json_to_db.py
-```
-
-This will:
-1. Scan all JSON snapshots in `data/snapshots/`
-2. Extract metrics and compute derived fields (bat_pct)
-3. Insert into the SQLite database with duplicate handling
 
 ## Database Maintenance
 

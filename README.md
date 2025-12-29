@@ -19,6 +19,10 @@ A Python-based monitoring system for MeshCore networks. Collects metrics from co
 - jinja2 >= 3.1.0
 - matplotlib >= 3.8.0
 
+### System Dependencies
+
+- sqlite3 (for database maintenance script)
+
 ## Setup
 
 ### 1. Create Virtual Environment
@@ -149,7 +153,7 @@ meshcore-stats/
 │   ├── phase2_render_charts.py
 │   ├── phase3_render_site.py
 │   ├── phase4_render_reports.py
-│   └── migrate_json_to_db.py   # One-time migration from JSON
+│   └── db_maintenance.sh       # Database VACUUM/ANALYZE
 ├── data/
 │   └── state/
 │       ├── metrics.db          # SQLite database (WAL mode)
@@ -300,16 +304,6 @@ Metrics are stored in a SQLite database at `data/state/metrics.db` with WAL mode
 ### Schema Migrations
 
 Database migrations are stored as SQL files in `src/meshmon/migrations/` and are applied automatically when the database is initialized. Migration files follow the naming convention `NNN_description.sql` (e.g., `001_initial_schema.sql`).
-
-### Migrating from JSON Snapshots
-
-If you have existing JSON snapshots, you can migrate them to the SQLite database:
-
-```bash
-python scripts/migrate_json_to_db.py
-```
-
-This will scan all JSON snapshots in `data/snapshots/` and import them into the database, computing derived fields (like battery percentage) along the way.
 
 ## License
 

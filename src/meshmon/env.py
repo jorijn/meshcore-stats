@@ -46,24 +46,6 @@ def get_path(key: str, default: str) -> Path:
     return Path(val).expanduser().resolve()
 
 
-def parse_metrics(env_var: str) -> dict[str, str]:
-    """
-    Parse metric mapping from env var.
-    Format: "ds_name=dotted.path,ds_name2=other.path"
-    Returns: {"ds_name": "dotted.path", ...}
-    """
-    val = os.environ.get(env_var, "")
-    if not val.strip():
-        return {}
-    result = {}
-    for part in val.split(","):
-        part = part.strip()
-        if "=" in part:
-            ds_name, path = part.split("=", 1)
-            result[ds_name.strip()] = path.strip()
-    return result
-
-
 class Config:
     """Configuration loaded from environment variables."""
 
@@ -94,14 +76,8 @@ class Config:
         self.remote_cb_cooldown_s = get_int("REMOTE_CB_COOLDOWN_S", 3600)
 
         # Paths
-        self.snapshot_dir = get_path("SNAPSHOT_DIR", "./data/snapshots")
-        self.rrd_dir = get_path("RRD_DIR", "./data/rrd")
         self.state_dir = get_path("STATE_DIR", "./data/state")
         self.out_dir = get_path("OUT_DIR", "./out")
-
-        # Metric mappings
-        self.companion_metrics = parse_metrics("COMPANION_METRICS")
-        self.repeater_metrics = parse_metrics("REPEATER_METRICS")
 
         # Report location metadata
         self.report_location_name = get_str(
@@ -118,26 +94,6 @@ class Config:
         self.companion_display_name = get_str(
             "COMPANION_DISPLAY_NAME", "Companion Node"
         )
-
-        # Defaults if not specified
-        # Based on actual payload structure from device
-        if not self.companion_metrics:
-            self.companion_metrics = {
-                "bat_mv": "stats.core.battery_mv",  # Battery in millivolts
-                "contacts": "derived.contacts_count",
-                "rx": "derived.rx_packets",  # From stats.packets.recv
-                "tx": "derived.tx_packets",  # From stats.packets.sent
-            }
-        if not self.repeater_metrics:
-            self.repeater_metrics = {
-                "bat_v": "telemetry.bat",
-                "bat_pct": "telemetry.bat_pct",
-                "neigh": "derived.neighbours_count",
-                "rx": "telemetry.rx_packets",
-                "tx": "telemetry.tx_packets",
-                "rssi": "status.rssi",
-                "snr": "status.snr",
-            }
 
 
 # Global config instance
