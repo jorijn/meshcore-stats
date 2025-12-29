@@ -20,10 +20,7 @@ build/
 data/snapshots/companion/**/*.json
 data/snapshots/repeater/**/*.json
 data/rrd/*.rrd
-data/state/*.json
-data/state/*.db
-data/state/*.db-shm
-data/state/*.db-wal
+data/state/*
 
 # Generated output (except .htaccess)
 out/*

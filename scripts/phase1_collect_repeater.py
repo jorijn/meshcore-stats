@@ -12,7 +12,7 @@ Features:
 
 Outputs:
 - Concise summary to stdout
-- Metrics written to SQLite database
+- Metrics written to SQLite database (EAV schema)
 """
 
 import asyncio
@@ -34,7 +34,7 @@ from meshmon.meshcore_client import (
     extract_contact_info,
     list_contacts_summary,
 )
-from meshmon.db import init_db, insert_repeater_metrics
+from meshmon.db import init_db, insert_metrics
 from meshmon.retry import get_repeater_circuit_breaker, with_retries
 
 
@@ -169,16 +169,9 @@ async def collect_repeater() -> int:
         log.error("Failed to connect to companion node")
         return 1
 
-    # Initialize snapshot
-    snapshot = {
-        "ts": ts,
-        "node": {"role": "repeater"},
-        "status": None,
-        "telemetry": None,
-        "acl": None,
-        "derived": {},
-    }
-
+    # Metrics to insert (firmware field names from req_status_sync)
+    metrics: dict[str, float] = {}
+    node_name = "unknown"
     status_ok = False
 
     # Commands are accessed via mc.commands
@@ -201,10 +194,9 @@ async def collect_repeater() -> int:
 
         # Store contact info
         contact_info = extract_contact_info(contact)
-        snapshot["node"]["name"] = contact_info.get("adv_name", "unknown")
-        snapshot["node"]["pubkey_prefix"] = contact_info.get("pubkey_prefix", "")[:12]
+        node_name = contact_info.get("adv_name", "unknown")
 
-        log.debug(f"Found repeater: {snapshot['node']['name']}")
+        log.debug(f"Found repeater: {node_name}")
 
         # Optional login (if command exists)
         if cfg.repeater_password and hasattr(cmd, "send_login"):
@@ -231,9 +223,12 @@ async def collect_repeater() -> int:
             "req_status_sync",
             lambda: cmd.req_status_sync(contact, timeout=0, min_timeout=cfg.remote_timeout_s),
         )
-        if success:
+        if success and payload and isinstance(payload, dict):
             status_ok = True
-            snapshot["status"] = payload
+            # Insert all numeric fields from status response
+            for key, value in payload.items():
+                if isinstance(value, (int, float)):
+                    metrics[key] = float(value)
             log.debug(f"req_status_sync: {payload}")
         else:
             log.warn(f"req_status_sync failed: {err}")
@@ -248,7 +243,6 @@ async def collect_repeater() -> int:
                 lambda: cmd.req_acl_sync(contact, timeout=0, min_timeout=cfg.remote_timeout_s),
             )
             if success:
-                snapshot["acl"] = payload
                 log.debug(f"req_acl_sync: {payload}")
             else:
                 log.debug(f"req_acl_sync failed: {err}")
@@ -273,86 +267,26 @@ async def collect_repeater() -> int:
             except Exception:
                 pass
 
-    # Extract metrics and print summary
+    # Print summary
     summary_parts = [f"ts={ts}"]
-    node_name = snapshot["node"].get("name", "unknown")
-
-    # Extract all metrics from status
-    bat_v = None
-    rssi = None
-    snr = None
-    uptime = None
-    noise = None
-    txq = None
-    rx = None
-    tx = None
-    airtime = None
-    rx_air = None
-    fl_dups = None
-    di_dups = None
-    fl_tx = None
-    fl_rx = None
-    di_tx = None
-    di_rx = None
-
-    if snapshot["status"]:
-        status = snapshot["status"]
-        if isinstance(status, dict):
-            bat = status.get("bat")
-            if bat is not None:
-                bat_v = bat / 1000.0
-                summary_parts.append(f"bat={bat_v:.2f}V")
-
-            uptime = status.get("uptime")
-            if uptime is not None:
-                summary_parts.append(f"uptime={uptime // 86400}d")
-
-            rssi = status.get("last_rssi")
-            snr = status.get("last_snr")
-            noise = status.get("noise_floor")
-            txq = status.get("tx_queue_len")
-
-            rx = status.get("nb_recv")
-            tx = status.get("nb_sent")
-            if rx is not None:
-                summary_parts.append(f"rx={rx}")
-            if tx is not None:
-                summary_parts.append(f"tx={tx}")
-
-            airtime = status.get("airtime")
-            rx_air = status.get("rx_airtime")
-            fl_dups = status.get("flood_dups")
-            di_dups = status.get("direct_dups")
-            fl_tx = status.get("sent_flood")
-            fl_rx = status.get("recv_flood")
-            di_tx = status.get("sent_direct")
-            di_rx = status.get("recv_direct")
+    if "bat" in metrics:
+        bat_v = metrics["bat"] / 1000.0
+        summary_parts.append(f"bat={bat_v:.2f}V")
+    if "uptime" in metrics:
+        uptime_days = metrics["uptime"] // 86400
+        summary_parts.append(f"uptime={int(uptime_days)}d")
+    if "nb_recv" in metrics:
+        summary_parts.append(f"rx={int(metrics['nb_recv'])}")
+    if "nb_sent" in metrics:
+        summary_parts.append(f"tx={int(metrics['nb_sent'])}")
 
     log.info(f"Repeater ({node_name}): {', '.join(summary_parts)}")
 
     # Write metrics to database
-    if status_ok:
+    if status_ok and metrics:
         try:
-            insert_repeater_metrics(
-                ts=ts,
-                bat_v=bat_v,
-                rssi=rssi,
-                snr=snr,
-                uptime=uptime,
-                noise=noise,
-                txq=txq,
-                rx=rx,
-                tx=tx,
-                airtime=airtime,
-                rx_air=rx_air,
-                fl_dups=fl_dups,
-                di_dups=di_dups,
-                fl_tx=fl_tx,
-                fl_rx=fl_rx,
-                di_tx=di_tx,
-                di_rx=di_rx,
-            )
-            log.debug(f"Metrics written to database (ts={ts})")
+            inserted = insert_metrics(ts=ts, role="repeater", metrics=metrics)
+            log.debug(f"Inserted {inserted} metrics to database (ts={ts})")
         except Exception as e:
             log.error(f"Failed to write metrics to database: {e}")
             return 1

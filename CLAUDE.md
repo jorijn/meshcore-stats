@@ -75,8 +75,10 @@ meshcore-stats/
 │   ├── html.py            # HTML site generation
 │   ├── metrics.py         # Metric type definitions (counter vs gauge)
 │   ├── reports.py         # Report generation (WeeWX-style)
+│   ├── battery.py         # 18650 Li-ion voltage to percentage conversion
 │   └── migrations/        # SQL schema migrations
-│       └── 001_initial_schema.sql
+│       ├── 001_initial_schema.sql
+│       └── 002_eav_schema.sql
 ├── scripts/               # Executable scripts (cron-friendly)
 │   ├── phase1_collect_companion.py
 │   ├── phase1_collect_repeater.py
@@ -161,15 +163,15 @@ See the "Metrics Reference" sections below for the full list of companion and re
 
 ## Metric Types
 
-Metrics are classified as either **gauge** or **counter** in `src/meshmon/metrics.py`:
+Metrics are classified as either **gauge** or **counter** in `src/meshmon/metrics.py`, using firmware field names directly:
 
-- **GAUGE**: Instantaneous values (bat_v, bat_pct, contacts, neigh, rssi, snr, uptime, noise, txq)
+- **GAUGE**: Instantaneous values
+  - Companion: `battery_mv`, `bat_pct`, `contacts`, `uptime_secs`
+  - Repeater: `bat`, `bat_pct`, `last_rssi`, `last_snr`, `noise_floor`, `uptime`, `tx_queue_len`
+
 - **COUNTER**: Cumulative values that show rate of change - displayed as per-minute:
-  - `rx`, `tx` - Total packet counters
-  - `airtime`, `rx_air` - TX/RX airtime in seconds
-  - `fl_dups`, `di_dups` - Duplicate packet counters (flood/direct)
-  - `fl_tx`, `fl_rx` - Flood packet counters
-  - `di_tx`, `di_rx` - Direct packet counters
+  - Companion: `recv`, `sent`
+  - Repeater: `nb_recv`, `nb_sent`, `airtime`, `rx_airtime`, `flood_dups`, `direct_dups`, `sent_flood`, `recv_flood`, `sent_direct`, `recv_direct`
 
 Counter metrics are converted to rates during chart rendering by calculating deltas between consecutive readings.
 
@@ -177,46 +179,52 @@ Counter metrics are converted to rates during chart rendering by calculating del
 
 Metrics are stored in a SQLite database at `data/state/metrics.db` with WAL mode enabled for concurrent access.
 
-### Companion Metrics Table
+### EAV Schema (Entity-Attribute-Value)
+
+The database uses an EAV schema for flexible metric storage. Firmware field names are stored directly, allowing new metrics to be captured automatically without schema changes.
+
 ```sql
-CREATE TABLE companion_metrics (
-    ts INTEGER PRIMARY KEY NOT NULL,   -- Unix timestamp
-    bat_v REAL,                        -- Battery voltage (V)
-    bat_pct REAL,                      -- Battery percentage (%)
-    contacts INTEGER,                  -- Number of known contacts
-    uptime INTEGER,                    -- Uptime in seconds
-    rx INTEGER,                        -- Total packets received (counter)
-    tx INTEGER                         -- Total packets transmitted (counter)
+CREATE TABLE metrics (
+    ts INTEGER NOT NULL,      -- Unix timestamp
+    role TEXT NOT NULL,       -- 'companion' or 'repeater'
+    metric TEXT NOT NULL,     -- Firmware field name (e.g., 'bat', 'nb_recv')
+    value REAL,               -- Metric value
+    PRIMARY KEY (ts, role, metric)
 ) STRICT, WITHOUT ROWID;
+
+CREATE INDEX idx_metrics_role_ts ON metrics(role, ts);
 ```
 
-### Repeater Metrics Table
-```sql
-CREATE TABLE repeater_metrics (
-    ts INTEGER PRIMARY KEY NOT NULL,   -- Unix timestamp
-    bat_v REAL,                        -- Battery voltage (V)
-    bat_pct REAL,                      -- Battery percentage (%)
-    rssi INTEGER,                      -- Last RSSI (dBm)
-    snr REAL,                          -- Last SNR (dB)
-    uptime INTEGER,                    -- Uptime in seconds
-    noise INTEGER,                     -- Noise floor (dBm)
-    txq INTEGER,                       -- TX queue length
-    rx INTEGER,                        -- Total packets received (counter)
-    tx INTEGER,                        -- Total packets transmitted (counter)
-    airtime INTEGER,                   -- TX airtime in seconds (counter)
-    rx_air INTEGER,                    -- RX airtime in seconds (counter)
-    fl_dups INTEGER,                   -- Flood duplicate packets (counter)
-    di_dups INTEGER,                   -- Direct duplicate packets (counter)
-    fl_tx INTEGER,                     -- Flood packets transmitted (counter)
-    fl_rx INTEGER,                     -- Flood packets received (counter)
-    di_tx INTEGER,                     -- Direct packets transmitted (counter)
-    di_rx INTEGER                      -- Direct packets received (counter)
-) STRICT, WITHOUT ROWID;
-```
+**Key features:**
+- Firmware field names stored as-is (no translation)
+- New firmware fields captured automatically
+- Renamed/dropped fields handled gracefully
+- ~3.75M rows/year is well within SQLite capacity
 
-### Derived Fields (Pre-computed at Insert)
+### Firmware Field Names
 
-Battery percentage (`bat_pct`) is calculated from voltage using the 18650 Li-ion discharge curve at insert time:
+Collectors iterate firmware response dicts directly and insert all numeric values:
+
+**Companion** (from `get_stats_core`, `get_stats_packets`, `get_contacts`):
+- `battery_mv` - Battery in millivolts
+- `uptime_secs` - Uptime in seconds
+- `recv`, `sent` - Packet counters
+- `contacts` - Number of contacts
+
+**Repeater** (from `req_status_sync`):
+- `bat` - Battery in millivolts
+- `uptime` - Uptime in seconds
+- `last_rssi`, `last_snr`, `noise_floor` - Signal metrics
+- `nb_recv`, `nb_sent` - Packet counters
+- `airtime`, `rx_airtime` - Airtime counters
+- `tx_queue_len` - TX queue depth
+- `flood_dups`, `direct_dups`, `sent_flood`, `recv_flood`, `sent_direct`, `recv_direct` - Detailed packet counters
+
+See `docs/firmware-responses.md` for complete firmware response documentation.
+
+### Derived Fields (Computed at Query Time)
+
+Battery percentage (`bat_pct`) is computed at query time from voltage using the 18650 Li-ion discharge curve:
 
 | Voltage | Percentage |
 |---------|------------|
@@ -233,11 +241,15 @@ Battery percentage (`bat_pct`) is calculated from voltage using the 18650 Li-ion
 | 3.45V   | 5%         |
 | 3.00V   | 0%         |
 
-Uses piecewise linear interpolation between points.
+Uses piecewise linear interpolation between points. Implementation in `src/meshmon/battery.py`.
 
 ### Migration System
 
 Database migrations are stored as SQL files in `src/meshmon/migrations/` with naming convention `NNN_description.sql`. Migrations are applied automatically on database initialization.
+
+Current migrations:
+1. `001_initial_schema.sql` - Creates db_meta table and initial wide tables
+2. `002_eav_schema.sql` - Migrates to EAV schema, converts field names
 
 ## Running the Scripts
 
@@ -380,36 +392,40 @@ Data points are aggregated into bins to keep chart file sizes reasonable and lin
 
 ### Repeater Metrics Summary
 
-| Metric | Source | Type | Display Unit | Description |
-|--------|--------|------|--------------|-------------|
-| `bat_v` | `derived.bat_v` | gauge | Voltage (V) | Battery voltage |
-| `bat_pct` | `derived.bat_pct` | gauge | Battery (%) | Battery percentage |
-| `rx` | `derived.rx` | counter | Packets/min | Total packets received |
-| `tx` | `derived.tx` | counter | Packets/min | Total packets transmitted |
-| `rssi` | `derived.rssi` | gauge | RSSI (dBm) | Signal strength of last packet |
-| `snr` | `derived.snr` | gauge | SNR (dB) | Signal-to-noise ratio |
-| `uptime` | `status.uptime` | gauge | Days | Time since reboot (seconds ÷ 86400) |
-| `noise` | `status.noise_floor` | gauge | dBm | Background RF noise |
-| `airtime` | `status.airtime` | counter | Seconds/min | TX airtime rate |
-| `rx_air` | `status.rx_airtime` | counter | Seconds/min | RX airtime rate |
-| `fl_dups` | `status.flood_dups` | counter | Packets/min | Flood duplicate packets |
-| `di_dups` | `status.direct_dups` | counter | Packets/min | Direct duplicate packets |
-| `fl_tx` | `status.sent_flood` | counter | Packets/min | Flood packets transmitted |
-| `fl_rx` | `status.recv_flood` | counter | Packets/min | Flood packets received |
-| `di_tx` | `status.sent_direct` | counter | Packets/min | Direct packets transmitted |
-| `di_rx` | `status.recv_direct` | counter | Packets/min | Direct packets received |
-| `txq` | `status.tx_queue_len` | gauge | Queue depth | TX queue length |
+Metrics use firmware field names directly from `req_status_sync`:
+
+| Metric | Type | Display Unit | Description |
+|--------|------|--------------|-------------|
+| `bat` | gauge | Voltage (V) | Battery voltage (stored in mV, displayed as V) |
+| `bat_pct` | gauge | Battery (%) | Battery percentage (computed at query time) |
+| `last_rssi` | gauge | RSSI (dBm) | Signal strength of last packet |
+| `last_snr` | gauge | SNR (dB) | Signal-to-noise ratio |
+| `noise_floor` | gauge | dBm | Background RF noise |
+| `uptime` | gauge | Days | Time since reboot (seconds ÷ 86400) |
+| `tx_queue_len` | gauge | Queue depth | TX queue length |
+| `nb_recv` | counter | Packets/min | Total packets received |
+| `nb_sent` | counter | Packets/min | Total packets transmitted |
+| `airtime` | counter | Seconds/min | TX airtime rate |
+| `rx_airtime` | counter | Seconds/min | RX airtime rate |
+| `flood_dups` | counter | Packets/min | Flood duplicate packets |
+| `direct_dups` | counter | Packets/min | Direct duplicate packets |
+| `sent_flood` | counter | Packets/min | Flood packets transmitted |
+| `recv_flood` | counter | Packets/min | Flood packets received |
+| `sent_direct` | counter | Packets/min | Direct packets transmitted |
+| `recv_direct` | counter | Packets/min | Direct packets received |
 
 ### Companion Metrics Summary
 
-| Metric | Source | Type | Display Unit | Description |
-|--------|--------|------|--------------|-------------|
-| `bat_v` | `derived.bat_v` | gauge | Voltage (V) | Battery voltage |
-| `bat_pct` | `derived.bat_pct` | gauge | Battery (%) | Battery percentage |
-| `contacts` | `derived.contacts_count` | gauge | Count | Known mesh nodes |
-| `rx` | `stats.packets.recv` | counter | Packets/min | Total packets received |
-| `tx` | `stats.packets.sent` | counter | Packets/min | Total packets transmitted |
-| `uptime` | `stats.core.uptime_secs` | gauge | Days | Time since reboot (seconds ÷ 86400) |
+Metrics use firmware field names directly from `get_stats_*`:
+
+| Metric | Type | Display Unit | Description |
+|--------|------|--------------|-------------|
+| `battery_mv` | gauge | Voltage (V) | Battery voltage (stored in mV, displayed as V) |
+| `bat_pct` | gauge | Battery (%) | Battery percentage (computed at query time) |
+| `contacts` | gauge | Count | Known mesh nodes |
+| `uptime_secs` | gauge | Days | Time since reboot (seconds ÷ 86400) |
+| `recv` | counter | Packets/min | Total packets received |
+| `sent` | counter | Packets/min | Total packets transmitted |
 
 ## Circuit Breaker
 
@@ -477,28 +493,40 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 ## Adding New Metrics
 
-1. Create a new migration file in `src/meshmon/migrations/` (e.g., `002_add_new_metric.sql`)
-2. Add ALTER TABLE statement to add the column to the appropriate table
-3. Update the `insert_*_metrics()` function in `src/meshmon/db.py`
-4. Update the phase1 collector script to extract and insert the metric
-5. Update `COMPANION_METRICS` or `REPEATER_METRICS` dict in `src/meshmon/charts.py`
-6. If it's a counter metric (rate of change), add it to `COUNTER_METRICS` in `src/meshmon/metrics.py`
-7. Add a label in `CHART_LABELS` in `src/meshmon/html.py`
-8. Run the phase1 collector to apply the migration and start collecting
-9. Regenerate charts and site
+With the EAV schema, adding new metrics is simple:
+
+1. **Automatic capture**: New numeric fields from firmware responses are automatically stored in the database. No schema changes needed.
+
+2. **To display in charts**: Add the firmware field name to:
+   - `METRIC_CONFIG` in `src/meshmon/metrics.py` (label, unit, type, transform)
+   - `COMPANION_CHART_METRICS` or `REPEATER_CHART_METRICS` in `src/meshmon/metrics.py`
+   - `COMPANION_CHART_GROUPS` or `REPEATER_CHART_GROUPS` in `src/meshmon/html.py`
+
+3. **To display in reports**: Add the firmware field name to:
+   - `COMPANION_REPORT_METRICS` or `REPEATER_REPORT_METRICS` in `src/meshmon/reports.py`
+   - Update the report table builders in `src/meshmon/html.py` if needed
+
+4. Regenerate charts and site.
 
 ## Changing Metric Types
 
-Metric type configuration is centralized in `src/meshmon/metrics.py`:
+Metric configuration is centralized in `src/meshmon/metrics.py` using `MetricConfig`:
 
-- `COUNTER_METRICS`: Set of metrics that show rate of change (displayed as per-minute)
-- `GRAPH_SCALING`: Dict of metric → scale factor for display (e.g., ×60 for per-minute)
+```python
+MetricConfig(
+    label="Packets RX",    # Human-readable label
+    unit="/min",           # Display unit
+    type="counter",        # "gauge" or "counter"
+    scale=60,              # Multiply by this for display (60 = per minute)
+    transform="mv_to_v",   # Optional: apply voltage conversion
+)
+```
 
-If you need to change a metric from gauge to counter (or vice versa):
+To change a metric from gauge to counter (or vice versa):
 
-1. Update `COUNTER_METRICS` in `src/meshmon/metrics.py`
-2. Update `GRAPH_SCALING` if the metric needs display scaling
-3. Regenerate charts: `python scripts/phase2_render_charts.py`
+1. Update `METRIC_CONFIG` in `src/meshmon/metrics.py` - change the `type` field
+2. Update `scale` if needed (counters often use scale=60 for per-minute display)
+3. Regenerate charts: `direnv exec . python scripts/phase2_render_charts.py`
 
 ## Database Maintenance
 
