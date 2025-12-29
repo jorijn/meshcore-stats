@@ -30,6 +30,12 @@ from . import log
 # Type alias for theme names
 ThemeName = Literal["light", "dark"]
 
+# Bin size constants (in seconds)
+# These control time aggregation to keep chart data points at reasonable density
+BIN_30_MINUTES = 1800  # 30 minutes in seconds
+BIN_2_HOURS = 7200  # 2 hours in seconds
+BIN_1_DAY = 86400  # 1 day in seconds
+
 # Period configuration: lookback duration and aggregation bin size
 # Period configuration for chart rendering
 # Target: ~100-400 data points per chart for clean visualization
@@ -41,15 +47,15 @@ PERIOD_CONFIG = {
     },
     "week": {
         "lookback": timedelta(days=7),
-        "bin_seconds": 1800,  # 30-min bins (~336 points, ~2px per point)
+        "bin_seconds": BIN_30_MINUTES,  # 30-min bins (~336 points, ~2px per point)
     },
     "month": {
         "lookback": timedelta(days=31),
-        "bin_seconds": 7200,  # 2-hour bins (~372 points, ~1.7px per point)
+        "bin_seconds": BIN_2_HOURS,  # 2-hour bins (~372 points, ~1.7px per point)
     },
     "year": {
         "lookback": timedelta(days=365),
-        "bin_seconds": 86400,  # 1-day bins (~365 points, ~1.8px per point)
+        "bin_seconds": BIN_1_DAY,  # 1-day bins (~365 points, ~1.8px per point)
     },
 }
 
