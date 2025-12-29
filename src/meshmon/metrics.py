@@ -14,6 +14,7 @@ COUNTER_METRICS = {
     "fl_dups", "di_dups",          # Duplicate packet counts
     "fl_tx", "fl_rx",              # Flood packets
     "di_tx", "di_rx",              # Direct packets
+    "txq",                         # TX queue length (bar chart for discrete samples)
 }
 
 # Airtime metrics are counters but displayed differently (seconds/min not packets/min)

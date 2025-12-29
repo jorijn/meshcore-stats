@@ -160,13 +160,14 @@ REPEATER_METRICS="bat_v=derived.bat_v,bat_pct=derived.bat_pct,rx=derived.rx,tx=d
 
 Metrics are classified as either **gauge** or **counter** in `src/meshmon/metrics.py`:
 
-- **GAUGE**: Instantaneous values (bat_v, bat_pct, contacts, neigh, rssi, snr, uptime, noise, txq)
+- **GAUGE**: Instantaneous values (bat_v, bat_pct, contacts, neigh, rssi, snr, uptime, noise)
 - **COUNTER**: Cumulative values that show rate of change - displayed as per-minute:
   - `rx`, `tx` - Total packet counters
   - `airtime`, `rx_air` - TX/RX airtime in seconds
   - `fl_dups`, `di_dups` - Duplicate packet counters (flood/direct)
   - `fl_tx`, `fl_rx` - Flood packet counters
   - `di_tx`, `di_rx` - Direct packet counters
+  - `txq` - TX queue length (bar chart for discrete samples)
 
 Counter metrics are converted to rates during chart rendering by calculating deltas between consecutive snapshots.
 
@@ -423,7 +424,7 @@ Data points are aggregated into bins to keep chart file sizes reasonable and lin
 | `fl_rx` | `status.recv_flood` | counter | Packets/min | Flood packets received |
 | `di_tx` | `status.sent_direct` | counter | Packets/min | Direct packets transmitted |
 | `di_rx` | `status.recv_direct` | counter | Packets/min | Direct packets received |
-| `txq` | `status.tx_queue_len` | gauge | Queue depth | TX queue length |
+| `txq` | `status.tx_queue_len` | counter | Queue depth | TX queue length |
 
 ### Companion Metrics Summary
 
