@@ -256,9 +256,6 @@
    * Handle touch events for mobile
    */
   function handleTouchStart(event) {
-    // Prevent scrolling while interacting with chart
-    event.preventDefault();
-
     // Convert touch to mouse-like event
     const touch = event.touches[0];
     const mouseEvent = {
@@ -273,8 +270,6 @@
   }
 
   function handleTouchMove(event) {
-    event.preventDefault();
-
     const touch = event.touches[0];
     const mouseEvent = {
       currentTarget: event.currentTarget,
@@ -304,18 +299,17 @@
       svg.addEventListener('mouseleave', handleMouseLeave);
 
       // Touch events for mobile
-      svg.addEventListener('touchstart', handleTouchStart, { passive: false });
-      svg.addEventListener('touchmove', handleTouchMove, { passive: false });
+      svg.addEventListener('touchstart', handleTouchStart, { passive: true });
+      svg.addEventListener('touchmove', handleTouchMove, { passive: true });
       svg.addEventListener('touchend', handleTouchEnd);
       svg.addEventListener('touchcancel', handleTouchEnd);
 
       // Set cursor to indicate interactivity
       svg.style.cursor = 'crosshair';
-    });
 
-    if (chartSvgs.length > 0) {
-      console.log('Chart tooltips initialized for', chartSvgs.length, 'charts');
-    }
+      // Allow vertical scrolling but prevent horizontal pan on mobile
+      svg.style.touchAction = 'pan-y';
+    });
   }
 
   // Initialize when DOM is ready
