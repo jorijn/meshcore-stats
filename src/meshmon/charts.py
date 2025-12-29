@@ -1,7 +1,7 @@
 """Matplotlib-based chart generation from SQLite database.
 
 This module generates SVG charts with CSS variable support for theming,
-reading metrics directly from the SQLite database for fast performance.
+reading metrics directly from the SQLite database (EAV schema).
 """
 
 import io
@@ -17,9 +17,14 @@ matplotlib.use('Agg')  # Non-interactive backend for server-side rendering
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
-from .db import get_connection, get_metrics_for_period
+from .db import get_metrics_for_period
 from .env import get_config
-from .metrics import is_counter_metric, get_graph_scale
+from .metrics import (
+    get_chart_metrics,
+    is_counter_metric,
+    get_graph_scale,
+    transform_value,
+)
 from . import log
 
 
@@ -165,12 +170,12 @@ def load_timeseries_from_db(
 ) -> TimeSeries:
     """Load time series data from SQLite database.
 
-    Fetches the metric column directly, handles counter-to-rate conversion,
-    and applies time binning as needed.
+    Fetches metric data from EAV table, handles counter-to-rate conversion,
+    applies transforms (e.g., mv_to_v), and applies time binning as needed.
 
     Args:
         role: "companion" or "repeater"
-        metric: Metric name (e.g., "bat_v", "rx")
+        metric: Metric name (firmware field name, e.g., "bat", "nb_recv")
         end_time: End of the time range (typically now)
         lookback: How far back to look
         period: Period name for binning config ("day", "week", etc.)
@@ -182,30 +187,24 @@ def load_timeseries_from_db(
     start_ts = int(start_time.timestamp())
     end_ts = int(end_time.timestamp())
 
-    # Fetch rows from database
-    rows = get_metrics_for_period(role, start_ts, end_ts)
+    # Fetch all metrics for this role/period (returns pivoted dict)
+    all_metrics = get_metrics_for_period(role, start_ts, end_ts)
 
-    if not rows:
+    # Get data for this specific metric
+    metric_data = all_metrics.get(metric, [])
+
+    if not metric_data:
         return TimeSeries(metric=metric, role=role, period=period)
 
     is_counter = is_counter_metric(metric)
     scale = get_graph_scale(metric)
 
-    # Extract raw values
+    # Convert to (datetime, value) tuples with transform applied
     raw_points: list[tuple[datetime, float]] = []
-
-    for row in rows:
-        ts = row.get("ts")
-        value = row.get(metric)
-
-        if ts is None or value is None:
-            continue
-
-        try:
-            float_val = float(value)
-            raw_points.append((datetime.fromtimestamp(ts), float_val))
-        except (ValueError, TypeError):
-            continue
+    for ts, value in metric_data:
+        # Apply any configured transform (e.g., mv_to_v for battery)
+        transformed_value = transform_value(metric, value)
+        raw_points.append((datetime.fromtimestamp(ts), transformed_value))
 
     if not raw_points:
         return TimeSeries(metric=metric, role=role, period=period)
@@ -516,57 +515,9 @@ def _inject_data_attributes(
     return svg
 
 
-# Hardcoded metric configurations (previously from environment variables)
-COMPANION_METRICS = {
-    "bat_v": "bat_v",
-    "bat_pct": "bat_pct",
-    "contacts": "contacts",
-    "rx": "rx",
-    "tx": "tx",
-    "uptime": "uptime",
-}
-
-REPEATER_METRICS = {
-    "bat_v": "bat_v",
-    "bat_pct": "bat_pct",
-    "rx": "rx",
-    "tx": "tx",
-    "rssi": "rssi",
-    "snr": "snr",
-    "uptime": "uptime",
-    "noise": "noise",
-    "airtime": "airtime",
-    "rx_air": "rx_air",
-    "fl_dups": "fl_dups",
-    "di_dups": "di_dups",
-    "fl_tx": "fl_tx",
-    "fl_rx": "fl_rx",
-    "di_tx": "di_tx",
-    "di_rx": "di_rx",
-    "txq": "txq",
-}
-
-
-def get_metrics_for_role(role: str) -> dict[str, str]:
-    """Get metric name to column mapping for a role.
-
-    Args:
-        role: "companion" or "repeater"
-
-    Returns:
-        Dict mapping metric names to database columns
-    """
-    if role == "companion":
-        return COMPANION_METRICS
-    elif role == "repeater":
-        return REPEATER_METRICS
-    else:
-        raise ValueError(f"Unknown role: {role}")
-
-
 def render_all_charts(
     role: str,
-    metrics: Optional[dict[str, str]] = None,
+    metrics: Optional[list[str]] = None,
 ) -> tuple[list[Path], dict[str, dict[str, dict[str, Any]]]]:
     """Render all charts for a role in both light and dark themes.
 
@@ -574,14 +525,14 @@ def render_all_charts(
 
     Args:
         role: "companion" or "repeater"
-        metrics: Optional override for metrics config (for testing)
+        metrics: Optional list of metric names to render (for testing)
 
     Returns:
         Tuple of (list of generated chart paths, stats dict)
         Stats dict structure: {metric_name: {period: {min, avg, max, current}}}
     """
     if metrics is None:
-        metrics = get_metrics_for_role(role)
+        metrics = get_chart_metrics(role)
 
     cfg = get_config()
     charts_dir = cfg.out_dir / "assets" / role
@@ -596,13 +547,15 @@ def render_all_charts(
     # Current time for all lookbacks
     now = datetime.now()
 
-    # Fixed Y-axis ranges for battery metrics
+    # Fixed Y-axis ranges for specific metrics
+    # Battery metrics use transformed values (volts, not millivolts)
     y_ranges = {
-        "bat_v": (3.0, 4.2),
-        "bat_pct": (0, 100),
+        "bat": (3.0, 4.2),          # Repeater battery (V)
+        "battery_mv": (3.0, 4.2),   # Companion battery (V after transform)
+        "bat_pct": (0, 100),        # Battery percentage
     }
 
-    for metric in sorted(metrics.keys()):
+    for metric in metrics:
         all_stats[metric] = {}
 
         for period in periods:

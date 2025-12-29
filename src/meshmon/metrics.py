@@ -1,51 +1,306 @@
 """Centralized metrics configuration.
 
-This module defines which metrics are counters (DERIVE) vs gauges (GAUGE),
-and how they should be displayed. This is the single source of truth for
-metric type information used by RRD creation, updates, and graphing.
+This module defines metric display properties using firmware field names.
+It is the single source of truth for:
+- Metric type (gauge vs counter)
+- Display labels and units
+- Scaling factors for charts
+- Which metrics to display per role
+
+Firmware field names are used directly (e.g., 'bat', 'nb_recv', 'battery_mv').
+See docs/firmware-responses.md for the complete field reference.
 """
 
-# Counter metrics use DERIVE in RRD (computes rate of change)
-# These are cumulative counters that reset on device reboot
-# RRD stores them as per-second rates
-COUNTER_METRICS = {
-    "rx", "tx",                    # Total packets
-    "airtime", "rx_air",           # Airtime in seconds
-    "fl_dups", "di_dups",          # Duplicate packet counts
-    "fl_tx", "fl_rx",              # Flood packets
-    "di_tx", "di_rx",              # Direct packets
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass(frozen=True)
+class MetricConfig:
+    """Configuration for displaying a metric.
+
+    Attributes:
+        label: Human-readable label for charts/reports
+        unit: Display unit (e.g., 'V', 'dBm', '/min')
+        type: 'gauge' for instantaneous values, 'counter' for cumulative values
+        scale: Multiply raw value by this for display (e.g., 60 for per-minute)
+        transform: Optional transform to apply ('mv_to_v' for millivolts to volts)
+    """
+    label: str
+    unit: str
+    type: str = "gauge"
+    scale: float = 1.0
+    transform: Optional[str] = None
+
+
+# =============================================================================
+# Metric Definitions (firmware field names)
+# =============================================================================
+
+METRIC_CONFIG: dict[str, MetricConfig] = {
+    # -------------------------------------------------------------------------
+    # Companion metrics (from get_stats_core, get_stats_packets, get_contacts)
+    # -------------------------------------------------------------------------
+    "battery_mv": MetricConfig(
+        label="Battery",
+        unit="V",
+        transform="mv_to_v",
+    ),
+    "uptime_secs": MetricConfig(
+        label="Uptime",
+        unit="days",
+        scale=1 / 86400,
+    ),
+    "contacts": MetricConfig(
+        label="Contacts",
+        unit="",
+    ),
+    "recv": MetricConfig(
+        label="Packets RX",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+    "sent": MetricConfig(
+        label="Packets TX",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+
+    # -------------------------------------------------------------------------
+    # Repeater metrics (from req_status_sync)
+    # -------------------------------------------------------------------------
+    "bat": MetricConfig(
+        label="Battery",
+        unit="V",
+        transform="mv_to_v",
+    ),
+    "uptime": MetricConfig(
+        label="Uptime",
+        unit="days",
+        scale=1 / 86400,
+    ),
+    "last_rssi": MetricConfig(
+        label="RSSI",
+        unit="dBm",
+    ),
+    "last_snr": MetricConfig(
+        label="SNR",
+        unit="dB",
+    ),
+    "noise_floor": MetricConfig(
+        label="Noise Floor",
+        unit="dBm",
+    ),
+    "tx_queue_len": MetricConfig(
+        label="TX Queue",
+        unit="",
+    ),
+    "nb_recv": MetricConfig(
+        label="Packets RX",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+    "nb_sent": MetricConfig(
+        label="Packets TX",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+    "airtime": MetricConfig(
+        label="TX Airtime",
+        unit="s/min",
+        type="counter",
+        scale=60,
+    ),
+    "rx_airtime": MetricConfig(
+        label="RX Airtime",
+        unit="s/min",
+        type="counter",
+        scale=60,
+    ),
+    "flood_dups": MetricConfig(
+        label="Flood Dups",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+    "direct_dups": MetricConfig(
+        label="Direct Dups",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+    "sent_flood": MetricConfig(
+        label="Flood TX",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+    "recv_flood": MetricConfig(
+        label="Flood RX",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+    "sent_direct": MetricConfig(
+        label="Direct TX",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+    "recv_direct": MetricConfig(
+        label="Direct RX",
+        unit="/min",
+        type="counter",
+        scale=60,
+    ),
+
+    # -------------------------------------------------------------------------
+    # Derived metrics (computed at query time, not stored in database)
+    # -------------------------------------------------------------------------
+    "bat_pct": MetricConfig(
+        label="Battery",
+        unit="%",
+    ),
 }
 
-# Airtime metrics are counters but displayed differently (seconds/min not packets/min)
-AIRTIME_METRICS = {"airtime", "rx_air"}
 
-# Metrics that need special scaling in graphs
-GRAPH_SCALING = {
-    # Counter metrics: per-second → per-minute (×60)
-    "rx": 60,
-    "tx": 60,
-    "fl_dups": 60,
-    "di_dups": 60,
-    "fl_tx": 60,
-    "fl_rx": 60,
-    "di_tx": 60,
-    "di_rx": 60,
-    # Airtime: per-second → per-minute (×60)
-    "airtime": 60,
-    "rx_air": 60,
-    # Uptime: seconds → days (÷86400)
-    "uptime": 1 / 86400,
-}
+# =============================================================================
+# Metrics to display in charts (in display order)
+# =============================================================================
+
+COMPANION_CHART_METRICS = [
+    "battery_mv",
+    "bat_pct",
+    "uptime_secs",
+    "contacts",
+    "recv",
+    "sent",
+]
+
+REPEATER_CHART_METRICS = [
+    "bat",
+    "bat_pct",
+    "last_rssi",
+    "last_snr",
+    "noise_floor",
+    "uptime",
+    "tx_queue_len",
+    "nb_recv",
+    "nb_sent",
+    "airtime",
+    "rx_airtime",
+    "flood_dups",
+    "direct_dups",
+    "sent_flood",
+    "recv_flood",
+    "sent_direct",
+    "recv_direct",
+]
 
 
-def is_counter_metric(ds_name: str) -> bool:
-    """Check if a metric is a counter (DERIVE) type."""
-    return ds_name in COUNTER_METRICS
+# =============================================================================
+# Helper functions
+# =============================================================================
+
+def get_chart_metrics(role: str) -> list[str]:
+    """Get list of metrics to chart for a role.
+
+    Args:
+        role: 'companion' or 'repeater'
+
+    Returns:
+        List of metric names in display order
+    """
+    if role == "companion":
+        return COMPANION_CHART_METRICS
+    elif role == "repeater":
+        return REPEATER_CHART_METRICS
+    else:
+        raise ValueError(f"Unknown role: {role}")
 
 
-def get_graph_scale(ds_name: str) -> float:
+def get_metric_config(metric: str) -> Optional[MetricConfig]:
+    """Get configuration for a metric.
+
+    Args:
+        metric: Firmware field name
+
+    Returns:
+        MetricConfig or None if metric is not configured
+    """
+    return METRIC_CONFIG.get(metric)
+
+
+def is_counter_metric(metric: str) -> bool:
+    """Check if a metric is a counter type.
+
+    Counter metrics show rate of change (delta per time unit).
+    Gauge metrics show instantaneous values.
+
+    Args:
+        metric: Firmware field name
+
+    Returns:
+        True if counter, False if gauge or unknown
+    """
+    config = METRIC_CONFIG.get(metric)
+    return config is not None and config.type == "counter"
+
+
+def get_graph_scale(metric: str) -> float:
     """Get the scaling factor for graphing a metric.
 
-    Returns 1.0 for metrics that don't need scaling.
+    Args:
+        metric: Firmware field name
+
+    Returns:
+        Scale factor (1.0 if not configured)
     """
-    return GRAPH_SCALING.get(ds_name, 1.0)
+    config = METRIC_CONFIG.get(metric)
+    return config.scale if config else 1.0
+
+
+def get_metric_label(metric: str) -> str:
+    """Get human-readable label for a metric.
+
+    Args:
+        metric: Firmware field name
+
+    Returns:
+        Display label or the metric name if not configured
+    """
+    config = METRIC_CONFIG.get(metric)
+    return config.label if config else metric
+
+
+def get_metric_unit(metric: str) -> str:
+    """Get display unit for a metric.
+
+    Args:
+        metric: Firmware field name
+
+    Returns:
+        Unit string or empty string if not configured
+    """
+    config = METRIC_CONFIG.get(metric)
+    return config.unit if config else ""
+
+
+def transform_value(metric: str, value: float) -> float:
+    """Apply any configured transform to a metric value.
+
+    Args:
+        metric: Firmware field name
+        value: Raw value from database
+
+    Returns:
+        Transformed value for display
+    """
+    config = METRIC_CONFIG.get(metric)
+    if config and config.transform == "mv_to_v":
+        return value / 1000.0
+    return value

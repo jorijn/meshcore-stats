@@ -12,7 +12,7 @@ Connects to the local companion node via serial and collects:
 
 Outputs:
 - Concise summary to stdout
-- Metrics written to SQLite database
+- Metrics written to SQLite database (EAV schema)
 """
 
 import asyncio
@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from meshmon.env import get_config
 from meshmon import log
 from meshmon.meshcore_client import connect_from_env, run_command
-from meshmon.db import init_db, insert_companion_metrics
+from meshmon.db import init_db, insert_metrics
 
 
 async def collect_companion() -> int:
@@ -46,21 +46,8 @@ async def collect_companion() -> int:
         log.error("Failed to connect to companion node")
         return 1
 
-    # Initialize snapshot
-    snapshot = {
-        "ts": ts,
-        "node": {"role": "companion"},
-        "device_info": None,
-        "self_info": None,
-        "bat": None,
-        "time": None,
-        "self_telemetry": None,
-        "custom_vars": None,
-        "contacts": None,
-        "stats": None,
-        "derived": {},
-    }
-
+    # Metrics to insert (firmware field names)
+    metrics: dict[str, float] = {}
     commands_succeeded = 0
 
     # Commands are accessed via mc.commands
@@ -73,7 +60,6 @@ async def collect_companion() -> int:
         )
         if ok:
             commands_succeeded += 1
-            snapshot["self_info"] = payload
             log.debug(f"appstart: {evt_type}")
         else:
             log.error(f"appstart failed: {err}")
@@ -84,7 +70,6 @@ async def collect_companion() -> int:
         )
         if ok:
             commands_succeeded += 1
-            snapshot["device_info"] = payload
             log.debug(f"device_query: {payload}")
         else:
             log.error(f"device_query failed: {err}")
@@ -95,7 +80,6 @@ async def collect_companion() -> int:
         )
         if ok:
             commands_succeeded += 1
-            snapshot["bat"] = payload
             log.debug(f"get_bat: {payload}")
         else:
             log.error(f"get_bat failed: {err}")
@@ -106,7 +90,6 @@ async def collect_companion() -> int:
         )
         if ok:
             commands_succeeded += 1
-            snapshot["time"] = payload
             log.debug(f"get_time: {payload}")
         else:
             log.error(f"get_time failed: {err}")
@@ -117,7 +100,6 @@ async def collect_companion() -> int:
         )
         if ok:
             commands_succeeded += 1
-            snapshot["self_telemetry"] = payload
             log.debug(f"get_self_telemetry: {payload}")
         else:
             log.error(f"get_self_telemetry failed: {err}")
@@ -128,67 +110,56 @@ async def collect_companion() -> int:
         )
         if ok:
             commands_succeeded += 1
-            snapshot["custom_vars"] = payload
             log.debug(f"get_custom_vars: {payload}")
         else:
             log.debug(f"get_custom_vars failed: {err}")
 
-        # get_contacts
+        # get_contacts - count contacts
         ok, evt_type, payload, err = await run_command(
             mc, cmd.get_contacts(), "get_contacts"
         )
         if ok:
             commands_succeeded += 1
-            # Contacts payload is a dict keyed by public key
-            contacts_names = []
-            if payload and isinstance(payload, dict):
-                for pk, c in payload.items():
-                    if isinstance(c, dict) and c.get("adv_name"):
-                        contacts_names.append(c["adv_name"])
-
-            snapshot["contacts"] = {"list": payload if payload else {}}
-            snapshot["derived"]["contacts_count"] = len(payload) if payload else 0
-            snapshot["derived"]["contacts_names"] = contacts_names
-            log.debug(f"get_contacts: found {snapshot['derived']['contacts_count']} contacts")
+            contacts_count = len(payload) if payload else 0
+            metrics["contacts"] = float(contacts_count)
+            log.debug(f"get_contacts: found {contacts_count} contacts")
         else:
             log.error(f"get_contacts failed: {err}")
-            snapshot["derived"]["contacts_count"] = 0
 
-        # Get statistics
-        stats = {}
-
-        # Core stats
+        # Get statistics - these contain the main metrics
+        # Core stats (battery_mv, uptime_secs, errors, queue_len)
         ok, evt_type, payload, err = await run_command(
             mc, cmd.get_stats_core(), "get_stats_core"
         )
-        if ok and payload:
-            stats["core"] = payload
+        if ok and payload and isinstance(payload, dict):
             commands_succeeded += 1
+            # Insert all numeric fields from stats_core
+            for key, value in payload.items():
+                if isinstance(value, (int, float)):
+                    metrics[key] = float(value)
+            log.debug(f"stats_core: {payload}")
 
-        # Radio stats
+        # Radio stats (noise_floor, last_rssi, last_snr, tx_air_secs, rx_air_secs)
         ok, evt_type, payload, err = await run_command(
             mc, cmd.get_stats_radio(), "get_stats_radio"
         )
-        if ok and payload:
-            stats["radio"] = payload
+        if ok and payload and isinstance(payload, dict):
             commands_succeeded += 1
+            for key, value in payload.items():
+                if isinstance(value, (int, float)):
+                    metrics[key] = float(value)
+            log.debug(f"stats_radio: {payload}")
 
-        # Packet stats
+        # Packet stats (recv, sent, flood_tx, direct_tx, flood_rx, direct_rx)
         ok, evt_type, payload, err = await run_command(
             mc, cmd.get_stats_packets(), "get_stats_packets"
         )
-        if ok and payload:
-            stats["packets"] = payload
+        if ok and payload and isinstance(payload, dict):
             commands_succeeded += 1
-            # Extract rx/tx for convenience (actual field names are recv/sent)
-            if isinstance(payload, dict):
-                if "recv" in payload:
-                    snapshot["derived"]["rx_packets"] = payload["recv"]
-                if "sent" in payload:
-                    snapshot["derived"]["tx_packets"] = payload["sent"]
-
-        if stats:
-            snapshot["stats"] = stats
+            for key, value in payload.items():
+                if isinstance(value, (int, float)):
+                    metrics[key] = float(value)
+            log.debug(f"stats_packets: {payload}")
 
     except Exception as e:
         log.error(f"Error during collection: {e}")
@@ -201,48 +172,31 @@ async def collect_companion() -> int:
             except Exception:
                 pass
 
-    # Extract metrics for database
-    bat_mv = None
-    uptime = None
-    if snapshot.get("stats") and snapshot["stats"].get("core"):
-        bat_mv = snapshot["stats"]["core"].get("battery_mv")
-        uptime = snapshot["stats"]["core"].get("uptime_secs")
-
-    bat_v = bat_mv / 1000.0 if bat_mv is not None else None
-    contacts_count = snapshot["derived"].get("contacts_count", 0)
-    rx = snapshot["derived"].get("rx_packets")
-    tx = snapshot["derived"].get("tx_packets")
-
     # Print summary
     summary_parts = [f"ts={ts}"]
-    if bat_v is not None:
+    if "battery_mv" in metrics:
+        bat_v = metrics["battery_mv"] / 1000.0
         summary_parts.append(f"bat={bat_v:.2f}V")
-    summary_parts.append(f"contacts={contacts_count}")
-    if rx is not None:
-        summary_parts.append(f"rx={rx}")
-    if tx is not None:
-        summary_parts.append(f"tx={tx}")
+    if "contacts" in metrics:
+        summary_parts.append(f"contacts={int(metrics['contacts'])}")
+    if "recv" in metrics:
+        summary_parts.append(f"rx={int(metrics['recv'])}")
+    if "sent" in metrics:
+        summary_parts.append(f"tx={int(metrics['sent'])}")
 
     log.info(f"Companion: {', '.join(summary_parts)}")
 
     # Write metrics to database
-    if commands_succeeded > 0:
+    if commands_succeeded > 0 and metrics:
         try:
-            insert_companion_metrics(
-                ts=ts,
-                bat_v=bat_v,
-                contacts=contacts_count,
-                uptime=uptime,
-                rx=rx,
-                tx=tx,
-            )
-            log.debug(f"Metrics written to database (ts={ts})")
+            inserted = insert_metrics(ts=ts, role="companion", metrics=metrics)
+            log.debug(f"Inserted {inserted} metrics to database (ts={ts})")
         except Exception as e:
             log.error(f"Failed to write metrics to database: {e}")
             return 1
         return 0
     else:
-        log.error("No commands succeeded")
+        log.error("No commands succeeded or no metrics collected")
         return 1
 
 

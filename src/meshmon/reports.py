@@ -4,9 +4,13 @@ This module provides functionality to generate monthly and yearly
 reports from SQLite database metrics. Reports are generated in TXT (WeeWX-style
 ASCII tables), JSON, and HTML formats.
 
-Counter metrics (rx, tx, airtime, etc.) are aggregated using absolute
+Counter metrics (nb_recv, nb_sent, airtime, etc.) are aggregated using absolute
 counter values from the database, summing positive deltas to handle device
 reboots gracefully.
+
+Metric names use firmware field names directly:
+- Companion: battery_mv, uptime_secs, recv, sent, contacts
+- Repeater: bat, uptime, last_rssi, last_snr, nb_recv, nb_sent, airtime, etc.
 """
 
 import calendar
@@ -18,7 +22,11 @@ from typing import Any, Optional
 
 from .db import get_connection, get_metrics_for_period, VALID_ROLES
 from .env import get_config
-from .metrics import is_counter_metric
+from .metrics import (
+    is_counter_metric,
+    get_chart_metrics,
+    transform_value,
+)
 from . import log
 
 
@@ -29,24 +37,24 @@ def _validate_role(role: str) -> str:
     return role
 
 
-# Hardcoded metric names (matches database columns)
-COMPANION_METRICS = [
-    "bat_v", "bat_pct", "contacts", "uptime", "rx", "tx"
+# Report metrics use firmware field names (subset of chart metrics for reports)
+COMPANION_REPORT_METRICS = [
+    "battery_mv", "bat_pct", "contacts", "uptime_secs", "recv", "sent"
 ]
 
-REPEATER_METRICS = [
-    "bat_v", "bat_pct", "rssi", "snr", "uptime", "noise", "txq",
-    "rx", "tx", "airtime", "rx_air", "fl_dups", "di_dups",
-    "fl_tx", "fl_rx", "di_tx", "di_rx"
+REPEATER_REPORT_METRICS = [
+    "bat", "bat_pct", "last_rssi", "last_snr", "uptime", "noise_floor", "tx_queue_len",
+    "nb_recv", "nb_sent", "airtime", "rx_airtime", "flood_dups", "direct_dups",
+    "sent_flood", "recv_flood", "sent_direct", "recv_direct"
 ]
 
 
 def get_metrics_for_role(role: str) -> list[str]:
-    """Get list of metric names for a role."""
+    """Get list of metric names for report aggregation (firmware field names)."""
     if role == "companion":
-        return COMPANION_METRICS
+        return COMPANION_REPORT_METRICS
     elif role == "repeater":
-        return REPEATER_METRICS
+        return REPEATER_REPORT_METRICS
     else:
         raise ValueError(f"Unknown role: {role}")
 
@@ -107,12 +115,15 @@ class YearlyAggregate:
 def get_rows_for_date(role: str, d: date) -> list[dict[str, Any]]:
     """Fetch all metric rows for a specific date from the database.
 
+    Converts EAV data back to row-per-timestamp format for aggregation.
+
     Args:
         role: "companion" or "repeater"
         d: The date to load data for
 
     Returns:
-        List of row dicts, sorted by timestamp
+        List of row dicts (one per timestamp), sorted by timestamp.
+        Each dict has 'ts' and all metric values at that timestamp.
     """
     # Calculate timestamp range for the day
     start_dt = datetime.combine(d, datetime.min.time())
@@ -120,7 +131,27 @@ def get_rows_for_date(role: str, d: date) -> list[dict[str, Any]]:
     start_ts = int(start_dt.timestamp())
     end_ts = int(end_dt.timestamp())
 
-    return get_metrics_for_period(role, start_ts, end_ts)
+    # get_metrics_for_period returns dict[metric, list[(ts, value)]]
+    metrics_data = get_metrics_for_period(role, start_ts, end_ts)
+
+    # Pivot to row-per-timestamp format
+    # Collect all unique timestamps
+    all_timestamps: set[int] = set()
+    for metric_values in metrics_data.values():
+        for ts, _ in metric_values:
+            all_timestamps.add(ts)
+
+    if not all_timestamps:
+        return []
+
+    # Build row dicts
+    rows: dict[int, dict[str, Any]] = {ts: {"ts": ts} for ts in all_timestamps}
+    for metric, values in metrics_data.items():
+        for ts, value in values:
+            rows[ts][metric] = value
+
+    # Return sorted by timestamp
+    return [rows[ts] for ts in sorted(all_timestamps)]
 
 
 def compute_counter_total(
@@ -481,16 +512,16 @@ def get_available_periods(role: str) -> list[tuple[int, int]]:
         ValueError: If role is not valid
     """
     role = _validate_role(role)
-    table = f"{role}_metrics"
 
     with get_connection(readonly=True) as conn:
-        cursor = conn.execute(f"""
+        cursor = conn.execute("""
             SELECT DISTINCT
                 strftime('%Y', ts, 'unixepoch') as year,
                 strftime('%m', ts, 'unixepoch') as month
-            FROM {table}
+            FROM metrics
+            WHERE role = ?
             ORDER BY year, month
-        """)
+        """, (role,))
         return [(int(row[0]), int(row[1])) for row in cursor.fetchall()]
 
 
@@ -644,6 +675,35 @@ def _format_separator(columns: list[Column], char: str = "-") -> str:
     return char * sum(col.width for col in columns)
 
 
+def _get_bat_v(m: dict[str, MetricStats], role: str) -> MetricStats:
+    """Get battery voltage stats, converting from millivolts to volts.
+
+    Args:
+        m: Metrics dict
+        role: 'companion' or 'repeater'
+
+    Returns:
+        MetricStats with values in volts
+    """
+    if role == "companion":
+        bat = m.get("battery_mv", MetricStats())
+    else:
+        bat = m.get("bat", MetricStats())
+
+    if not bat.has_data:
+        return bat
+
+    # Convert mV to V
+    return MetricStats(
+        mean=bat.mean / 1000.0 if bat.mean is not None else None,
+        min_value=bat.min_value / 1000.0 if bat.min_value is not None else None,
+        min_time=bat.min_time,
+        max_value=bat.max_value / 1000.0 if bat.max_value is not None else None,
+        max_time=bat.max_time,
+        count=bat.count,
+    )
+
+
 def format_monthly_txt_repeater(
     agg: MonthlyAggregate, node_name: str, location: LocationInfo
 ) -> str:
@@ -678,18 +738,18 @@ def format_monthly_txt_repeater(
         day_num = daily.date.day
         m = daily.metrics
 
-        # Battery
-        bat_v = m.get("bat_v", MetricStats())
+        # Battery (firmware: bat in mV, bat_pct computed)
+        bat_v = _get_bat_v(m, "repeater")
         bat_pct = m.get("bat_pct", MetricStats())
 
-        # Signal
-        rssi = m.get("rssi", MetricStats())
-        snr = m.get("snr", MetricStats())
-        noise = m.get("noise", MetricStats())
+        # Signal (firmware: last_rssi, last_snr, noise_floor)
+        rssi = m.get("last_rssi", MetricStats())
+        snr = m.get("last_snr", MetricStats())
+        noise = m.get("noise_floor", MetricStats())
 
-        # Packets (counters)
-        rx = m.get("rx", MetricStats())
-        tx = m.get("tx", MetricStats())
+        # Packets (firmware: nb_recv, nb_sent, airtime)
+        rx = m.get("nb_recv", MetricStats())
+        tx = m.get("nb_sent", MetricStats())
         airtime = m.get("airtime", MetricStats())
 
         line = (
@@ -705,13 +765,13 @@ def format_monthly_txt_repeater(
     # Summary row
     lines.append("-" * 95)
     s = agg.summary
-    bat_v = s.get("bat_v", MetricStats())
+    bat_v = _get_bat_v(s, "repeater")
     bat_pct = s.get("bat_pct", MetricStats())
-    rssi = s.get("rssi", MetricStats())
-    snr = s.get("snr", MetricStats())
-    noise = s.get("noise", MetricStats())
-    rx = s.get("rx", MetricStats())
-    tx = s.get("tx", MetricStats())
+    rssi = s.get("last_rssi", MetricStats())
+    snr = s.get("last_snr", MetricStats())
+    noise = s.get("noise_floor", MetricStats())
+    rx = s.get("nb_recv", MetricStats())
+    tx = s.get("nb_sent", MetricStats())
     airtime = s.get("airtime", MetricStats())
 
     summary_line = (
@@ -761,11 +821,12 @@ def format_monthly_txt_companion(
         day_num = daily.date.day
         m = daily.metrics
 
-        bat_v = m.get("bat_v", MetricStats())
+        # Firmware: battery_mv, bat_pct (computed), contacts, recv, sent
+        bat_v = _get_bat_v(m, "companion")
         bat_pct = m.get("bat_pct", MetricStats())
         contacts = m.get("contacts", MetricStats())
-        rx = m.get("rx", MetricStats())
-        tx = m.get("tx", MetricStats())
+        rx = m.get("recv", MetricStats())
+        tx = m.get("sent", MetricStats())
 
         line = (
             f"{day_num:3d}  "
@@ -780,11 +841,11 @@ def format_monthly_txt_companion(
     # Summary row
     lines.append("-" * 75)
     s = agg.summary
-    bat_v = s.get("bat_v", MetricStats())
+    bat_v = _get_bat_v(s, "companion")
     bat_pct = s.get("bat_pct", MetricStats())
     contacts = s.get("contacts", MetricStats())
-    rx = s.get("rx", MetricStats())
-    tx = s.get("tx", MetricStats())
+    rx = s.get("recv", MetricStats())
+    tx = s.get("sent", MetricStats())
 
     summary_line = (
         f"AVG  "
@@ -872,12 +933,13 @@ def format_yearly_txt_repeater(
     # Monthly rows
     for monthly in agg.monthly:
         s = monthly.summary
-        bat_v = s.get("bat_v", MetricStats())
+        # Firmware: bat (mV), bat_pct, last_rssi, last_snr, nb_recv, nb_sent
+        bat_v = _get_bat_v(s, "repeater")
         bat_pct = s.get("bat_pct", MetricStats())
-        rssi = s.get("rssi", MetricStats())
-        snr = s.get("snr", MetricStats())
-        rx = s.get("rx", MetricStats())
-        tx = s.get("tx", MetricStats())
+        rssi = s.get("last_rssi", MetricStats())
+        snr = s.get("last_snr", MetricStats())
+        rx = s.get("nb_recv", MetricStats())
+        tx = s.get("nb_sent", MetricStats())
 
         # Format day as 2-digit number
         max_day = f"{bat_v.max_time.day:02d}" if bat_v.max_time else "--"
@@ -901,12 +963,12 @@ def format_yearly_txt_repeater(
     # Summary row
     lines.append(_format_separator(cols))
     s = agg.summary
-    bat_v = s.get("bat_v", MetricStats())
+    bat_v = _get_bat_v(s, "repeater")
     bat_pct = s.get("bat_pct", MetricStats())
-    rssi = s.get("rssi", MetricStats())
-    snr = s.get("snr", MetricStats())
-    rx = s.get("rx", MetricStats())
-    tx = s.get("tx", MetricStats())
+    rssi = s.get("last_rssi", MetricStats())
+    snr = s.get("last_snr", MetricStats())
+    rx = s.get("nb_recv", MetricStats())
+    tx = s.get("nb_sent", MetricStats())
 
     max_month = calendar.month_abbr[bat_v.max_time.month] if bat_v.max_time else "---"
     min_month = calendar.month_abbr[bat_v.min_time.month] if bat_v.min_time else "---"
@@ -980,11 +1042,12 @@ def format_yearly_txt_companion(
     # Monthly rows
     for monthly in agg.monthly:
         s = monthly.summary
-        bat_v = s.get("bat_v", MetricStats())
+        # Firmware: battery_mv, bat_pct, contacts, recv, sent
+        bat_v = _get_bat_v(s, "companion")
         bat_pct = s.get("bat_pct", MetricStats())
         contacts = s.get("contacts", MetricStats())
-        rx = s.get("rx", MetricStats())
-        tx = s.get("tx", MetricStats())
+        rx = s.get("recv", MetricStats())
+        tx = s.get("sent", MetricStats())
 
         max_day = f"{bat_v.max_time.day:02d}" if bat_v.max_time else "--"
         min_day = f"{bat_v.min_time.day:02d}" if bat_v.min_time else "--"
@@ -1006,11 +1069,11 @@ def format_yearly_txt_companion(
     # Summary row
     lines.append(_format_separator(cols))
     s = agg.summary
-    bat_v = s.get("bat_v", MetricStats())
+    bat_v = _get_bat_v(s, "companion")
     bat_pct = s.get("bat_pct", MetricStats())
     contacts = s.get("contacts", MetricStats())
-    rx = s.get("rx", MetricStats())
-    tx = s.get("tx", MetricStats())
+    rx = s.get("recv", MetricStats())
+    tx = s.get("sent", MetricStats())
 
     max_month = calendar.month_abbr[bat_v.max_time.month] if bat_v.max_time else "---"
     min_month = calendar.month_abbr[bat_v.min_time.month] if bat_v.min_time else "---"

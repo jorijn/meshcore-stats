@@ -16,7 +16,8 @@ from .formatters import (
     format_duration,
     format_uptime,
 )
-from .charts import load_chart_stats, get_metrics_for_role
+from .charts import load_chart_stats
+from .metrics import get_chart_metrics, get_metric_label
 from . import log
 
 
@@ -32,68 +33,45 @@ PERIOD_CONFIG = {
     "year": ("365-Day Observations", "Radio telemetry from the past year"),
 }
 
-# Chart groupings for repeater
+# Chart groupings for repeater (using firmware field names)
 REPEATER_CHART_GROUPS = [
     {
         "title": "Power",
-        "metrics": ["bat_v", "bat_pct"],
+        "metrics": ["bat", "bat_pct"],
     },
     {
         "title": "Signal Quality",
-        "metrics": ["rssi", "snr", "noise"],
+        "metrics": ["last_rssi", "last_snr", "noise_floor"],
     },
     {
         "title": "Packet Traffic",
-        "metrics": ["rx", "tx", "fl_rx", "fl_tx", "di_rx", "di_tx"],
+        "metrics": ["nb_recv", "nb_sent", "recv_flood", "sent_flood", "recv_direct", "sent_direct"],
     },
     {
         "title": "Airtime",
-        "metrics": ["airtime", "rx_air"],
+        "metrics": ["airtime", "rx_airtime"],
     },
     {
         "title": "Duplicates & Queue",
-        "metrics": ["fl_dups", "di_dups", "txq", "uptime"],
+        "metrics": ["flood_dups", "direct_dups", "tx_queue_len", "uptime"],
     },
 ]
 
-# Chart groupings for companion
+# Chart groupings for companion (using firmware field names)
 COMPANION_CHART_GROUPS = [
     {
         "title": "Power",
-        "metrics": ["bat_v", "bat_pct"],
+        "metrics": ["battery_mv", "bat_pct"],
     },
     {
         "title": "Network",
-        "metrics": ["contacts", "uptime"],
+        "metrics": ["contacts", "uptime_secs"],
     },
     {
         "title": "Packet Traffic",
-        "metrics": ["rx", "tx"],
+        "metrics": ["recv", "sent"],
     },
 ]
-
-# Chart labels
-CHART_LABELS = {
-    "bat_v": "Battery Voltage",
-    "bat_pct": "Battery Percentage",
-    "contacts": "Known Contacts",
-    "neigh": "Neighbours",
-    "rx": "Packets Received",
-    "tx": "Packets Transmitted",
-    "rssi": "RSSI",
-    "snr": "Signal-to-Noise Ratio",
-    "uptime": "Uptime",
-    "noise": "Noise Floor",
-    "airtime": "TX Airtime",
-    "rx_air": "RX Airtime",
-    "fl_dups": "Flood Duplicates",
-    "di_dups": "Direct Duplicates",
-    "fl_tx": "Flood TX",
-    "fl_rx": "Flood RX",
-    "di_tx": "Direct TX",
-    "di_rx": "Direct RX",
-    "txq": "TX Queue Length",
-}
 
 # Singleton Jinja2 environment
 _jinja_env: Optional[Environment] = None
@@ -150,7 +128,8 @@ def build_repeater_metrics(row: Optional[dict]) -> dict:
     """Build metrics data from repeater database row.
 
     Args:
-        row: Database row dict with flat column names (bat_v, rssi, snr, etc.)
+        row: Database row dict with firmware field names (bat, last_rssi, last_snr, etc.)
+             Battery is in millivolts, bat_pct is computed at query time.
 
     Returns dict with critical_metrics, secondary_metrics, traffic_metrics.
     """
@@ -161,8 +140,9 @@ def build_repeater_metrics(row: Optional[dict]) -> dict:
             "traffic_metrics": [],
         }
 
-    # Battery (already in volts from db)
-    bat_v = row.get("bat_v")
+    # Battery (stored in millivolts, convert to volts)
+    bat_mv = row.get("bat")
+    bat_v = bat_mv / 1000.0 if bat_mv is not None else None
     bat_pct = row.get("bat_pct")
 
     # Critical metrics (top 4 in sidebar)
@@ -181,15 +161,15 @@ def build_repeater_metrics(row: Optional[dict]) -> dict:
             "label": "Charge",
         })
 
-    rssi = row.get("rssi")
+    rssi = row.get("last_rssi")
     if rssi is not None:
         critical_metrics.append({
-            "value": str(rssi),
+            "value": str(int(rssi)),
             "unit": "dBm",
             "label": "RSSI",
         })
 
-    snr = row.get("snr")
+    snr = row.get("last_snr")
     if snr is not None:
         critical_metrics.append({
             "value": f"{snr:.2f}",
@@ -206,39 +186,39 @@ def build_repeater_metrics(row: Optional[dict]) -> dict:
             "value": format_uptime(uptime),
         })
 
-    noise = row.get("noise")
+    noise = row.get("noise_floor")
     if noise is not None:
         secondary_metrics.append({
             "label": "Noise Floor",
-            "value": f"{noise} dBm",
+            "value": f"{int(noise)} dBm",
         })
 
-    txq = row.get("txq")
+    txq = row.get("tx_queue_len")
     if txq is not None:
         secondary_metrics.append({
             "label": "TX Queue",
-            "value": str(txq),
+            "value": str(int(txq)),
         })
 
-    # Traffic metrics (from db columns)
+    # Traffic metrics (firmware field names)
     traffic_metrics = []
     traffic_fields = [
-        ("RX", "rx"),
-        ("TX", "tx"),
-        ("Flood RX", "fl_rx"),
-        ("Flood TX", "fl_tx"),
-        ("Direct RX", "di_rx"),
-        ("Direct TX", "di_tx"),
+        ("RX", "nb_recv"),
+        ("TX", "nb_sent"),
+        ("Flood RX", "recv_flood"),
+        ("Flood TX", "sent_flood"),
+        ("Direct RX", "recv_direct"),
+        ("Direct TX", "sent_direct"),
         ("Airtime TX", "airtime"),
-        ("Airtime RX", "rx_air"),
+        ("Airtime RX", "rx_airtime"),
     ]
     for label, key in traffic_fields:
         val = row.get(key)
         if val is not None:
-            if "airtime" in key.lower() or key == "rx_air":
-                traffic_metrics.append({"label": label, "value": f"{val:,}s"})
+            if "airtime" in key.lower():
+                traffic_metrics.append({"label": label, "value": f"{int(val):,}s"})
             else:
-                traffic_metrics.append({"label": label, "value": f"{val:,}"})
+                traffic_metrics.append({"label": label, "value": f"{int(val):,}"})
 
     return {
         "critical_metrics": critical_metrics,
@@ -251,7 +231,8 @@ def build_companion_metrics(row: Optional[dict]) -> dict:
     """Build metrics data from companion database row.
 
     Args:
-        row: Database row dict with flat column names (bat_v, contacts, etc.)
+        row: Database row dict with firmware field names (battery_mv, contacts, etc.)
+             Battery is in millivolts, bat_pct is computed at query time.
 
     Returns dict with critical_metrics, secondary_metrics, traffic_metrics.
     """
@@ -262,8 +243,9 @@ def build_companion_metrics(row: Optional[dict]) -> dict:
             "traffic_metrics": [],
         }
 
-    # Battery (already in volts from db)
-    bat_v = row.get("bat_v")
+    # Battery (stored in millivolts, convert to volts)
+    bat_mv = row.get("battery_mv")
+    bat_v = bat_mv / 1000.0 if bat_mv is not None else None
     bat_pct = row.get("bat_pct")
 
     # Critical metrics
@@ -285,12 +267,12 @@ def build_companion_metrics(row: Optional[dict]) -> dict:
     contacts = row.get("contacts")
     if contacts is not None:
         critical_metrics.append({
-            "value": str(contacts),
+            "value": str(int(contacts)),
             "unit": None,
             "label": "Contacts",
         })
 
-    uptime = row.get("uptime")
+    uptime = row.get("uptime_secs")
     if uptime is not None:
         critical_metrics.append({
             "value": format_uptime(uptime),
@@ -300,12 +282,12 @@ def build_companion_metrics(row: Optional[dict]) -> dict:
 
     # Secondary metrics
     secondary_metrics = []
-    rx = row.get("rx")
+    rx = row.get("recv")
     if rx is not None:
-        secondary_metrics.append({"label": "Packets RX", "value": f"{rx:,}"})
-    tx = row.get("tx")
+        secondary_metrics.append({"label": "Packets RX", "value": f"{int(rx):,}"})
+    tx = row.get("sent")
     if tx is not None:
-        secondary_metrics.append({"label": "Packets TX", "value": f"{tx:,}"})
+        secondary_metrics.append({"label": "Packets TX", "value": f"{int(tx):,}"})
 
     return {
         "critical_metrics": critical_metrics,
@@ -353,7 +335,7 @@ def _format_stat_value(value: Optional[float], metric: str) -> str:
 
     Args:
         value: The numeric value (or None)
-        metric: Metric name to determine formatting
+        metric: Metric name (firmware field name) to determine formatting
 
     Returns:
         Formatted string like "4.08 V", "85%", "2.3/min"
@@ -361,22 +343,30 @@ def _format_stat_value(value: Optional[float], metric: str) -> str:
     if value is None:
         return "-"
 
-    # Determine format and suffix based on metric
-    if metric == "bat_v":
+    # Determine format and suffix based on metric (using firmware field names)
+    # Battery voltage (already transformed to volts in charts.py)
+    if metric in ("bat", "battery_mv"):
         return f"{value:.2f} V"
     elif metric == "bat_pct":
         return f"{value:.0f}%"
-    elif metric in ("rssi", "noise"):
+    # Signal metrics
+    elif metric in ("last_rssi", "noise_floor"):
         return f"{value:.0f} dBm"
-    elif metric == "snr":
+    elif metric == "last_snr":
         return f"{value:.1f} dB"
-    elif metric in ("contacts", "txq"):
+    # Counters (contacts, queue)
+    elif metric in ("contacts", "tx_queue_len"):
         return f"{value:.0f}"
-    elif metric == "uptime":
+    # Uptime (already scaled to days in charts.py)
+    elif metric in ("uptime", "uptime_secs"):
         return f"{value:.1f} d"
-    elif metric in ("rx", "tx", "fl_rx", "fl_tx", "di_rx", "di_tx", "fl_dups", "di_dups"):
+    # Packet counters (per-minute rate from charts.py)
+    elif metric in ("recv", "sent", "nb_recv", "nb_sent",
+                    "recv_flood", "sent_flood", "recv_direct", "sent_direct",
+                    "flood_dups", "direct_dups"):
         return f"{value:.1f}/min"
-    elif metric in ("airtime", "rx_air"):
+    # Airtime (per-minute rate from charts.py)
+    elif metric in ("airtime", "rx_airtime"):
         return f"{value:.1f} s/min"
     else:
         return f"{value:.2f}"
@@ -418,7 +408,7 @@ def build_chart_groups(
     """
     cfg = get_config()
     groups_config = REPEATER_CHART_GROUPS if role == "repeater" else COMPANION_CHART_GROUPS
-    metrics = get_metrics_for_role(role)
+    chart_metrics = get_chart_metrics(role)
 
     if chart_stats is None:
         chart_stats = {}
@@ -427,7 +417,7 @@ def build_chart_groups(
     for group in groups_config:
         charts = []
         for metric in group["metrics"]:
-            if metric not in metrics:
+            if metric not in chart_metrics:
                 continue
 
             # Try SVG first (new format), fall back to PNG (legacy)
@@ -462,7 +452,7 @@ def build_chart_groups(
                 ]
 
             chart_data = {
-                "label": CHART_LABELS.get(metric, metric),
+                "label": get_metric_label(metric),
                 "metric": metric,
                 "current": current_formatted,
                 "stats": stats_list,
@@ -765,23 +755,29 @@ def build_monthly_table_data(
         rows = []
         for daily in agg.daily:
             m = daily.metrics
-            bat_v = m.get("bat_v", MetricStats())
+            # Firmware: bat (mV), bat_pct, last_rssi, last_snr, noise_floor, nb_recv, nb_sent, airtime
+            bat = m.get("bat", MetricStats())
             bat_pct = m.get("bat_pct", MetricStats())
-            rssi = m.get("rssi", MetricStats())
-            snr = m.get("snr", MetricStats())
-            noise = m.get("noise", MetricStats())
-            rx = m.get("rx", MetricStats())
-            tx = m.get("tx", MetricStats())
+            rssi = m.get("last_rssi", MetricStats())
+            snr = m.get("last_snr", MetricStats())
+            noise = m.get("noise_floor", MetricStats())
+            rx = m.get("nb_recv", MetricStats())
+            tx = m.get("nb_sent", MetricStats())
             airtime = m.get("airtime", MetricStats())
+
+            # Convert mV to V for display
+            bat_v_mean = bat.mean / 1000.0 if bat.mean else None
+            bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
+            bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
 
             rows.append({
                 "is_summary": False,
                 "cells": [
                     {"value": f"{daily.date.day:02d}", "class": None},
-                    {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": _fmt_val_time(bat_v.min_value, bat_v.min_time), "class": "muted"},
-                    {"value": _fmt_val_time(bat_v.max_value, bat_v.max_time), "class": "muted"},
+                    {"value": _fmt_val_time(bat_v_min, bat.min_time), "class": "muted"},
+                    {"value": _fmt_val_time(bat_v_max, bat.max_time), "class": "muted"},
                     {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                     {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                     {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
@@ -793,23 +789,27 @@ def build_monthly_table_data(
 
         # Add summary row
         s = agg.summary
-        bat_v = s.get("bat_v", MetricStats())
+        bat = s.get("bat", MetricStats())
         bat_pct = s.get("bat_pct", MetricStats())
-        rssi = s.get("rssi", MetricStats())
-        snr = s.get("snr", MetricStats())
-        noise = s.get("noise", MetricStats())
-        rx = s.get("rx", MetricStats())
-        tx = s.get("tx", MetricStats())
+        rssi = s.get("last_rssi", MetricStats())
+        snr = s.get("last_snr", MetricStats())
+        noise = s.get("noise_floor", MetricStats())
+        rx = s.get("nb_recv", MetricStats())
+        tx = s.get("nb_sent", MetricStats())
         airtime = s.get("airtime", MetricStats())
+
+        bat_v_mean = bat.mean / 1000.0 if bat.mean else None
+        bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
+        bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
 
         rows.append({
             "is_summary": True,
             "cells": [
                 {"value": "Avg", "class": None},
-                {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": _fmt_val_plain(bat_v.min_value), "class": "muted"},
-                {"value": _fmt_val_plain(bat_v.max_value), "class": "muted"},
+                {"value": _fmt_val_plain(bat_v_min), "class": "muted"},
+                {"value": _fmt_val_plain(bat_v_max), "class": "muted"},
                 {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                 {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                 {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
@@ -841,20 +841,26 @@ def build_monthly_table_data(
         rows = []
         for daily in agg.daily:
             m = daily.metrics
-            bat_v = m.get("bat_v", MetricStats())
+            # Firmware: battery_mv, bat_pct, contacts, recv, sent
+            bat = m.get("battery_mv", MetricStats())
             bat_pct = m.get("bat_pct", MetricStats())
             contacts = m.get("contacts", MetricStats())
-            rx = m.get("rx", MetricStats())
-            tx = m.get("tx", MetricStats())
+            rx = m.get("recv", MetricStats())
+            tx = m.get("sent", MetricStats())
+
+            # Convert mV to V for display
+            bat_v_mean = bat.mean / 1000.0 if bat.mean else None
+            bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
+            bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
 
             rows.append({
                 "is_summary": False,
                 "cells": [
                     {"value": f"{daily.date.day:02d}", "class": None},
-                    {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": _fmt_val_time(bat_v.min_value, bat_v.min_time), "class": "muted"},
-                    {"value": _fmt_val_time(bat_v.max_value, bat_v.max_time), "class": "muted"},
+                    {"value": _fmt_val_time(bat_v_min, bat.min_time), "class": "muted"},
+                    {"value": _fmt_val_time(bat_v_max, bat.max_time), "class": "muted"},
                     {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
                     {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                     {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
@@ -863,20 +869,24 @@ def build_monthly_table_data(
 
         # Summary row
         s = agg.summary
-        bat_v = s.get("bat_v", MetricStats())
+        bat = s.get("battery_mv", MetricStats())
         bat_pct = s.get("bat_pct", MetricStats())
         contacts = s.get("contacts", MetricStats())
-        rx = s.get("rx", MetricStats())
-        tx = s.get("tx", MetricStats())
+        rx = s.get("recv", MetricStats())
+        tx = s.get("sent", MetricStats())
+
+        bat_v_mean = bat.mean / 1000.0 if bat.mean else None
+        bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
+        bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
 
         rows.append({
             "is_summary": True,
             "cells": [
                 {"value": "Avg", "class": None},
-                {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": _fmt_val_plain(bat_v.min_value), "class": "muted"},
-                {"value": _fmt_val_plain(bat_v.max_value), "class": "muted"},
+                {"value": _fmt_val_plain(bat_v_min), "class": "muted"},
+                {"value": _fmt_val_plain(bat_v_max), "class": "muted"},
                 {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
                 {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                 {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
@@ -935,22 +945,28 @@ def build_yearly_table_data(
         rows = []
         for monthly in agg.monthly:
             s = monthly.summary
-            bat_v = s.get("bat_v", MetricStats())
+            # Firmware: bat (mV), bat_pct, last_rssi, last_snr, nb_recv, nb_sent
+            bat = s.get("bat", MetricStats())
             bat_pct = s.get("bat_pct", MetricStats())
-            rssi = s.get("rssi", MetricStats())
-            snr = s.get("snr", MetricStats())
-            rx = s.get("rx", MetricStats())
-            tx = s.get("tx", MetricStats())
+            rssi = s.get("last_rssi", MetricStats())
+            snr = s.get("last_snr", MetricStats())
+            rx = s.get("nb_recv", MetricStats())
+            tx = s.get("nb_sent", MetricStats())
+
+            # Convert mV to V
+            bat_v_mean = bat.mean / 1000.0 if bat.mean else None
+            bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
+            bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
 
             rows.append({
                 "is_summary": False,
                 "cells": [
                     {"value": str(agg.year), "class": None},
                     {"value": f"{monthly.month:02d}", "class": None},
-                    {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": _fmt_val_day(bat_v.max_value, bat_v.max_time), "class": "muted"},
-                    {"value": _fmt_val_day(bat_v.min_value, bat_v.min_time), "class": "muted"},
+                    {"value": _fmt_val_day(bat_v_max, bat.max_time), "class": "muted"},
+                    {"value": _fmt_val_day(bat_v_min, bat.min_time), "class": "muted"},
                     {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                     {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                     {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
@@ -960,22 +976,26 @@ def build_yearly_table_data(
 
         # Summary row
         s = agg.summary
-        bat_v = s.get("bat_v", MetricStats())
+        bat = s.get("bat", MetricStats())
         bat_pct = s.get("bat_pct", MetricStats())
-        rssi = s.get("rssi", MetricStats())
-        snr = s.get("snr", MetricStats())
-        rx = s.get("rx", MetricStats())
-        tx = s.get("tx", MetricStats())
+        rssi = s.get("last_rssi", MetricStats())
+        snr = s.get("last_snr", MetricStats())
+        rx = s.get("nb_recv", MetricStats())
+        tx = s.get("nb_sent", MetricStats())
+
+        bat_v_mean = bat.mean / 1000.0 if bat.mean else None
+        bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
+        bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
 
         rows.append({
             "is_summary": True,
             "cells": [
                 {"value": "", "class": None},
                 {"value": "Avg", "class": None},
-                {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": _fmt_val_month(bat_v.max_value, bat_v.max_time), "class": "muted"},
-                {"value": _fmt_val_month(bat_v.min_value, bat_v.min_time), "class": "muted"},
+                {"value": _fmt_val_month(bat_v_max, bat.max_time), "class": "muted"},
+                {"value": _fmt_val_month(bat_v_min, bat.min_time), "class": "muted"},
                 {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
                 {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
                 {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
@@ -1006,21 +1026,27 @@ def build_yearly_table_data(
         rows = []
         for monthly in agg.monthly:
             s = monthly.summary
-            bat_v = s.get("bat_v", MetricStats())
+            # Firmware: battery_mv, bat_pct, contacts, recv, sent
+            bat = s.get("battery_mv", MetricStats())
             bat_pct = s.get("bat_pct", MetricStats())
             contacts = s.get("contacts", MetricStats())
-            rx = s.get("rx", MetricStats())
-            tx = s.get("tx", MetricStats())
+            rx = s.get("recv", MetricStats())
+            tx = s.get("sent", MetricStats())
+
+            # Convert mV to V
+            bat_v_mean = bat.mean / 1000.0 if bat.mean else None
+            bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
+            bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
 
             rows.append({
                 "is_summary": False,
                 "cells": [
                     {"value": str(agg.year), "class": None},
                     {"value": f"{monthly.month:02d}", "class": None},
-                    {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                     {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                    {"value": _fmt_val_day(bat_v.max_value, bat_v.max_time), "class": "muted"},
-                    {"value": _fmt_val_day(bat_v.min_value, bat_v.min_time), "class": "muted"},
+                    {"value": _fmt_val_day(bat_v_max, bat.max_time), "class": "muted"},
+                    {"value": _fmt_val_day(bat_v_min, bat.min_time), "class": "muted"},
                     {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
                     {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                     {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
@@ -1029,21 +1055,25 @@ def build_yearly_table_data(
 
         # Summary row
         s = agg.summary
-        bat_v = s.get("bat_v", MetricStats())
+        bat = s.get("battery_mv", MetricStats())
         bat_pct = s.get("bat_pct", MetricStats())
         contacts = s.get("contacts", MetricStats())
-        rx = s.get("rx", MetricStats())
-        tx = s.get("tx", MetricStats())
+        rx = s.get("recv", MetricStats())
+        tx = s.get("sent", MetricStats())
+
+        bat_v_mean = bat.mean / 1000.0 if bat.mean else None
+        bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
+        bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
 
         rows.append({
             "is_summary": True,
             "cells": [
                 {"value": "", "class": None},
                 {"value": "Avg", "class": None},
-                {"value": f"{bat_v.mean:.2f}" if bat_v.mean else "-", "class": None},
+                {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
-                {"value": _fmt_val_month(bat_v.max_value, bat_v.max_time), "class": "muted"},
-                {"value": _fmt_val_month(bat_v.min_value, bat_v.min_time), "class": "muted"},
+                {"value": _fmt_val_month(bat_v_max, bat.max_time), "class": "muted"},
+                {"value": _fmt_val_month(bat_v_min, bat.min_time), "class": "muted"},
                 {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
                 {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
                 {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
