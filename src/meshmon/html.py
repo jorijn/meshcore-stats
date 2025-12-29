@@ -299,19 +299,20 @@ def build_companion_metrics(row: Optional[dict]) -> dict:
 def build_node_details(role: str) -> list[dict]:
     """Build node details for sidebar.
 
-    Uses hardcoded values since device info doesn't change often.
+    Uses configuration values from environment.
     """
     cfg = get_config()
     details = []
 
     if role == "repeater":
-        details.append({"label": "Location", "value": "Oosterhout, NL"})
-        details.append({"label": "Coordinates", "value": f"{cfg.report_lat:.4f}°N, {cfg.report_lon:.4f}°E"})
-        details.append({"label": "Elevation", "value": f"{cfg.report_elev:.0f}m"})
-        details.append({"label": "Hardware", "value": "SenseCAP P1-Pro"})
+        details.append({"label": "Location", "value": cfg.report_location_short})
+        lat_dir = "N" if cfg.report_lat >= 0 else "S"
+        lon_dir = "E" if cfg.report_lon >= 0 else "W"
+        details.append({"label": "Coordinates", "value": f"{abs(cfg.report_lat):.4f}°{lat_dir}, {abs(cfg.report_lon):.4f}°{lon_dir}"})
+        details.append({"label": "Elevation", "value": f"{cfg.report_elev:.0f} {cfg.report_elev_unit}"})
+        details.append({"label": "Hardware", "value": cfg.repeater_hardware})
     elif role == "companion":
-        details.append({"label": "Model", "value": "Elecrow ThinkNode-M1"})
-        details.append({"label": "Firmware", "value": "v1.11.0"})
+        details.append({"label": "Hardware", "value": cfg.companion_hardware})
         details.append({"label": "Connection", "value": "USB Serial"})
 
     return details
@@ -320,13 +321,14 @@ def build_node_details(role: str) -> list[dict]:
 def build_radio_config() -> list[dict]:
     """Build radio config for sidebar.
 
-    Uses hardcoded values matching the MeshCore EU/UK Narrow preset.
+    Uses configuration values from environment.
     """
+    cfg = get_config()
     return [
-        {"label": "Frequency", "value": "869.618 MHz"},
-        {"label": "Bandwidth", "value": "62.5 kHz"},
-        {"label": "Spread Factor", "value": "SF8"},
-        {"label": "Coding Rate", "value": "CR8"},
+        {"label": "Frequency", "value": cfg.radio_frequency},
+        {"label": "Bandwidth", "value": cfg.radio_bandwidth},
+        {"label": "Spread Factor", "value": cfg.radio_spread_factor},
+        {"label": "Coding Rate", "value": cfg.radio_coding_rate},
     ]
 
 
@@ -539,9 +541,10 @@ def build_page_context(
         page_subtitle = page_subtitle.replace("Radio", "Companion node")
 
     # Meta description
+    cfg = get_config()
     meta_descriptions = {
         "repeater": (
-            "Live stats for MeshCore LoRa repeater in Oosterhout, NL. "
+            f"Live stats for MeshCore LoRa repeater in {cfg.report_location_short}. "
             "Battery, signal strength, packet counts, and uptime charts."
         ),
         "companion": (
@@ -665,7 +668,8 @@ def write_site(
     for period in ["day", "week", "month", "year"]:
         page_path = cfg.out_dir / f"{period}.html"
         page_path.write_text(
-            render_node_page("repeater", period, repeater_row, at_root=True)
+            render_node_page("repeater", period, repeater_row, at_root=True),
+            encoding="utf-8",
         )
         written.append(page_path)
         log.debug(f"Wrote {page_path}")
@@ -674,7 +678,8 @@ def write_site(
     for period in ["day", "week", "month", "year"]:
         page_path = cfg.out_dir / "companion" / f"{period}.html"
         page_path.write_text(
-            render_node_page("companion", period, companion_row)
+            render_node_page("companion", period, companion_row),
+            encoding="utf-8",
         )
         written.append(page_path)
         log.debug(f"Wrote {page_path}")
@@ -1178,7 +1183,7 @@ def render_reports_index(report_sections: list[dict]) -> str:
 
     # Add descriptions to sections
     descriptions = {
-        "repeater": f"{cfg.repeater_display_name} — Solar-powered remote node in Oosterhout, NL",
+        "repeater": f"{cfg.repeater_display_name} — Remote node in {cfg.report_location_short}",
         "companion": f"{cfg.companion_display_name} — Local USB-connected node",
     }
 

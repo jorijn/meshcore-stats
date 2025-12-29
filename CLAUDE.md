@@ -12,7 +12,7 @@
 | HTML templates | `src/meshmon/templates/*.html` | `out/*.html` |
 | JavaScript | `src/meshmon/templates/*.js` | `out/*.js` |
 
-Always edit the source templates, then regenerate with `direnv exec . python scripts/phase3_render_site.py`.
+Always edit the source templates, then regenerate with `direnv exec . python scripts/render_site.py`.
 
 ## Running Commands
 
@@ -20,7 +20,7 @@ Always edit the source templates, then regenerate with `direnv exec . python scr
 
 ```bash
 # Correct way to run scripts
-direnv exec . python scripts/phase3_render_site.py
+direnv exec . python scripts/render_site.py
 
 # NEVER use these (virtualenv won't be loaded correctly):
 # source .envrc && python ...
@@ -30,11 +30,8 @@ direnv exec . python scripts/phase3_render_site.py
 ## Project Overview
 
 This project monitors a MeshCore LoRa mesh network consisting of:
-- **1 Companion node**: Connected via USB serial to a NUC (local device)
+- **1 Companion node**: Connected via USB serial to a local machine
 - **1 Remote repeater**: Reachable over LoRa from the companion
-  - Hardware: **Seeed SenseCAP Solar Node P1-Pro**
-  - Location: **Oosterhout, The Netherlands**
-  - Preset: **MeshCore EU/UK Narrow** (869.618 MHz, 62.5 kHz BW, SF8, CR8)
 
 The system collects metrics, stores them in a SQLite database, and generates a static HTML dashboard with SVG charts.
 
@@ -49,7 +46,7 @@ The system collects metrics, stores them in a SQLite database, and generates a s
          │ Serial
          ▼
 ┌─────────────────┐
-│      NUC        │
+│   Local Host    │
 │  (This System)  │
 └─────────────────┘
 
@@ -76,17 +73,28 @@ meshcore-stats/
 │   ├── metrics.py         # Metric type definitions (counter vs gauge)
 │   ├── reports.py         # Report generation (WeeWX-style)
 │   ├── battery.py         # 18650 Li-ion voltage to percentage conversion
-│   └── migrations/        # SQL schema migrations
-│       ├── 001_initial_schema.sql
-│       └── 002_eav_schema.sql
+│   ├── migrations/        # SQL schema migrations
+│   │   ├── 001_initial_schema.sql
+│   │   └── 002_eav_schema.sql
+│   └── templates/         # Jinja2 HTML templates
+│       ├── base.html      # Base template with head/meta tags
+│       ├── node.html      # Dashboard page template
+│       ├── report.html    # Individual report template
+│       ├── report_index.html  # Reports archive template
+│       ├── credit.html    # Reusable footer credit partial
+│       ├── styles.css     # Source CSS stylesheet
+│       └── chart-tooltip.js   # Source tooltip JavaScript
+├── docs/                  # Documentation
+│   ├── firmware-responses.md  # MeshCore firmware response formats
+│   ├── battery-voltage-sources.md  # Battery voltage research
+│   └── repeater-winter-solar-analysis.md
 ├── scripts/               # Executable scripts (cron-friendly)
-│   ├── phase1_collect_companion.py
-│   ├── phase1_collect_repeater.py
-│   ├── phase2_render_charts.py   # Generate SVG charts from database
-│   ├── phase3_render_site.py
-│   ├── phase4_render_reports.py  # Monthly/yearly reports
-│   ├── db_maintenance.sh         # Database VACUUM/ANALYZE
-│   └── rsync_output.sh           # Deploy to web server
+│   ├── collect_companion.py      # Collect metrics from companion node
+│   ├── collect_repeater.py       # Collect metrics from repeater node
+│   ├── render_charts.py          # Generate SVG charts from database
+│   ├── render_site.py            # Generate static HTML site
+│   ├── render_reports.py         # Generate monthly/yearly reports
+│   └── db_maintenance.sh         # Database VACUUM/ANALYZE
 ├── data/
 │   └── state/             # Persistent state
 │       ├── metrics.db     # SQLite database (WAL mode)
@@ -140,11 +148,23 @@ All configuration via environment variables (see `.envrc`):
 - `COMPANION_STEP`: Collection interval for companion (default: 60s)
 - `REPEATER_STEP`: Collection interval for repeater (default: 900s / 15min)
 
-### Report Location Metadata
-- `REPORT_LOCATION_NAME`: Location name for report headers (default: "Oosterhout, The Netherlands")
-- `REPORT_LAT`: Latitude in decimal degrees (default: 51.6674308)
-- `REPORT_LON`: Longitude in decimal degrees (default: 4.8596901)
-- `REPORT_ELEV`: Elevation in meters (default: 10.0)
+### Location & Display
+- `REPORT_LOCATION_NAME`: Full location name for reports (default: "Your Location")
+- `REPORT_LOCATION_SHORT`: Short location for sidebar/meta (default: "Your Location")
+- `REPORT_LAT`: Latitude in decimal degrees (default: 0.0)
+- `REPORT_LON`: Longitude in decimal degrees (default: 0.0)
+- `REPORT_ELEV`: Elevation (default: 0.0)
+- `REPORT_ELEV_UNIT`: Elevation unit, "m" or "ft" (default: "m")
+- `REPEATER_DISPLAY_NAME`: Display name for repeater in UI (default: "Repeater Node")
+- `COMPANION_DISPLAY_NAME`: Display name for companion in UI (default: "Companion Node")
+- `REPEATER_HARDWARE`: Repeater hardware model for sidebar (default: "LoRa Repeater")
+- `COMPANION_HARDWARE`: Companion hardware model for sidebar (default: "LoRa Node")
+
+### Radio Configuration (for display)
+- `RADIO_FREQUENCY`: e.g., "869.618 MHz"
+- `RADIO_BANDWIDTH`: e.g., "62.5 kHz"
+- `RADIO_SPREAD_FACTOR`: e.g., "SF8"
+- `RADIO_CODING_RATE`: e.g., "CR8"
 
 ### Metrics (Hardcoded)
 
@@ -263,39 +283,39 @@ cd /path/to/meshcore-stats
 source .envrc 2>/dev/null
 ```
 
-### Phase 1: Data Collection
+### Data Collection
 
 ```bash
 # Collect companion data (run every 60s)
-python scripts/phase1_collect_companion.py
+python scripts/collect_companion.py
 
 # Collect repeater data (run every 15min)
-python scripts/phase1_collect_repeater.py
+python scripts/collect_repeater.py
 ```
 
-### Phase 2: Chart Rendering
+### Chart Rendering
 
 ```bash
 # Render all SVG charts from database (day/week/month/year for all metrics)
-python scripts/phase2_render_charts.py
+python scripts/render_charts.py
 ```
 
 Charts are rendered using matplotlib, reading directly from the SQLite database. Each chart is generated in both light and dark theme variants.
 
-### Phase 3: HTML Generation
+### HTML Generation
 
 ```bash
 # Generate static site pages
-python scripts/phase3_render_site.py
+python scripts/render_site.py
 ```
 
-### Phase 4: Reports
+### Reports
 
 Generates monthly and yearly statistics reports in HTML, TXT (WeeWX-style ASCII), and JSON formats:
 
 ```bash
 # Generate all reports
-python scripts/phase4_render_reports.py
+python scripts/render_reports.py
 ```
 
 Reports are generated for all available months/years based on database data. Output structure:
@@ -304,13 +324,6 @@ Reports are generated for all available months/years based on database data. Out
 - `/reports/{role}/{year}/{month}/` - Monthly report (HTML, TXT, JSON)
 
 Counter metrics (rx, tx, airtime) are aggregated from absolute counter values in the database, with proper handling of device reboots (negative deltas).
-
-### Deploy to Web Server
-
-```bash
-# Dry run first (edit script to remove --dry-run for actual sync)
-./scripts/rsync_output.sh
-```
 
 ## Web Dashboard UI
 
@@ -440,7 +453,7 @@ The repeater collector uses a circuit breaker to avoid spamming LoRa when the re
 
 Enable debug logging:
 ```bash
-MESH_DEBUG=1 python scripts/phase1_collect_companion.py
+MESH_DEBUG=1 python scripts/collect_companion.py
 ```
 
 Check circuit breaker state:
@@ -473,22 +486,19 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 ```cron
 # Companion: every minute at :00
-* * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_companion.py
+* * * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/collect_companion.py
 
 # Repeater: every 15 minutes at :01, :16, :31, :46 (offset by 1 min to avoid USB conflict)
-1,16,31,46 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase1_collect_repeater.py
+1,16,31,46 * * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/collect_repeater.py
 
 # Charts: every 5 minutes (generates SVG charts from database)
-*/5 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase2_render_charts.py
+*/5 * * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/render_charts.py
 
 # HTML: every 5 minutes
-*/5 * * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase3_render_site.py
+*/5 * * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/render_site.py
 
 # Reports: daily at midnight (historical stats don't change often)
-0 0 * * * cd /home/jorijn/apps/meshcore-stats && .direnv/python-3.12.3/bin/python scripts/phase4_render_reports.py
-
-# Deploy: every 5 minutes (after removing --dry-run from script)
-*/5 * * * * cd /home/jorijn/apps/meshcore-stats && ./scripts/rsync_output.sh
+0 0 * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/render_reports.py
 ```
 
 ## Adding New Metrics
@@ -526,7 +536,7 @@ To change a metric from gauge to counter (or vice versa):
 
 1. Update `METRIC_CONFIG` in `src/meshmon/metrics.py` - change the `type` field
 2. Update `scale` if needed (counters often use scale=60 for per-minute display)
-3. Regenerate charts: `direnv exec . python scripts/phase2_render_charts.py`
+3. Regenerate charts: `direnv exec . python scripts/render_charts.py`
 
 ## Database Maintenance
 
@@ -545,5 +555,5 @@ Add to your crontab for monthly maintenance at 3 AM on the 1st:
 
 ```cron
 # Database maintenance: monthly at 3 AM on the 1st
-0 3 1 * * cd /home/jorijn/apps/meshcore-stats && ./scripts/db_maintenance.sh >> /var/log/meshcore-stats-maintenance.log 2>&1
+0 3 1 * * cd /path/to/meshcore-stats && ./scripts/db_maintenance.sh >> /var/log/meshcore-stats-maintenance.log 2>&1
 ```

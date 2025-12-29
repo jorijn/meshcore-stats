@@ -44,7 +44,7 @@ class CircuitBreaker:
             "cooldown_until": self.cooldown_until,
             "last_success": self.last_success,
         }
-        self.state_file.write_text(json.dumps(data, indent=2))
+        self.state_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     def is_open(self) -> bool:
         """Check if circuit is open (in cooldown)."""

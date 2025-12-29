@@ -598,7 +598,7 @@ def render_all_charts(
 
                 # Save to file
                 output_path = charts_dir / f"{metric}_{period}_{theme_name}.svg"
-                output_path.write_text(svg_content)
+                output_path.write_text(svg_content, encoding="utf-8")
                 generated.append(output_path)
 
                 log.debug(f"Generated chart: {output_path}")

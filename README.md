@@ -1,13 +1,20 @@
 # MeshCore Stats
 
-A Python-based monitoring system for MeshCore networks. Collects metrics from companion and repeater nodes, stores them in a SQLite database, and generates a static website with interactive SVG charts and statistics.
+A Python-based monitoring system for a MeshCore repeater node and its companion. Collects metrics from both devices, stores them in a SQLite database, and generates a static website with interactive SVG charts and statistics.
+
+**Live demo:** [meshcore.jorijn.com](https://meshcore.jorijn.com)
+
+<p>
+  <img src="docs/screenshot-1.png" width="49%" alt="MeshCore Stats Dashboard">
+  <img src="docs/screenshot-2.png" width="49%" alt="MeshCore Stats Reports">
+</p>
 
 ## Features
 
-- **Phase 1: Data Collection** - Collect metrics from companion (local) and repeater (remote) nodes
-- **Phase 2: Chart Rendering** - Generate interactive SVG charts from database using matplotlib
-- **Phase 3: Static Site** - Generate a static HTML website with day/week/month/year views
-- **Phase 4: Reports** - Generate monthly and yearly statistics reports
+- **Data Collection** - Collect metrics from companion (local) and repeater (remote) nodes
+- **Chart Rendering** - Generate interactive SVG charts from the database using matplotlib
+- **Static Site** - Generate a static HTML website with day/week/month/year views
+- **Reports** - Generate monthly and yearly statistics reports
 
 ## Requirements
 
@@ -36,39 +43,21 @@ pip install -r requirements.txt
 
 ### 2. Configure Environment Variables
 
-Create a `.envrc` file (for direnv) or export variables manually:
+Copy the example configuration file and customize it:
 
 ```bash
-# .envrc example
-
-# Connection settings
-export MESH_TRANSPORT=serial
-export MESH_SERIAL_PORT=/dev/ttyUSB0  # Optional: auto-detects if not set
-export MESH_SERIAL_BAUD=115200
-export MESH_DEBUG=0
-
-# Remote repeater identity
-export REPEATER_NAME="my-repeater"
-# export REPEATER_KEY_PREFIX="a1b2c3"  # Alternative to name
-# export REPEATER_PASSWORD="secret"   # Optional login password
-
-# Intervals
-export COMPANION_STEP=60
-export REPEATER_STEP=900
-export REMOTE_TIMEOUT_S=10
-export REMOTE_RETRY_ATTEMPTS=2
-export REMOTE_RETRY_BACKOFF_S=4
-export REMOTE_CB_FAILS=6
-export REMOTE_CB_COOLDOWN_S=3600
-
-# Paths (relative to project root)
-export DATA_DIR=./data
-export STATE_DIR=./data/state
-export OUT_DIR=./out
-
-# Optional: fetch ACL from repeater
-export REPEATER_FETCH_ACL=0
+cp .envrc.example .envrc
+# Edit .envrc with your settings
 ```
+
+The `.envrc.example` file contains all available configuration options with documentation. Key settings to configure:
+
+- **Connection**: `MESH_SERIAL_PORT`, `MESH_TRANSPORT`
+- **Repeater Identity**: `REPEATER_NAME`, `REPEATER_PASSWORD`
+- **Display Names**: `REPEATER_DISPLAY_NAME`, `COMPANION_DISPLAY_NAME`
+- **Location**: `REPORT_LOCATION_NAME`, `REPORT_LAT`, `REPORT_LON`, `REPORT_ELEV`
+- **Hardware Info**: `REPEATER_HARDWARE`, `COMPANION_HARDWARE`
+- **Radio Config**: `RADIO_FREQUENCY`, `RADIO_BANDWIDTH`, etc. (includes presets for different regions)
 
 If using direnv:
 ```bash
@@ -81,16 +70,16 @@ direnv allow
 
 ```bash
 # Collect companion data
-python scripts/phase1_collect_companion.py
+python scripts/collect_companion.py
 
 # Collect repeater data
-python scripts/phase1_collect_repeater.py
+python scripts/collect_repeater.py
 
 # Generate static site (includes chart rendering)
-python scripts/phase3_render_site.py
+python scripts/render_site.py
 
 # Generate reports
-python scripts/phase4_render_reports.py
+python scripts/render_reports.py
 ```
 
 ### Cron Setup
@@ -104,16 +93,16 @@ MESHCORE_STATS=/home/user/meshcore-stats
 DIRENV=/usr/bin/direnv
 
 # Every minute: collect companion data
-* * * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/phase1_collect_companion.py
+* * * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/collect_companion.py
 
 # Every 15 minutes: collect repeater data
-*/15 * * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/phase1_collect_repeater.py
+*/15 * * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/collect_repeater.py
 
 # Every 5 minutes: render site
-*/5 * * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/phase3_render_site.py
+*/5 * * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/render_site.py
 
 # Daily at midnight: generate reports
-0 0 * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/phase4_render_reports.py
+0 0 * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/render_reports.py
 
 # Monthly at 3 AM on the 1st: database maintenance
 0 3 1 * * cd $MESHCORE_STATS && ./scripts/db_maintenance.sh
@@ -136,7 +125,8 @@ cd out && python3 -m http.server 8080
 meshcore-stats/
 ├── requirements.txt
 ├── README.md
-├── .envrc                      # Environment variables (create this)
+├── .envrc.example              # Example configuration (copy to .envrc)
+├── .envrc                      # Your configuration (create this)
 ├── src/meshmon/
 │   ├── __init__.py
 │   ├── env.py                  # Environment variable parsing
@@ -147,21 +137,27 @@ meshcore-stats/
 │   ├── charts.py               # Matplotlib SVG chart generation
 │   ├── html.py                 # HTML rendering
 │   ├── reports.py              # Report generation
+│   ├── metrics.py              # Metric type definitions
+│   ├── battery.py              # Battery voltage to percentage conversion
 │   ├── migrations/             # SQL schema migrations
-│   │   └── 001_initial_schema.sql
+│   │   ├── 001_initial_schema.sql
+│   │   └── 002_eav_schema.sql
 │   └── templates/              # Jinja2 HTML templates
 ├── scripts/
-│   ├── phase1_collect_companion.py
-│   ├── phase1_collect_repeater.py
-│   ├── phase2_render_charts.py
-│   ├── phase3_render_site.py
-│   ├── phase4_render_reports.py
+│   ├── collect_companion.py    # Collect metrics from companion node
+│   ├── collect_repeater.py     # Collect metrics from repeater node
+│   ├── render_charts.py        # Generate SVG charts from database
+│   ├── render_site.py          # Generate static HTML site
+│   ├── render_reports.py       # Generate monthly/yearly reports
 │   └── db_maintenance.sh       # Database VACUUM/ANALYZE
 ├── data/
 │   └── state/
 │       ├── metrics.db          # SQLite database (WAL mode)
 │       └── repeater_circuit.json
 └── out/                        # Generated site
+    ├── .htaccess               # Apache config (DirectoryIndex, caching)
+    ├── styles.css              # Stylesheet
+    ├── chart-tooltip.js        # Chart tooltip enhancement
     ├── day.html                # Repeater pages (entry point)
     ├── week.html
     ├── month.html
@@ -237,6 +233,7 @@ If repeater collection shows "cooldown active":
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| **Connection** | | |
 | `MESH_TRANSPORT` | serial | Connection type: serial, tcp, ble |
 | `MESH_SERIAL_PORT` | (auto) | Serial port path |
 | `MESH_SERIAL_BAUD` | 115200 | Baud rate |
@@ -245,10 +242,30 @@ If repeater collection shows "cooldown active":
 | `MESH_BLE_ADDR` | - | BLE device address |
 | `MESH_BLE_PIN` | - | BLE PIN |
 | `MESH_DEBUG` | 0 | Enable debug output |
+| **Repeater Identity** | | |
 | `REPEATER_NAME` | - | Repeater advertised name |
 | `REPEATER_KEY_PREFIX` | - | Repeater public key prefix |
 | `REPEATER_PASSWORD` | - | Repeater login password |
 | `REPEATER_FETCH_ACL` | 0 | Also fetch ACL from repeater |
+| **Display Names** | | |
+| `REPEATER_DISPLAY_NAME` | Repeater Node | Display name for repeater in UI |
+| `COMPANION_DISPLAY_NAME` | Companion Node | Display name for companion in UI |
+| **Location** | | |
+| `REPORT_LOCATION_NAME` | Your Location | Full location name for reports |
+| `REPORT_LOCATION_SHORT` | Your Location | Short location for sidebar/meta |
+| `REPORT_LAT` | 0.0 | Latitude in decimal degrees |
+| `REPORT_LON` | 0.0 | Longitude in decimal degrees |
+| `REPORT_ELEV` | 0.0 | Elevation |
+| `REPORT_ELEV_UNIT` | m | Elevation unit: "m" or "ft" |
+| **Hardware Info** | | |
+| `REPEATER_HARDWARE` | LoRa Repeater | Repeater hardware model for sidebar |
+| `COMPANION_HARDWARE` | LoRa Node | Companion hardware model for sidebar |
+| **Radio Config** | | |
+| `RADIO_FREQUENCY` | 869.618 MHz | Radio frequency for display |
+| `RADIO_BANDWIDTH` | 62.5 kHz | Radio bandwidth for display |
+| `RADIO_SPREAD_FACTOR` | SF8 | Spread factor for display |
+| `RADIO_CODING_RATE` | CR8 | Coding rate for display |
+| **Intervals** | | |
 | `COMPANION_STEP` | 60 | Companion data collection interval (seconds) |
 | `REPEATER_STEP` | 900 | Repeater data collection interval (seconds) |
 | `REMOTE_TIMEOUT_S` | 10 | Remote request timeout |
@@ -256,44 +273,46 @@ If repeater collection shows "cooldown active":
 | `REMOTE_RETRY_BACKOFF_S` | 4 | Retry backoff delay |
 | `REMOTE_CB_FAILS` | 6 | Failures before circuit opens |
 | `REMOTE_CB_COOLDOWN_S` | 3600 | Circuit breaker cooldown |
-| `DATA_DIR` | ./data | Data directory (contains metrics.db) |
+| **Paths** | | |
 | `STATE_DIR` | ./data/state | State file path |
 | `OUT_DIR` | ./out | Output site path |
 
 ## Metrics Reference
 
+The system uses an EAV (Entity-Attribute-Value) schema where firmware field names are stored directly in the database. This allows new metrics to be captured automatically without schema changes.
+
 ### Repeater Metrics
 
-| Metric | Source Path | Type | Display Unit | Description |
-|--------|-------------|------|--------------|-------------|
-| `bat_v` | `derived.bat_v` | Gauge | Voltage (V) | Battery voltage (from status.bat / 1000) |
-| `bat_pct` | `derived.bat_pct` | Gauge | Battery (%) | Battery percentage (calculated from voltage) |
-| `rx` | `derived.rx` | Counter | Packets/min | Total packets received (from status.nb_recv) |
-| `tx` | `derived.tx` | Counter | Packets/min | Total packets sent (from status.nb_sent) |
-| `rssi` | `derived.rssi` | Gauge | RSSI (dBm) | Last received signal strength |
-| `snr` | `derived.snr` | Gauge | SNR (dB) | Last signal-to-noise ratio |
-| `uptime` | `status.uptime` | Gauge | Days | Device uptime (seconds / 86400) |
-| `noise` | `status.noise_floor` | Gauge | dBm | Background RF noise floor |
-| `airtime` | `status.airtime` | Counter | Seconds/min | Transmit airtime rate |
-| `rx_air` | `status.rx_airtime` | Counter | Seconds/min | Receive airtime rate |
-| `fl_dups` | `status.flood_dups` | Counter | Packets/min | Duplicate flood packets received |
-| `di_dups` | `status.direct_dups` | Counter | Packets/min | Duplicate direct packets received |
-| `fl_tx` | `status.sent_flood` | Counter | Packets/min | Flood packets transmitted |
-| `fl_rx` | `status.recv_flood` | Counter | Packets/min | Flood packets received |
-| `di_tx` | `status.sent_direct` | Counter | Packets/min | Direct packets transmitted |
-| `di_rx` | `status.recv_direct` | Counter | Packets/min | Direct packets received |
-| `txq` | `status.tx_queue_len` | Gauge | Queue depth | Current transmit queue length |
+| Metric | Type | Display Unit | Description |
+|--------|------|--------------|-------------|
+| `bat` | Gauge | Voltage (V) | Battery voltage (stored in mV, displayed as V) |
+| `bat_pct` | Gauge | Battery (%) | Battery percentage (computed from voltage) |
+| `last_rssi` | Gauge | RSSI (dBm) | Signal strength of last packet |
+| `last_snr` | Gauge | SNR (dB) | Signal-to-noise ratio |
+| `noise_floor` | Gauge | dBm | Background RF noise |
+| `uptime` | Gauge | Days | Time since reboot (seconds ÷ 86400) |
+| `tx_queue_len` | Gauge | Queue depth | TX queue length |
+| `nb_recv` | Counter | Packets/min | Total packets received |
+| `nb_sent` | Counter | Packets/min | Total packets transmitted |
+| `airtime` | Counter | Seconds/min | TX airtime rate |
+| `rx_airtime` | Counter | Seconds/min | RX airtime rate |
+| `flood_dups` | Counter | Packets/min | Flood duplicate packets |
+| `direct_dups` | Counter | Packets/min | Direct duplicate packets |
+| `sent_flood` | Counter | Packets/min | Flood packets transmitted |
+| `recv_flood` | Counter | Packets/min | Flood packets received |
+| `sent_direct` | Counter | Packets/min | Direct packets transmitted |
+| `recv_direct` | Counter | Packets/min | Direct packets received |
 
 ### Companion Metrics
 
-| Metric | Source Path | Type | Display Unit | Description |
-|--------|-------------|------|--------------|-------------|
-| `bat_v` | `derived.bat_v` | Gauge | Voltage (V) | Battery voltage |
-| `bat_pct` | `derived.bat_pct` | Gauge | Battery (%) | Battery percentage (calculated from voltage) |
-| `contacts` | `derived.contacts_count` | Gauge | Count | Number of known contacts |
-| `rx` | `stats.packets.recv` | Counter | Packets/min | Packets received |
-| `tx` | `stats.packets.sent` | Counter | Packets/min | Packets sent |
-| `uptime` | `stats.core.uptime_secs` | Gauge | Days | Device uptime (seconds / 86400) |
+| Metric | Type | Display Unit | Description |
+|--------|------|--------------|-------------|
+| `battery_mv` | Gauge | Voltage (V) | Battery voltage (stored in mV, displayed as V) |
+| `bat_pct` | Gauge | Battery (%) | Battery percentage (computed from voltage) |
+| `contacts` | Gauge | Count | Known mesh nodes |
+| `uptime_secs` | Gauge | Days | Time since reboot (seconds ÷ 86400) |
+| `recv` | Counter | Packets/min | Total packets received |
+| `sent` | Counter | Packets/min | Total packets transmitted |
 
 ### Metric Types
 

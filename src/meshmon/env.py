@@ -81,19 +81,33 @@ class Config:
 
         # Report location metadata
         self.report_location_name = get_str(
-            "REPORT_LOCATION_NAME", "Oosterhout, The Netherlands"
+            "REPORT_LOCATION_NAME", "Your Location"
         )
-        self.report_lat = get_float("REPORT_LAT", 51.6674308)
-        self.report_lon = get_float("REPORT_LON", 4.8596901)
-        self.report_elev = get_float("REPORT_ELEV", 10.0)
+        self.report_location_short = get_str(
+            "REPORT_LOCATION_SHORT", "Your Location"
+        )
+        self.report_lat = get_float("REPORT_LAT", 0.0)
+        self.report_lon = get_float("REPORT_LON", 0.0)
+        self.report_elev = get_float("REPORT_ELEV", 0.0)
+        self.report_elev_unit = get_str("REPORT_ELEV_UNIT", "m")  # "m" or "ft"
 
-        # Node display names for reports
+        # Node display names for UI
         self.repeater_display_name = get_str(
-            "REPEATER_DISPLAY_NAME", "jorijn.com Repeater N"
+            "REPEATER_DISPLAY_NAME", "Repeater Node"
         )
         self.companion_display_name = get_str(
             "COMPANION_DISPLAY_NAME", "Companion Node"
         )
+
+        # Hardware info for sidebar
+        self.repeater_hardware = get_str("REPEATER_HARDWARE", "LoRa Repeater")
+        self.companion_hardware = get_str("COMPANION_HARDWARE", "LoRa Node")
+
+        # Radio configuration (for display in sidebar)
+        self.radio_frequency = get_str("RADIO_FREQUENCY", "869.618 MHz")
+        self.radio_bandwidth = get_str("RADIO_BANDWIDTH", "62.5 kHz")
+        self.radio_spread_factor = get_str("RADIO_SPREAD_FACTOR", "SF8")
+        self.radio_coding_rate = get_str("RADIO_CODING_RATE", "CR8")
 
 
 # Global config instance

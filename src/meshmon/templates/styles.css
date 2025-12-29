@@ -972,6 +972,49 @@ h4 { font-size: var(--text-lg); }
   color: var(--accent-primary);
 }
 
+/* Site credit line */
+footer.site-credit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-2xl);
+  padding: var(--space-lg) 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+footer.site-credit .separator {
+  color: var(--text-muted);
+}
+
+footer.site-credit a {
+  color: var(--text-muted);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  border-radius: 2px;
+}
+
+footer.site-credit a:hover {
+  color: var(--text-secondary);
+}
+
+footer.site-credit a:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+footer.site-credit svg {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  flex-shrink: 0;
+  vertical-align: -0.125em;
+}
+
 /* ========================================
    Utilities
    ======================================== */

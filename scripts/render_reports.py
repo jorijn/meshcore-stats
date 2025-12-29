@@ -46,7 +46,7 @@ def safe_write(path: Path, content: str) -> bool:
         True if write succeeded, False otherwise
     """
     try:
-        path.write_text(content)
+        path.write_text(content, encoding="utf-8")
         return True
     except IOError as e:
         log.error(f"Failed to write {path}: {e}")
