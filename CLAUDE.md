@@ -2,6 +2,18 @@
 
 > **Maintenance Note**: This file should always reflect the current state of the project. When making changes to the codebase (adding features, changing architecture, modifying configuration), update this document accordingly. Keep it accurate and comprehensive for future reference.
 
+## Important: Source Files vs Generated Output
+
+**NEVER edit files in `out/` directly** - they are generated and will be overwritten.
+
+| Type | Source Location | Generated Output |
+|------|-----------------|------------------|
+| CSS | `src/meshmon/templates/styles.css` | `out/styles.css` |
+| HTML templates | `src/meshmon/templates/*.html` | `out/*.html` |
+| JavaScript | `src/meshmon/templates/*.js` | `out/*.js` |
+
+Always edit the source templates, then regenerate with `direnv exec . python scripts/phase3_render_site.py`.
+
 ## Running Commands
 
 **IMPORTANT**: Always use `direnv exec .` to run Python scripts in this project. This ensures the correct virtualenv and environment variables are loaded.
