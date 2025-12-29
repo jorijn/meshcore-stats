@@ -470,7 +470,8 @@ def render_chart_svg(
                 # Plot bars with theme-based alpha (matches line chart area fill)
                 area_color = _hex_to_rgba(theme.area)
                 ax.bar(timestamps, values, width=bar_width,
-                       color=f"#{theme.line}", alpha=area_color[3], edgecolor='none')
+                       color=f"#{theme.line}", alpha=area_color[3],
+                       edgecolor=f"#{theme.line}", linewidth=1)
             else:
                 # Line chart for gauge metrics
                 # Plot area fill
