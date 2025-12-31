@@ -926,29 +926,53 @@ h4 { font-size: var(--text-lg); }
 }
 
 /* ========================================
-   Traffic metrics - compact display
+   Traffic metrics - table display
    ======================================== */
-.traffic-metrics {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-sm);
-  padding: var(--space-md) 0;
+.traffic-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
   border-top: 1px solid var(--border-subtle);
 }
 
-.traffic-metric {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--text-xs);
+.traffic-table th,
+.traffic-table td {
+  padding: var(--space-xs) var(--space-sm);
+  text-align: right;
 }
 
-.traffic-metric .label {
+.traffic-table th:first-child,
+.traffic-table td:first-child {
+  padding-left: 0;
+}
+
+.traffic-table th:last-child,
+.traffic-table td:last-child {
+  padding-right: 0;
+}
+
+.traffic-table th[scope="row"] {
+  text-align: left;
   color: var(--text-muted);
+  font-weight: 400;
 }
 
-.traffic-metric .value {
+.traffic-table thead th {
+  color: var(--text-muted);
+  font-weight: 400;
+  padding-top: var(--space-md);
+  padding-bottom: var(--space-xs);
+}
+
+.traffic-table tbody tr:last-child th,
+.traffic-table tbody tr:last-child td {
+  padding-bottom: var(--space-md);
+}
+
+.traffic-table td {
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
+  cursor: help;
 }
 
 /* ========================================

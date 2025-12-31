@@ -15,6 +15,8 @@ from .formatters import (
     format_number,
     format_duration,
     format_uptime,
+    format_compact_number,
+    format_duration_compact,
 )
 from .charts import load_chart_stats
 from .metrics import get_chart_metrics, get_metric_label
@@ -101,6 +103,8 @@ def get_jinja_env() -> Environment:
     env.filters["format_number"] = format_number
     env.filters["format_duration"] = format_duration
     env.filters["format_uptime"] = format_uptime
+    env.filters["format_compact_number"] = format_compact_number
+    env.filters["format_duration_compact"] = format_duration_compact
 
     _jinja_env = env
     return env
@@ -183,7 +187,7 @@ def build_repeater_metrics(row: Optional[dict]) -> dict:
     if uptime is not None:
         secondary_metrics.append({
             "label": "Uptime",
-            "value": format_uptime(uptime),
+            "value": format_duration_compact(int(uptime)),
         })
 
     noise = row.get("noise_floor")
@@ -215,10 +219,21 @@ def build_repeater_metrics(row: Optional[dict]) -> dict:
     for label, key in traffic_fields:
         val = row.get(key)
         if val is not None:
+            int_val = int(val)
             if "airtime" in key.lower():
-                traffic_metrics.append({"label": label, "value": f"{int(val):,}s"})
+                traffic_metrics.append({
+                    "label": label,
+                    "value": format_duration_compact(int_val),
+                    "raw_value": int_val,
+                    "unit": "seconds",
+                })
             else:
-                traffic_metrics.append({"label": label, "value": f"{int(val):,}"})
+                traffic_metrics.append({
+                    "label": label,
+                    "value": format_compact_number(int_val),
+                    "raw_value": int_val,
+                    "unit": "packets",
+                })
 
     return {
         "critical_metrics": critical_metrics,
@@ -275,25 +290,80 @@ def build_companion_metrics(row: Optional[dict]) -> dict:
     uptime = row.get("uptime_secs")
     if uptime is not None:
         critical_metrics.append({
-            "value": format_uptime(uptime),
+            "value": format_duration_compact(int(uptime)),
             "unit": None,
             "label": "Uptime",
         })
 
-    # Secondary metrics
+    # Secondary metrics (empty for companion)
     secondary_metrics = []
+
+    # Traffic metrics for companion
+    traffic_metrics = []
     rx = row.get("recv")
     if rx is not None:
-        secondary_metrics.append({"label": "Packets RX", "value": f"{int(rx):,}"})
+        int_rx = int(rx)
+        traffic_metrics.append({
+            "label": "RX",
+            "value": format_compact_number(int_rx),
+            "raw_value": int_rx,
+            "unit": "packets",
+        })
     tx = row.get("sent")
     if tx is not None:
-        secondary_metrics.append({"label": "Packets TX", "value": f"{int(tx):,}"})
+        int_tx = int(tx)
+        traffic_metrics.append({
+            "label": "TX",
+            "value": format_compact_number(int_tx),
+            "raw_value": int_tx,
+            "unit": "packets",
+        })
 
     return {
         "critical_metrics": critical_metrics,
         "secondary_metrics": secondary_metrics,
-        "traffic_metrics": [],
+        "traffic_metrics": traffic_metrics,
     }
+
+
+def _build_traffic_table_rows(traffic_metrics: list[dict]) -> list[dict]:
+    """Convert flat traffic metrics to structured table rows with RX/TX columns.
+
+    Input: List of dicts with 'label', 'value', 'raw_value', 'unit'
+    Output: List of row dicts with 'label', 'rx', 'rx_raw', 'tx', 'tx_raw', 'unit'
+    """
+    rows_map: dict[str, dict] = {}
+
+    for metric in traffic_metrics:
+        label = metric.get("label", "")
+        # Determine base name and direction from label
+        if label == "RX":
+            base, direction = "Packets", "rx"
+        elif label == "TX":
+            base, direction = "Packets", "tx"
+        elif label.endswith(" RX"):
+            base, direction = label[:-3], "rx"
+        elif label.endswith(" TX"):
+            base, direction = label[:-3], "tx"
+        else:
+            continue
+
+        if base not in rows_map:
+            rows_map[base] = {
+                "label": base,
+                "rx": None,
+                "rx_raw": None,
+                "tx": None,
+                "tx_raw": None,
+                "unit": metric.get("unit", ""),
+            }
+
+        rows_map[base][direction] = metric.get("value")
+        rows_map[base][f"{direction}_raw"] = metric.get("raw_value")
+
+    # Return in order: Packets, Flood, Direct, Airtime
+    order = ["Packets", "Flood", "Direct", "Airtime"]
+    return [rows_map[k] for k in order if k in rows_map]
 
 
 def build_node_details(role: str) -> list[dict]:
@@ -578,6 +648,7 @@ def build_page_context(
         "critical_metrics": metrics_data["critical_metrics"],
         "secondary_metrics": metrics_data["secondary_metrics"],
         "traffic_metrics": metrics_data["traffic_metrics"],
+        "traffic_table_rows": _build_traffic_table_rows(metrics_data["traffic_metrics"]),
 
         # Node details
         "node_details": node_details,

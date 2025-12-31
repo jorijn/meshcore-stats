@@ -48,16 +48,26 @@
       </div>
       {% endif %}
 
-      {% if traffic_metrics %}
-      <!-- Traffic Metrics -->
-      <div class="traffic-metrics">
-        {% for m in traffic_metrics %}
-        <div class="traffic-metric">
-          <span class="label">{{ m.label }}</span>
-          <span class="value">{{ m.value }}</span>
-        </div>
-        {% endfor %}
-      </div>
+      {% if traffic_table_rows %}
+      <!-- Traffic Metrics Table -->
+      <table class="traffic-table">
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">RX</th>
+            <th scope="col">TX</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in traffic_table_rows %}
+          <tr>
+            <th scope="row">{{ row.label }}</th>
+            <td{% if row.rx_raw %} title="{{ row.rx_raw | format_number }} {{ row.unit }}"{% endif %}>{{ row.rx if row.rx else '—' }}</td>
+            <td{% if row.tx_raw %} title="{{ row.tx_raw | format_number }} {{ row.unit }}"{% endif %}>{{ row.tx if row.tx else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
       {% endif %}
 
       {% if node_details %}

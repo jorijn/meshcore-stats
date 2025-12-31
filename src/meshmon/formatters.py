@@ -1,7 +1,9 @@
 """Shared formatting functions for display values."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
+
+Number = Union[int, float]
 
 from .battery import voltage_to_percentage
 
@@ -81,3 +83,76 @@ def format_voltage_with_pct(mv: Optional[float]) -> str:
     v = mv / 1000.0
     pct = voltage_to_percentage(v)
     return f"{v:.2f} V ({pct:.0f}%)"
+
+
+def format_compact_number(value: Optional[Number], precision: int = 1) -> str:
+    """Format a number using compact notation (k, M suffixes).
+
+    Rules:
+    - None: Returns "N/A"
+    - < 1,000: Raw integer (847)
+    - 1,000 - 9,999: Comma-separated (4,989)
+    - 10,000 - 999,999: Compact with suffix (242.1k)
+    - >= 1,000,000: Millions (1.5M)
+
+    Args:
+        value: The numeric value to format
+        precision: Decimal places for compact notation (default: 1)
+
+    Returns:
+        Formatted string
+    """
+    if value is None:
+        return "N/A"
+
+    # Handle negative values
+    if value < 0:
+        return f"-{format_compact_number(abs(value), precision)}"
+
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.{precision}f}M"
+    elif value >= 10_000:
+        return f"{value / 1_000:.{precision}f}k"
+    elif value >= 1_000:
+        return f"{int(value):,}"
+    else:
+        return str(int(value))
+
+
+def format_duration_compact(seconds: Optional[int]) -> str:
+    """Format duration showing only the two most significant units.
+
+    Uses truncation (floor), not rounding.
+
+    Rules:
+    - None: Returns "N/A"
+    - 0: Returns "0s"
+    - < 60s: Seconds only (45s)
+    - < 1h: Minutes + seconds (45m 12s)
+    - < 1d: Hours + minutes (19h 45m)
+    - >= 1d: Days + hours (1d 20h)
+
+    Args:
+        seconds: Duration in seconds
+
+    Returns:
+        Formatted duration string
+    """
+    if seconds is None:
+        return "N/A"
+    if seconds == 0:
+        return "0s"
+
+    days = seconds // 86400
+    hours = (seconds % 86400) // 3600
+    mins = (seconds % 3600) // 60
+    secs = seconds % 60
+
+    if days > 0:
+        return f"{days}d {hours}h"
+    elif hours > 0:
+        return f"{hours}h {mins}m"
+    elif mins > 0:
+        return f"{mins}m {secs}s"
+    else:
+        return f"{secs}s"
