@@ -813,7 +813,7 @@ def build_monthly_table_data(
         rows.append({
             "is_summary": True,
             "cells": [
-                {"value": "Avg", "class": None},
+                {"value": "", "class": None},
                 {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
                 {"value": _fmt_val_plain(bat_v_min), "class": "muted"},
@@ -890,7 +890,7 @@ def build_monthly_table_data(
         rows.append({
             "is_summary": True,
             "cells": [
-                {"value": "Avg", "class": None},
+                {"value": "", "class": None},
                 {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
                 {"value": _fmt_val_plain(bat_v_min), "class": "muted"},
@@ -999,7 +999,7 @@ def build_yearly_table_data(
             "is_summary": True,
             "cells": [
                 {"value": "", "class": None},
-                {"value": "Avg", "class": None},
+                {"value": "", "class": None},
                 {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
                 {"value": _fmt_val_month(bat_v_max, bat.max_time), "class": "muted"},
@@ -1077,7 +1077,7 @@ def build_yearly_table_data(
             "is_summary": True,
             "cells": [
                 {"value": "", "class": None},
-                {"value": "Avg", "class": None},
+                {"value": "", "class": None},
                 {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
                 {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
                 {"value": _fmt_val_month(bat_v_max, bat.max_time), "class": "muted"},

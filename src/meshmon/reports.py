@@ -775,7 +775,7 @@ def format_monthly_txt_repeater(
     airtime = s.get("airtime", MetricStats())
 
     summary_line = (
-        f"AVG  "
+        f"     "
         f"{_fmt_val(bat_v.mean, 5, 2)}  {_fmt_val(bat_pct.mean, 3, 0)}  "
         f"{_fmt_val(bat_v.min_value, 5, 2)}  {_fmt_day(bat_v.min_time)}     "
         f"{_fmt_val(bat_v.max_value, 5, 2)}  {_fmt_day(bat_v.max_time)}     "
@@ -848,7 +848,7 @@ def format_monthly_txt_companion(
     tx = s.get("sent", MetricStats())
 
     summary_line = (
-        f"AVG  "
+        f"     "
         f"{_fmt_val(bat_v.mean, 5, 2)}  {_fmt_val(bat_pct.mean, 3, 0)}  "
         f"{_fmt_val(bat_v.min_value, 5, 2)}  {_fmt_day(bat_v.min_time)}     "
         f"{_fmt_val(bat_v.max_value, 5, 2)}  {_fmt_day(bat_v.max_time)}     "
@@ -975,7 +975,7 @@ def format_yearly_txt_repeater(
 
     lines.append(_format_row(cols, [
         "",
-        "AVG",
+        "",
         bat_v.mean,
         int(bat_pct.mean) if bat_pct.mean is not None else None,
         bat_v.max_value,
@@ -1080,7 +1080,7 @@ def format_yearly_txt_companion(
 
     lines.append(_format_row(cols, [
         "",
-        "AVG",
+        "",
         bat_v.mean,
         int(bat_pct.mean) if bat_pct.mean is not None else None,
         bat_v.max_value,
