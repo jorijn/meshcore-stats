@@ -1,0 +1,11 @@
+DirectoryIndex day.html index.html
+
+# Serve text files with UTF-8 charset
+AddDefaultCharset UTF-8
+AddCharset UTF-8 .txt .json .html .css .js .svg
+
+<FilesMatch "\.(html|png|json|txt)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+</FilesMatch>

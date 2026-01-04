@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="reports-layout">
+  <header class="reports-header">
+    <nav class="reports-breadcrumb">
+      <a href="{{ css_path }}day.html">Dashboard</a>
+      <span>/</span>
+      <a href="{{ css_path }}reports/">Reports</a>
+      <span>/</span>
+      {% if report_type == 'monthly' %}
+      <a href="{{ css_path }}reports/{{ role }}/{{ year }}/">{{ year }}</a>
+      <span>/</span>
+      <span>{{ month_name }}</span>
+      {% else %}
+      <span>{{ year }}</span>
+      {% endif %}
+    </nav>
+    <h1 class="reports-title">{{ report_title }}</h1>
+    <p class="reports-subtitle">{{ report_subtitle }}</p>
+  </header>
+
+  <!-- Location Info -->
+  <dl class="location-info">
+    <dt>Node</dt>
+    <dd>{{ node_name }}</dd>
+    <dt>Location</dt>
+    <dd>{{ location_name }}</dd>
+    <dt>Coordinates</dt>
+    <dd>{{ coords_str }}  •  Elevation {{ elev }}m</dd>
+  </dl>
+
+  <!-- Data Table -->
+  <div class="data-table-wrapper">
+    <table class="data-table">
+      <thead>
+        {% if col_groups %}
+        <tr class="col-group-header">
+          {% for cg in col_groups %}
+          <th{% if cg.colspan > 1 %} colspan="{{ cg.colspan }}"{% endif %}>{{ cg.label }}</th>
+          {% endfor %}
+        </tr>
+        {% endif %}
+        <tr>
+          {% for header in table_headers %}
+          <th{% if header.tooltip %} title="{{ header.tooltip }}"{% endif %}>{{ header.label }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in table_rows %}
+        {% if not row.is_summary %}
+        <tr>
+          {% for cell in row.cells %}
+          <td{% if cell.class %} class="{{ cell.class }}"{% endif %}>{{ cell.value|safe }}</td>
+          {% endfor %}
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        {% for row in table_rows %}
+        {% if row.is_summary %}
+        <tr>
+          {% for cell in row.cells %}
+          <td{% if cell.class %} class="{{ cell.class }}"{% endif %}>{{ cell.value|safe }}</td>
+          {% endfor %}
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tfoot>
+    </table>
+  </div>
+
+  {% if report_type == 'yearly' and monthly_links %}
+  <!-- Monthly links -->
+  <section style="margin-top: var(--space-2xl);">
+    <h3 style="font-size: var(--text-sm); font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--space-md);">Monthly Reports</h3>
+    <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
+      {% for link in monthly_links %}
+      <a href="{{ link.url }}" class="archive-month">{{ link.label }}</a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Download links -->
+  <div style="margin-top: var(--space-xl); display: flex; gap: var(--space-lg); font-size: var(--text-sm);">
+    <a href="report.txt" style="color: var(--text-secondary); text-decoration: none;" download="{{ download_prefix }}.txt">Download TXT</a>
+    <a href="report.json" style="color: var(--text-secondary); text-decoration: none;" download="{{ download_prefix }}.json">Download JSON</a>
+  </div>
+
+  <footer class="site-footer" style="margin-top: var(--space-3xl);">
+    <a href="{{ css_path }}reports/">Back to Reports Archive</a>
+  </footer>
+
+  {% include "credit.html" %}
+</div>
+{% endblock %}

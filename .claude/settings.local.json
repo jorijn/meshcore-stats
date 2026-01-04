@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(meshcore-cli:*)",
+      "Bash(.direnv/python-3.14/bin/pip index:*)",
+      "Bash(.direnv/python-3.14/bin/pip install:*)",
+      "Bash(.direnv/python-3.12/bin/pip:*)",
+      "Bash(rrdtool info:*)",
+      "Bash(rrdtool fetch:*)",
+      "Bash(cat:*)",
+      "Bash(xargs cat:*)",
+      "Bash(done)",
+      "Bash(ls:*)",
+      "Bash(source .envrc)",
+      "Bash(.direnv/python-3.12/bin/python:*)",
+      "Bash(xargs:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(find:*)",
+      "Bash(tree:*)",
+      "Skill(frontend-design:frontend-design)",
+      "Skill(frontend-design:frontend-design:*)",
+      "Bash(direnv exec:*)",
+      "Skill(frontend-design)",
+      "Skill(frontend-design:*)"
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.envrc
+.env
+
+# Data directories (keep structure, ignore content)
+data/snapshots/companion/**/*.json
+data/snapshots/repeater/**/*.json
+data/rrd/*.rrd
+data/state/*
+
+# Generated output (except .htaccess)
+out/*
+!out/.htaccess
+
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+.direnv

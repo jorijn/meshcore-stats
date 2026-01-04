@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="layout">
+  <!-- Sidebar - Instrument Panel -->
+  <aside class="sidebar">
+    <header class="site-header">
+      <div class="site-title">MeshCore Stats</div>
+      <div class="site-subtitle">LoRa Mesh Observatory</div>
+    </header>
+
+    <!-- Node Selector -->
+    <nav class="node-selector">
+      <a href="{{ repeater_link }}"{% if role == 'repeater' %} class="active"{% endif %}>Repeater</a>
+      <a href="{{ companion_link }}"{% if role == 'companion' %} class="active"{% endif %}>Companion</a>
+    </nav>
+
+    <!-- Node Info Card -->
+    <div class="node-info">
+      <div class="node-header">
+        <div>
+          <div class="node-name">{{ node_name }}</div>
+{% if pubkey_pre %}
+          <div class="node-id">{{ pubkey_pre }}</div>
+{% endif %}
+        </div>
+        <span class="status-badge {{ status_class }}">{{ status_text }}</span>
+      </div>
+
+      <!-- Critical Metrics -->
+      <div class="critical-metrics">
+        {% for m in critical_metrics %}
+        <div class="metric">
+          <div class="metric-value">{{ m.value }}{% if m.unit %}<span class="unit">{{ m.unit }}</span>{% endif %}</div>
+          <div class="metric-label">{{ m.label }}</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if secondary_metrics %}
+      <!-- Secondary Metrics -->
+      <div class="secondary-metrics">
+        {% for m in secondary_metrics %}
+        <div class="secondary-metric">
+          <span class="label">{{ m.label }}</span>
+          <span class="value">{{ m.value }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if traffic_table_rows %}
+      <!-- Traffic Metrics Table -->
+      <table class="traffic-table">
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">RX</th>
+            <th scope="col">TX</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in traffic_table_rows %}
+          <tr>
+            <th scope="row">{{ row.label }}</th>
+            <td{% if row.rx_raw %} title="{{ row.rx_raw | format_number }} {{ row.unit }}"{% endif %}>{{ row.rx if row.rx else '—' }}</td>
+            <td{% if row.tx_raw %} title="{{ row.tx_raw | format_number }} {{ row.unit }}"{% endif %}>{{ row.tx if row.tx else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      {% if node_details %}
+      <!-- Node Details -->
+      <div class="node-details">
+        {% for d in node_details %}
+        <div class="node-details-row">
+          <span class="label">{{ d.label }}</span>
+          <span class="value">{{ d.value }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if radio_config %}
+      <!-- Radio Config -->
+      <dl class="radio-config">
+        {% for r in radio_config %}
+        <dt>{{ r.label }}</dt>
+        <dd>{{ r.value }}</dd>
+        {% endfor %}
+      </dl>
+      {% endif %}
+    </div>
+
+    <!-- Last Updated -->
+    <div class="last-updated">
+      Last observation
+{% if last_updated %}
+      <time datetime="{{ last_updated_iso }}">{{ last_updated }}</time>
+{% else %}
+      <time>N/A</time>
+{% endif %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <a href="{{ reports_link }}">View Reports Archive</a>
+    </footer>
+  </aside>
+
+  <!-- Main Content - Charts -->
+  <main class="main-content">
+    <!-- Period Navigation -->
+    <nav class="period-nav">
+      <a href="{{ base_path }}/day.html"{% if period == 'day' %} class="active"{% endif %}>Day</a>
+      <a href="{{ base_path }}/week.html"{% if period == 'week' %} class="active"{% endif %}>Week</a>
+      <a href="{{ base_path }}/month.html"{% if period == 'month' %} class="active"{% endif %}>Month</a>
+      <a href="{{ base_path }}/year.html"{% if period == 'year' %} class="active"{% endif %}>Year</a>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">{{ page_title }}</h1>
+      <p class="page-subtitle">{{ page_subtitle }}</p>
+    </header>
+
+    {% for group in chart_groups %}
+    <section class="chart-group">
+      <h2 class="chart-group-title">{{ group.title }}</h2>
+      <div class="charts-grid">
+        {% for chart in group.charts %}
+        <article class="chart-card" data-metric="{{ chart.metric }}">
+          <header class="chart-header">
+            <h3 class="chart-title">{{ chart.label }}</h3>
+{% if chart.current %}
+            <span class="chart-current">{{ chart.current }}</span>
+{% endif %}
+          </header>
+{% if chart.use_svg %}
+          <div class="chart-svg-container">
+            <div class="chart-svg light-theme">{{ chart.svg_light | safe }}</div>
+            <div class="chart-svg dark-theme">{{ chart.svg_dark | safe }}</div>
+          </div>
+{% else %}
+          <picture>
+            <source srcset="{{ chart.src_dark }}" media="(prefers-color-scheme: dark)">
+            <img src="{{ chart.src_light }}" alt="{{ chart.label }} over the past {{ period }}" class="chart-image" loading="lazy">
+          </picture>
+{% endif %}
+          {% if chart.stats %}
+          <footer class="chart-footer">
+            {% for stat in chart.stats %}
+            <span class="chart-stat"><span class="label">{{ stat.label }}</span> <span class="value">{{ stat.value }}</span></span>
+            {% endfor %}
+          </footer>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+
+    {% include "credit.html" %}
+  </main>
+</div>
+{% endblock %}
