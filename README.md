@@ -327,6 +327,14 @@ Metrics are stored in a SQLite database at `data/state/metrics.db` with WAL mode
 
 Database migrations are stored as SQL files in `src/meshmon/migrations/` and are applied automatically when the database is initialized. Migration files follow the naming convention `NNN_description.sql` (e.g., `001_initial_schema.sql`).
 
+## Public Instances
+
+A list of publicly accessible MeshCore Stats installations. Want to add yours? [Open a pull request](https://github.com/jorijn/meshcore-stats/pulls)!
+
+| URL | Hardware | Location |
+|-----|----------|----------|
+| [meshcore.jorijn.com](https://meshcore.jorijn.com) | SenseCAP Solar Node P1 Pro + 6.5dBi Mikrotik antenna | Oosterhout, The Netherlands |
+
 ## License
 
 MIT
