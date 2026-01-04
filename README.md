@@ -41,16 +41,16 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment Variables
+### 2. Configure
 
 Copy the example configuration file and customize it:
 
 ```bash
-cp .envrc.example .envrc
-# Edit .envrc with your settings
+cp meshcore.conf.example meshcore.conf
+# Edit meshcore.conf with your settings
 ```
 
-The `.envrc.example` file contains all available configuration options with documentation. Key settings to configure:
+The configuration file is automatically loaded by the scripts. Key settings to configure:
 
 - **Connection**: `MESH_SERIAL_PORT`, `MESH_TRANSPORT`
 - **Repeater Identity**: `REPEATER_NAME`, `REPEATER_PASSWORD`
@@ -59,16 +59,16 @@ The `.envrc.example` file contains all available configuration options with docu
 - **Hardware Info**: `REPEATER_HARDWARE`, `COMPANION_HARDWARE`
 - **Radio Config**: `RADIO_FREQUENCY`, `RADIO_BANDWIDTH`, etc. (includes presets for different regions)
 
-If using direnv:
-```bash
-direnv allow
-```
+See `meshcore.conf.example` for all available options with documentation.
 
 ## Usage
 
 ### Manual Execution
 
 ```bash
+cd /path/to/meshcore-stats
+source .venv/bin/activate
+
 # Collect companion data
 python scripts/collect_companion.py
 
@@ -82,31 +82,45 @@ python scripts/render_site.py
 python scripts/render_reports.py
 ```
 
+The configuration is automatically loaded from `meshcore.conf`.
+
 ### Cron Setup
 
 Add these entries to your crontab (`crontab -e`):
 
 ```cron
-# MeshCore Stats - adjust paths as needed
-SHELL=/bin/bash
-MESHCORE_STATS=/home/user/meshcore-stats
-DIRENV=/usr/bin/direnv
+# MeshCore Stats - adjust path as needed
+MESHCORE=/home/user/meshcore-stats
 
 # Every minute: collect companion data
-* * * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/collect_companion.py
+* * * * * cd $MESHCORE && flock -w 60 /tmp/meshcore.lock .venv/bin/python scripts/collect_companion.py
 
 # Every 15 minutes: collect repeater data
-*/15 * * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/collect_repeater.py
+1,16,31,46 * * * * cd $MESHCORE && flock -w 60 /tmp/meshcore.lock .venv/bin/python scripts/collect_repeater.py
 
 # Every 5 minutes: render site
-*/5 * * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/render_site.py
+*/5 * * * * cd $MESHCORE && .venv/bin/python scripts/render_site.py
 
 # Daily at midnight: generate reports
-0 0 * * * cd $MESHCORE_STATS && $DIRENV exec . python scripts/render_reports.py
+0 0 * * * cd $MESHCORE && .venv/bin/python scripts/render_reports.py
 
 # Monthly at 3 AM on the 1st: database maintenance
-0 3 1 * * cd $MESHCORE_STATS && ./scripts/db_maintenance.sh
+0 3 1 * * $MESHCORE/scripts/db_maintenance.sh
 ```
+
+**Notes:**
+- `cd $MESHCORE` is required because paths in the config are relative to the project root
+- `flock` prevents USB serial conflicts when companion and repeater collection overlap
+
+### Docker / Container Usage
+
+When running in Docker, you can skip the config file and pass environment variables directly:
+
+```bash
+docker run -e MESH_SERIAL_PORT=/dev/ttyUSB0 -e REPEATER_NAME="My Repeater" ...
+```
+
+Environment variables always take precedence over `meshcore.conf`.
 
 ### Serving the Site
 
@@ -125,8 +139,8 @@ cd out && python3 -m http.server 8080
 meshcore-stats/
 ├── requirements.txt
 ├── README.md
-├── .envrc.example              # Example configuration (copy to .envrc)
-├── .envrc                      # Your configuration (create this)
+├── meshcore.conf.example       # Example configuration
+├── meshcore.conf               # Your configuration (create this)
 ├── src/meshmon/
 │   ├── __init__.py
 │   ├── env.py                  # Environment variable parsing

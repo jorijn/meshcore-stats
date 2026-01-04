@@ -1,11 +1,9 @@
 # MeshCore Stats Configuration
-# Copy this file to .envrc and customize for your setup:
-#   cp .envrc.example .envrc
+# Copy this file to meshcore.conf and customize for your setup:
+#   cp meshcore.conf.example meshcore.conf
 #
-# If using direnv, it will automatically load when you cd into this directory.
-# Otherwise, source it manually: source .envrc
-
-layout python3
+# This file is automatically loaded by the scripts. No need to source it manually.
+# Environment variables always take precedence over this file (useful for Docker).
 
 # =============================================================================
 # Connection Settings

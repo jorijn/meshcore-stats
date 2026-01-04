@@ -12,20 +12,17 @@
 | HTML templates | `src/meshmon/templates/*.html` | `out/*.html` |
 | JavaScript | `src/meshmon/templates/*.js` | `out/*.js` |
 
-Always edit the source templates, then regenerate with `direnv exec . python scripts/render_site.py`.
+Always edit the source templates, then regenerate with `python scripts/render_site.py`.
 
 ## Running Commands
 
-**IMPORTANT**: Always use `direnv exec .` to run Python scripts in this project. This ensures the correct virtualenv and environment variables are loaded.
-
 ```bash
-# Correct way to run scripts
-direnv exec . python scripts/render_site.py
-
-# NEVER use these (virtualenv won't be loaded correctly):
-# source .envrc && python ...
-# .direnv/python-3.12/bin/python ...
+cd /path/to/meshcore-stats
+source .venv/bin/activate
+python scripts/render_site.py
 ```
+
+Configuration is automatically loaded from `meshcore.conf` (if it exists). Environment variables always take precedence over the config file.
 
 ## Commit Message Guidelines
 
@@ -236,12 +233,13 @@ meshcore-stats/
 │       │       └── MM/
 │       │           └── index.html, report.txt, report.json  # Monthly
 │       └── companion/     # Same structure as repeater
-└── .envrc                 # Environment configuration
+├── meshcore.conf.example  # Example configuration
+└── meshcore.conf          # Your configuration (auto-loaded by scripts)
 ```
 
 ## Configuration
 
-All configuration via environment variables (see `.envrc`):
+All configuration via `meshcore.conf` or environment variables. The config file is automatically loaded by scripts; environment variables take precedence.
 
 ### Connection Settings
 - `MESH_TRANSPORT`: "serial" (default), "tcp", or "ble"
@@ -390,15 +388,12 @@ Current migrations:
 
 ## Running the Scripts
 
-Always source the environment first:
-
 ```bash
-# Using direnv (automatic)
 cd /path/to/meshcore-stats
-
-# Or manually
-source .envrc 2>/dev/null
+source .venv/bin/activate
 ```
+
+Configuration is automatically loaded from `meshcore.conf`.
 
 ### Data Collection
 
@@ -593,30 +588,36 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
    - Have routing issues (asymmetric path)
    - Be offline or rebooted
 
-2. **Environment variables not loaded**: Scripts must be run with direnv active or manually source `.envrc`
+2. **Configuration not loaded**: Ensure `meshcore.conf` exists in the project root, or set environment variables directly.
 
 3. **Empty charts**: Need at least 2 data points to display meaningful data.
 
 ## Cron Setup (Example)
 
-**Important**: Stagger companion and repeater collection to avoid USB serial conflicts.
+Use `flock` to prevent USB serial conflicts when companion and repeater collection overlap.
 
 ```cron
-# Companion: every minute at :00
-* * * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/collect_companion.py
+MESHCORE=/path/to/meshcore-stats
 
-# Repeater: every 15 minutes at :01, :16, :31, :46 (offset by 1 min to avoid USB conflict)
-1,16,31,46 * * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/collect_repeater.py
+# Companion: every minute
+* * * * * cd $MESHCORE && flock -w 60 /tmp/meshcore.lock .venv/bin/python scripts/collect_companion.py
+
+# Repeater: every 15 minutes (offset by 1 min for staggering)
+1,16,31,46 * * * * cd $MESHCORE && flock -w 60 /tmp/meshcore.lock .venv/bin/python scripts/collect_repeater.py
 
 # Charts: every 5 minutes (generates SVG charts from database)
-*/5 * * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/render_charts.py
+*/5 * * * * cd $MESHCORE && .venv/bin/python scripts/render_charts.py
 
 # HTML: every 5 minutes
-*/5 * * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/render_site.py
+*/5 * * * * cd $MESHCORE && .venv/bin/python scripts/render_site.py
 
 # Reports: daily at midnight (historical stats don't change often)
-0 0 * * * cd /path/to/meshcore-stats && .direnv/python-3.12/bin/python scripts/render_reports.py
+0 0 * * * cd $MESHCORE && .venv/bin/python scripts/render_reports.py
 ```
+
+**Notes:**
+- `cd $MESHCORE` is required because paths in the config are relative to the project root
+- `flock -w 60` waits up to 60 seconds for the lock, preventing USB serial conflicts
 
 ## Adding New Metrics
 
@@ -653,7 +654,7 @@ To change a metric from gauge to counter (or vice versa):
 
 1. Update `METRIC_CONFIG` in `src/meshmon/metrics.py` - change the `type` field
 2. Update `scale` if needed (counters often use scale=60 for per-minute display)
-3. Regenerate charts: `direnv exec . python scripts/render_charts.py`
+3. Regenerate charts: `python scripts/render_charts.py`
 
 ## Database Maintenance
 

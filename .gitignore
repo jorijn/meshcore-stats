@@ -15,6 +15,7 @@ build/
 # Environment
 .envrc
 .env
+meshcore.conf
 
 # Data directories (keep structure, ignore content)
 data/snapshots/companion/**/*.json

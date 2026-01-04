@@ -1,8 +1,89 @@
 """Environment variable parsing and configuration."""
 
 import os
+import re
+import warnings
 from pathlib import Path
 from typing import Optional
+
+
+def _parse_config_value(value: str) -> str:
+    """Parse a shell-style value, handling quotes and inline comments."""
+    value = value.strip()
+
+    if not value:
+        return ""
+
+    # Handle double-quoted strings
+    if value.startswith('"'):
+        end = value.find('"', 1)
+        if end != -1:
+            return value[1:end]
+        return value[1:]  # No closing quote
+
+    # Handle single-quoted strings
+    if value.startswith("'"):
+        end = value.find("'", 1)
+        if end != -1:
+            return value[1:end]
+        return value[1:]
+
+    # Unquoted value - strip inline comments (# preceded by whitespace)
+    comment_match = re.search(r"\s+#", value)
+    if comment_match:
+        value = value[: comment_match.start()]
+
+    return value.strip()
+
+
+def _load_config_file() -> None:
+    """Load meshcore.conf if it exists. Env vars take precedence.
+
+    The config file is expected in the project root (three levels up from this module).
+    Scripts should be run from the project directory via cron: cd $MESHCORE && .venv/bin/python ...
+    """
+    config_path = Path(__file__).resolve().parent.parent.parent / "meshcore.conf"
+
+    if not config_path.exists():
+        return
+
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+
+                # Skip comments and empty lines
+                if not line or line.startswith("#"):
+                    continue
+
+                # Remove 'export ' prefix
+                if line.startswith("export "):
+                    line = line[7:].lstrip()
+
+                # Must have KEY=value format
+                if "=" not in line:
+                    continue
+
+                key, _, value = line.partition("=")
+                key = key.strip()
+
+                # Validate key is a valid shell identifier
+                if not key or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
+                    continue
+
+                # Parse value (handles quotes, inline comments)
+                value = _parse_config_value(value)
+
+                # Only set if not already in environment
+                if key not in os.environ:
+                    os.environ[key] = value
+
+    except (OSError, UnicodeDecodeError) as e:
+        warnings.warn(f"Failed to load {config_path}: {e}")
+
+
+# Load config file at module import time, before Config is instantiated
+_load_config_file()
 
 
 def get_str(key: str, default: Optional[str] = None) -> Optional[str]:
