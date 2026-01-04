@@ -27,6 +27,123 @@ direnv exec . python scripts/render_site.py
 # .direnv/python-3.12/bin/python ...
 ```
 
+## Commit Message Guidelines
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) with [release-please](https://github.com/googleapis/release-please) for automated releases. **Commit messages directly control versioning and changelog generation.**
+
+### Format
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Commit Types
+
+| Type | Description | Version Bump | Changelog Section |
+|------|-------------|--------------|-------------------|
+| `feat` | New feature or capability | Minor (0.1.0 → 0.2.0) | Features |
+| `fix` | Bug fix | Patch (0.1.0 → 0.1.1) | Bug Fixes |
+| `perf` | Performance improvement | Patch | Performance Improvements |
+| `docs` | Documentation only | None | Documentation |
+| `style` | Code style (formatting, whitespace) | None | Styles |
+| `refactor` | Code change that neither fixes nor adds | None | Code Refactoring |
+| `test` | Adding or correcting tests | None | Tests |
+| `chore` | Maintenance tasks, dependencies | None | Miscellaneous Chores |
+| `build` | Build system or dependencies | None | Build System |
+| `ci` | CI/CD configuration | None | Continuous Integration |
+| `revert` | Reverts a previous commit | Varies | Reverts |
+
+### Breaking Changes (CRITICAL)
+
+Breaking changes trigger a **major version bump** (0.x.x → 1.0.0 or 1.x.x → 2.0.0).
+
+**Before marking a change as breaking, carefully consider:**
+
+1. **Does this change the database schema?**
+   - Schema changes are NOT breaking - migrations are applied automatically
+   - Data loss scenarios (dropping columns with important data) should be documented but are typically NOT breaking since migrations handle them
+
+2. **Does this change the configuration (environment variables)?**
+   - Adding new optional variables is NOT breaking
+   - Removing or renaming required variables IS breaking
+   - Changing default behavior that users depend on IS breaking
+
+3. **Does this change the output format?**
+   - Adding new fields to JSON output is NOT breaking
+   - Removing fields or changing structure IS breaking
+   - Changing HTML structure that external tools parse IS breaking
+
+4. **Does this require users to take action after upgrading?**
+   - If users must run migrations, update configs, or modify their setup → likely breaking
+
+**How to mark breaking changes:**
+
+```bash
+# Option 1: Add ! after the type
+feat!: remove support for legacy database schema
+
+# Option 2: Add BREAKING CHANGE footer
+feat: migrate to new metrics format
+
+BREAKING CHANGE: The old wide-table schema is no longer supported.
+Run the migration script before upgrading.
+```
+
+### Examples
+
+```bash
+# Feature (minor bump)
+feat: add noise floor metric to repeater charts
+
+# Bug fix (patch bump)
+fix: correct battery percentage calculation below 3.5V
+
+# Performance (patch bump)
+perf: reduce chart rendering time with data point caching
+
+# Documentation (no bump, in changelog)
+docs: add troubleshooting section for serial connection issues
+
+# Refactor (no bump, in changelog)
+refactor: extract chart rendering logic into separate module
+
+# Chore (no bump, in changelog)
+chore: update matplotlib to 3.9.0
+
+# Breaking change (major bump)
+feat!: change metrics database schema to EAV format
+
+BREAKING CHANGE: Existing databases must be migrated using
+scripts/migrate_to_eav.py before running the new version.
+```
+
+### Scopes (Optional)
+
+Use scopes to clarify what part of the codebase is affected:
+
+- `charts` - Chart rendering (`src/meshmon/charts.py`)
+- `db` - Database operations (`src/meshmon/db.py`)
+- `html` - HTML generation (`src/meshmon/html.py`)
+- `reports` - Report generation (`src/meshmon/reports.py`)
+- `collector` - Data collection scripts
+- `deps` - Dependencies
+
+Example: `fix(charts): prevent crash when no data points available`
+
+### Release Process
+
+1. Commits to `main` with conventional prefixes are analyzed automatically
+2. release-please creates/updates a "Release PR" with:
+   - Updated `CHANGELOG.md`
+   - Updated version in `src/meshmon/__init__.py`
+3. When the Release PR is merged:
+   - A GitHub Release is created
+   - A git tag (e.g., `v0.2.0`) is created
+
 ## Project Overview
 
 This project monitors a MeshCore LoRa mesh network consisting of:
