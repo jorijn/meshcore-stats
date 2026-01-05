@@ -5,6 +5,17 @@ on:
     branches:
       - main
 
+# Note: We use a fine-grained PAT (RELEASE_PLEASE_TOKEN) instead of GITHUB_TOKEN
+# because GITHUB_TOKEN cannot trigger other workflows (like docker-publish.yml).
+# This is a GitHub security feature to prevent infinite workflow loops.
+#
+# The PAT requires these permissions (scoped to this repository only):
+# - Contents: Read and write (for creating releases and pushing tags)
+# - Pull requests: Read and write (for creating/updating release PRs)
+#
+# To rotate: Settings > Developer settings > Fine-grained tokens
+# Recommended rotation: Every 90 days
+
 permissions:
   contents: write
   pull-requests: write
@@ -16,6 +27,6 @@ jobs:
       - name: Release Please
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
