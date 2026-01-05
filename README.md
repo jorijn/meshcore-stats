@@ -112,13 +112,137 @@ MESHCORE=/home/user/meshcore-stats
 - `cd $MESHCORE` is required because paths in the config are relative to the project root
 - `flock` prevents USB serial conflicts when companion and repeater collection overlap
 
-### Docker / Container Usage
+### Docker Installation
 
-When running in Docker, you can skip the config file and pass environment variables directly:
+The recommended way to run MeshCore Stats is with Docker Compose. This provides automatic scheduling of all collection and rendering tasks.
+
+#### Quick Start
 
 ```bash
-docker run -e MESH_SERIAL_PORT=/dev/ttyUSB0 -e REPEATER_NAME="My Repeater" ...
+# Clone the repository
+git clone https://github.com/jorijn/meshcore-stats.git
+cd meshcore-stats
+
+# Create configuration
+cp meshcore.conf.example meshcore.conf
+# Edit meshcore.conf with your settings
+
+# Create data directories with correct ownership for container (UID 1000)
+mkdir -p data/state out
+sudo chown -R 1000:1000 data out
+# Alternative: chmod -R 777 data out (less secure, use chown if possible)
+
+# Start the containers
+docker compose up -d
+
+# View logs
+docker compose logs -f
 ```
+
+The web interface will be available at `http://localhost:8080`.
+
+#### Architecture
+
+The Docker setup uses two containers:
+
+| Container | Purpose |
+|-----------|---------|
+| `meshcore-stats` | Runs Ofelia scheduler for data collection and rendering |
+| `nginx` | Serves the static website |
+
+#### Configuration
+
+Configuration is loaded from `meshcore.conf` via the `env_file` directive. Key settings:
+
+```bash
+# Required: Serial device for companion node
+MESH_SERIAL_PORT=/dev/ttyUSB0  # Adjust for your system
+
+# Required: Repeater identity
+REPEATER_NAME="Your Repeater Name"
+REPEATER_PASSWORD="your-password"
+
+# Display names (shown in UI)
+REPEATER_DISPLAY_NAME="My Repeater"
+COMPANION_DISPLAY_NAME="My Companion"
+```
+
+See `meshcore.conf.example` for all available options.
+
+#### Serial Device Access
+
+The container needs access to your USB serial device. To customize the device path without modifying the tracked `docker-compose.yml`, create a `docker-compose.override.yml` file (gitignored):
+
+```yaml
+# docker-compose.override.yml - Local overrides (not tracked in git)
+services:
+  meshcore-stats:
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0:rw  # Your device path
+```
+
+This file is automatically merged with `docker-compose.yml` when running `docker compose up`.
+
+On the host, ensure the device is accessible:
+
+```bash
+# Add user to dialout group (Linux)
+sudo usermod -a -G dialout $USER
+# Log out and back in for changes to take effect
+```
+
+#### Development Mode
+
+For local development with live code changes:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+This mounts `src/` and `scripts/` into the container, so changes take effect immediately without rebuilding.
+
+#### Image Tags
+
+Images are published to `ghcr.io/jorijn/meshcore-stats`:
+
+| Tag | Description |
+|-----|-------------|
+| `X.Y.Z` | Specific version (e.g., `0.3.0`) |
+| `latest` | Latest release |
+| `nightly` | Latest release rebuilt with OS patches |
+| `nightly-YYYYMMDD` | Dated nightly build |
+
+Version tags are rebuilt nightly to include OS security patches. For reproducible deployments, pin by SHA digest:
+
+```yaml
+image: ghcr.io/jorijn/meshcore-stats@sha256:abc123...
+```
+
+#### Volumes
+
+| Path | Purpose |
+|------|---------|
+| `./data/state` | SQLite database and circuit breaker state |
+| `./out` | Generated static site (served by nginx) |
+
+Both directories must be writable by UID 1000 (the container user). See Quick Start for setup.
+
+#### Resource Limits
+
+Default resource limits in `docker-compose.yml`:
+
+| Container | CPU | Memory |
+|-----------|-----|--------|
+| meshcore-stats | 1.0 | 512MB |
+| nginx | 0.5 | 64MB |
+
+Adjust in `docker-compose.yml` if needed.
+
+#### Important Notes
+
+- **Single instance only**: SQLite uses WAL mode which requires exclusive access. Do not run multiple container instances.
+- **Persistent storage**: Mount `./data/state` to preserve your database across container restarts.
+- **Health checks**: Both containers have health checks. Use `docker compose ps` to verify status.
 
 Environment variables always take precedence over `meshcore.conf`.
 
@@ -243,6 +367,34 @@ If repeater collection shows "cooldown active":
    rm data/state/repeater_circuit.json
    ```
 
+### Docker on macOS: Serial Devices Not Available
+
+Docker on macOS (including Docker Desktop and OrbStack) runs containers inside a Linux virtual machine. USB and serial devices connected to the Mac host cannot be passed through to this VM, so the `devices:` section in docker-compose.yml will fail with:
+
+```
+error gathering device information while adding custom device "/dev/cu.usbserial-0001": no such file or directory
+```
+
+**Workarounds:**
+
+1. **Use TCP transport**: Run a serial-to-TCP bridge on the host and configure the container to connect via TCP:
+   ```bash
+   # On macOS host, expose serial port over TCP (install socat via Homebrew)
+   socat TCP-LISTEN:5000,fork,reuseaddr OPEN:/dev/cu.usbserial-0001,rawer,nonblock,ispeed=115200,ospeed=115200
+   ```
+   Then configure in meshcore.conf:
+   ```bash
+   MESH_TRANSPORT=tcp
+   MESH_TCP_HOST=host.docker.internal
+   MESH_TCP_PORT=5000
+   ```
+
+2. **Run natively on macOS**: Use the cron-based setup instead of Docker (see "Cron Setup" section).
+
+3. **Use a Linux host**: Docker on Linux can pass through USB devices directly.
+
+Note: OrbStack has [USB passthrough on their roadmap](https://github.com/orbstack/orbstack/issues/89) but it is not yet available.
+
 ## Environment Variables Reference
 
 | Variable | Default | Description |
@@ -260,7 +412,6 @@ If repeater collection shows "cooldown active":
 | `REPEATER_NAME` | - | Repeater advertised name |
 | `REPEATER_KEY_PREFIX` | - | Repeater public key prefix |
 | `REPEATER_PASSWORD` | - | Repeater login password |
-| `REPEATER_FETCH_ACL` | 0 | Also fetch ACL from repeater |
 | **Display Names** | | |
 | `REPEATER_DISPLAY_NAME` | Repeater Node | Display name for repeater in UI |
 | `COMPANION_DISPLAY_NAME` | Companion Node | Display name for companion in UI |

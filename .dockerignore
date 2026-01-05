@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Project directories (generated/runtime)
+data/
+out/
+
+# Configuration (use environment variables in Docker)
+.envrc
+.direnv
+meshcore.conf
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development files
+.claude/
+*.log
+
+# macOS
+.DS_Store

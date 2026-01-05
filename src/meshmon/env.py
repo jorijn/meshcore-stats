@@ -145,7 +145,6 @@ class Config:
         self.repeater_name = get_str("REPEATER_NAME")
         self.repeater_key_prefix = get_str("REPEATER_KEY_PREFIX")
         self.repeater_password = get_str("REPEATER_PASSWORD")
-        self.repeater_fetch_acl = get_bool("REPEATER_FETCH_ACL", False)
 
         # Intervals and timeouts
         self.companion_step = get_int("COMPANION_STEP", 60)
@@ -156,9 +155,9 @@ class Config:
         self.remote_cb_fails = get_int("REMOTE_CB_FAILS", 6)
         self.remote_cb_cooldown_s = get_int("REMOTE_CB_COOLDOWN_S", 3600)
 
-        # Paths
-        self.state_dir = get_path("STATE_DIR", "./data/state")
-        self.out_dir = get_path("OUT_DIR", "./out")
+        # Paths (defaults are Docker container paths; native installs override via config)
+        self.state_dir = get_path("STATE_DIR", "/data/state")
+        self.out_dir = get_path("OUT_DIR", "/out")
 
         # Report location metadata
         self.report_location_name = get_str(

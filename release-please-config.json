@@ -9,6 +9,11 @@
           "type": "generic",
           "path": "src/meshmon/__init__.py",
           "glob": false
+        },
+        {
+          "type": "generic",
+          "path": "docker-compose.yml",
+          "glob": false
         }
       ],
       "changelog-sections": [

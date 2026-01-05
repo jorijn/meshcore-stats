@@ -233,20 +233,6 @@ async def collect_repeater() -> int:
         else:
             log.warn(f"req_status_sync failed: {err}")
 
-        # Optional ACL query (using _sync version)
-        if cfg.repeater_fetch_acl:
-            log.debug("Querying repeater ACL...")
-            success, payload, err = await query_repeater_with_retry(
-                mc,
-                contact,
-                "req_acl_sync",
-                lambda: cmd.req_acl_sync(contact, timeout=0, min_timeout=cfg.remote_timeout_s),
-            )
-            if success:
-                log.debug(f"req_acl_sync: {payload}")
-            else:
-                log.debug(f"req_acl_sync failed: {err}")
-
         # Update circuit breaker
         if status_ok:
             cb.record_success()

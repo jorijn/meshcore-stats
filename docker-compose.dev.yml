@@ -1,0 +1,29 @@
+# MeshCore Stats - Development Override
+#
+# Use this file for local development with live code changes.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.development.yml up --build
+#
+# This override:
+# - Builds the image locally instead of pulling from ghcr.io
+# - Mounts src/ and scripts/ for live code changes (no rebuild needed)
+
+services:
+  meshcore-stats:
+    # Build locally instead of using published image
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # Remove the image reference (use built image)
+    image: meshcore-stats:development
+
+    # Mount source code for live development
+    # Changes to Python files take effect immediately (no rebuild needed)
+    volumes:
+      - ./data/state:/data/state
+      - ./out:/out
+      # Development mounts (read-only to prevent accidental writes)
+      - ./src:/app/src:ro
+      - ./scripts:/app/scripts:ro
