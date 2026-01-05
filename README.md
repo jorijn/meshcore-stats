@@ -328,7 +328,7 @@ docker compose restart meshcore-stats
 
 ```
 ┌─────────────────┐     LoRa      ┌─────────────────┐
-│   Companion     │◄────────────►│    Repeater     │
+│   Companion     │◄─────────────►│    Repeater     │
 │  (USB Serial)   │               │   (Remote)      │
 └────────┬────────┘               └─────────────────┘
          │
