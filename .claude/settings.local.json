@@ -9,7 +9,12 @@
       "Bash(find:*)",
       "Bash(tree:*)",
       "Skill(frontend-design)",
-      "Skill(frontend-design:*)"
+      "Skill(frontend-design:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh release view:*)",
+      "Bash(gh release list:*)",
+      "Bash(gh workflow list:*)"
     ]
   }
 }

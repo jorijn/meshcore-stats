@@ -171,17 +171,20 @@ See `meshcore.conf.example` for all available options.
 
 #### Serial Device Access
 
-The container needs access to your USB serial device. To customize the device path without modifying the tracked `docker-compose.yml`, create a `docker-compose.override.yml` file (gitignored):
+For serial transport, the container needs access to your USB serial device. Create a `docker-compose.override.yml` file (gitignored) to specify your device:
 
 ```yaml
-# docker-compose.override.yml - Local overrides (not tracked in git)
+# docker-compose.override.yml - Local device configuration (not tracked in git)
 services:
   meshcore-stats:
     devices:
-      - /dev/ttyACM0:/dev/ttyACM0:rw  # Your device path
+      - /dev/ttyUSB0:/dev/ttyUSB0:rw  # Linux example
+      # - /dev/ttyACM0:/dev/ttyACM0:rw  # Alternative Linux device
 ```
 
 This file is automatically merged with `docker-compose.yml` when running `docker compose up`.
+
+> **Note**: TCP transport users (e.g., macOS with socat) don't need a devices section - just configure `MESH_TRANSPORT=tcp` in your `meshcore.conf`.
 
 On the host, ensure the device is accessible:
 

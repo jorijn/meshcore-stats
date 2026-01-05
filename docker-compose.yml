@@ -1,12 +1,13 @@
 # MeshCore Stats - Docker Compose Configuration
 #
 # Production deployment using published container image.
-# For local development, use: docker compose -f docker-compose.yml -f docker-compose.development.yml up
+# For local development, use: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
 # Prerequisites:
 # 1. Copy meshcore.conf.example to meshcore.conf and configure
-# 2. Ensure your user has access to the serial device (dialout group)
-# 3. Create data directories with correct ownership:
+# 2. For serial transport: Create docker-compose.override.yml with your device (see README)
+# 3. Ensure your user has access to the serial device (dialout group)
+# 4. Create data directories with correct ownership:
 #    mkdir -p ./data/state ./out && sudo chown -R 1000:1000 ./data ./out
 
 services:
@@ -22,10 +23,8 @@ services:
     env_file:
       - meshcore.conf
 
-    # Serial device for companion node communication
-    devices:
-      # Update to match your serial device (e.g., /dev/ttyACM0, /dev/cu.usbserial-*)
-      - /dev/ttyUSB0:/dev/ttyUSB0:rw
+    # NOTE: Serial device must be added via docker-compose.override.yml
+    # See README.md for examples. TCP transport users don't need devices.
 
     volumes:
       # Persistent storage for SQLite database and circuit breaker state

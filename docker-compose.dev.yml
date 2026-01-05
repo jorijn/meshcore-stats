@@ -3,7 +3,7 @@
 # Use this file for local development with live code changes.
 #
 # Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.development.yml up --build
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
 # This override:
 # - Builds the image locally instead of pulling from ghcr.io
