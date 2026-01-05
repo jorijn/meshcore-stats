@@ -1,7 +1,10 @@
 """MeshCore client wrapper with safe command execution and contact lookup."""
 
 import asyncio
-from typing import Any, Optional, Callable, Coroutine
+import fcntl
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any, AsyncIterator, Callable, Coroutine, Optional
 
 from .env import get_config
 from . import log
@@ -98,6 +101,92 @@ async def connect_from_env() -> Optional[Any]:
     except Exception as e:
         log.error(f"Failed to connect: {e}")
         return None
+
+
+async def _acquire_lock_async(
+    lock_file,
+    timeout: float = 60.0,
+    poll_interval: float = 0.1,
+) -> None:
+    """Acquire exclusive file lock without blocking the event loop.
+
+    Uses non-blocking LOCK_NB with async polling to avoid freezing the event loop.
+
+    Args:
+        lock_file: Open file handle to lock
+        timeout: Maximum seconds to wait for lock
+        poll_interval: Seconds between lock attempts
+
+    Raises:
+        TimeoutError: If lock cannot be acquired within timeout
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+
+    while True:
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            if loop.time() >= deadline:
+                raise TimeoutError(
+                    f"Could not acquire serial lock within {timeout}s. "
+                    "Another process may be using the serial port."
+                )
+            await asyncio.sleep(poll_interval)
+
+
+@asynccontextmanager
+async def connect_with_lock(
+    lock_timeout: float = 60.0,
+) -> AsyncIterator[Optional[Any]]:
+    """Connect to MeshCore with serial port locking to prevent concurrent access.
+
+    For serial transport: Acquires exclusive file lock before connecting.
+    For TCP/BLE: No locking needed (protocol handles multiple connections).
+
+    Args:
+        lock_timeout: Maximum seconds to wait for serial lock
+
+    Yields:
+        MeshCore client instance, or None if connection failed
+    """
+    cfg = get_config()
+    lock_file = None
+    mc = None
+    needs_lock = cfg.mesh_transport.lower() == "serial"
+
+    try:
+        if needs_lock:
+            lock_path: Path = cfg.state_dir / "serial.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Use 'a' mode: doesn't truncate, creates if missing
+            lock_file = open(lock_path, "a")
+            try:
+                await _acquire_lock_async(lock_file, timeout=lock_timeout)
+                log.debug(f"Acquired serial lock: {lock_path}")
+            except Exception:
+                # If lock acquisition fails, close file before re-raising
+                lock_file.close()
+                lock_file = None
+                raise
+
+        mc = await connect_from_env()
+        yield mc
+
+    finally:
+        # Disconnect first (while we still hold the lock)
+        if mc is not None and hasattr(mc, "disconnect"):
+            try:
+                await mc.disconnect()
+            except Exception as e:
+                log.debug(f"Error during disconnect (ignored): {e}")
+
+        # Release lock by closing the file (close() auto-releases flock)
+        if lock_file is not None:
+            lock_file.close()
+            log.debug("Released serial lock")
 
 
 async def run_command(

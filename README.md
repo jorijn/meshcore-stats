@@ -184,10 +184,10 @@ Add to your crontab (`crontab -e`):
 MESHCORE=/path/to/meshcore-stats
 
 # Companion: every minute
-* * * * * cd $MESHCORE && flock -w 60 /tmp/meshcore.lock .venv/bin/python scripts/collect_companion.py
+* * * * * cd $MESHCORE && .venv/bin/python scripts/collect_companion.py
 
 # Repeater: every 15 minutes
-1,16,31,46 * * * * cd $MESHCORE && flock -w 60 /tmp/meshcore.lock .venv/bin/python scripts/collect_repeater.py
+1,16,31,46 * * * * cd $MESHCORE && .venv/bin/python scripts/collect_repeater.py
 
 # Charts: every 5 minutes
 */5 * * * * cd $MESHCORE && .venv/bin/python scripts/render_charts.py

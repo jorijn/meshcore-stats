@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from meshmon.env import get_config
 from meshmon import log
 from meshmon.meshcore_client import (
-    connect_from_env,
+    connect_with_lock,
     run_command,
     get_contact_by_name,
     get_contact_by_key_prefix,
@@ -161,97 +161,90 @@ async def collect_repeater() -> int:
         # Skip collection - no metrics to write
         return 0
 
-    # Connect to companion
-    log.debug("Connecting to companion node...")
-    mc = await connect_from_env()
-
-    if mc is None:
-        log.error("Failed to connect to companion node")
-        return 1
-
     # Metrics to insert (firmware field names from req_status_sync)
     metrics: dict[str, float] = {}
     node_name = "unknown"
     status_ok = False
 
-    # Commands are accessed via mc.commands
-    cmd = mc.commands
-
-    try:
-        # Initialize (appstart already called during connect)
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.send_appstart(), "send_appstart"
-        )
-        if not ok:
-            log.error(f"appstart failed: {err}")
-
-        # Find repeater contact
-        contact = await find_repeater_contact(mc)
-
-        if contact is None:
-            log.error("Cannot find repeater contact")
+    # Connect to companion
+    log.debug("Connecting to companion node...")
+    async with connect_with_lock() as mc:
+        if mc is None:
+            log.error("Failed to connect to companion node")
             return 1
 
-        # Store contact info
-        contact_info = extract_contact_info(contact)
-        node_name = contact_info.get("adv_name", "unknown")
+        # Commands are accessed via mc.commands
+        cmd = mc.commands
 
-        log.debug(f"Found repeater: {node_name}")
+        try:
+            # Initialize (appstart already called during connect)
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.send_appstart(), "send_appstart"
+            )
+            if not ok:
+                log.error(f"appstart failed: {err}")
 
-        # Optional login (if command exists)
-        if cfg.repeater_password and hasattr(cmd, "send_login"):
-            log.debug("Attempting login...")
-            try:
-                ok, evt_type, payload, err = await run_command(
-                    mc,
-                    cmd.send_login(contact, cfg.repeater_password),
-                    "send_login",
-                )
-                if ok:
-                    log.debug("Login successful")
-                else:
-                    log.debug(f"Login failed or not supported: {err}")
-            except Exception as e:
-                log.debug(f"Login not supported: {e}")
+            # Find repeater contact
+            contact = await find_repeater_contact(mc)
 
-        # Query status (using _sync version which returns payload directly)
-        # Use timeout=0 to let the device suggest timeout, with min_timeout as floor
-        log.debug("Querying repeater status...")
-        success, payload, err = await query_repeater_with_retry(
-            mc,
-            contact,
-            "req_status_sync",
-            lambda: cmd.req_status_sync(contact, timeout=0, min_timeout=cfg.remote_timeout_s),
-        )
-        if success and payload and isinstance(payload, dict):
-            status_ok = True
-            # Insert all numeric fields from status response
-            for key, value in payload.items():
-                if isinstance(value, (int, float)):
-                    metrics[key] = float(value)
-            log.debug(f"req_status_sync: {payload}")
-        else:
-            log.warn(f"req_status_sync failed: {err}")
+            if contact is None:
+                log.error("Cannot find repeater contact")
+                return 1
 
-        # Update circuit breaker
-        if status_ok:
-            cb.record_success()
-            log.debug("Circuit breaker: recorded success")
-        else:
+            # Store contact info
+            contact_info = extract_contact_info(contact)
+            node_name = contact_info.get("adv_name", "unknown")
+
+            log.debug(f"Found repeater: {node_name}")
+
+            # Optional login (if command exists)
+            if cfg.repeater_password and hasattr(cmd, "send_login"):
+                log.debug("Attempting login...")
+                try:
+                    ok, evt_type, payload, err = await run_command(
+                        mc,
+                        cmd.send_login(contact, cfg.repeater_password),
+                        "send_login",
+                    )
+                    if ok:
+                        log.debug("Login successful")
+                    else:
+                        log.debug(f"Login failed or not supported: {err}")
+                except Exception as e:
+                    log.debug(f"Login not supported: {e}")
+
+            # Query status (using _sync version which returns payload directly)
+            # Use timeout=0 to let the device suggest timeout, with min_timeout as floor
+            log.debug("Querying repeater status...")
+            success, payload, err = await query_repeater_with_retry(
+                mc,
+                contact,
+                "req_status_sync",
+                lambda: cmd.req_status_sync(contact, timeout=0, min_timeout=cfg.remote_timeout_s),
+            )
+            if success and payload and isinstance(payload, dict):
+                status_ok = True
+                # Insert all numeric fields from status response
+                for key, value in payload.items():
+                    if isinstance(value, (int, float)):
+                        metrics[key] = float(value)
+                log.debug(f"req_status_sync: {payload}")
+            else:
+                log.warn(f"req_status_sync failed: {err}")
+
+            # Update circuit breaker
+            if status_ok:
+                cb.record_success()
+                log.debug("Circuit breaker: recorded success")
+            else:
+                cb.record_failure(cfg.remote_cb_fails, cfg.remote_cb_cooldown_s)
+                log.debug(f"Circuit breaker: recorded failure ({cb.consecutive_failures}/{cfg.remote_cb_fails})")
+
+        except Exception as e:
+            log.error(f"Error during collection: {e}")
             cb.record_failure(cfg.remote_cb_fails, cfg.remote_cb_cooldown_s)
-            log.debug(f"Circuit breaker: recorded failure ({cb.consecutive_failures}/{cfg.remote_cb_fails})")
 
-    except Exception as e:
-        log.error(f"Error during collection: {e}")
-        cb.record_failure(cfg.remote_cb_fails, cfg.remote_cb_cooldown_s)
-
-    finally:
-        # Close connection
-        if hasattr(mc, "disconnect"):
-            try:
-                await mc.disconnect()
-            except Exception:
-                pass
+    # Connection closed and lock released by context manager
 
     # Print summary
     summary_parts = [f"ts={ts}"]

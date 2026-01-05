@@ -694,16 +694,14 @@ meshcore-cli -s /dev/ttyACM0 reset_path "repeater name"
 
 ## Cron Setup (Example)
 
-Use `flock` to prevent USB serial conflicts when companion and repeater collection overlap.
-
 ```cron
 MESHCORE=/path/to/meshcore-stats
 
 # Companion: every minute
-* * * * * cd $MESHCORE && flock -w 60 /tmp/meshcore.lock .venv/bin/python scripts/collect_companion.py
+* * * * * cd $MESHCORE && .venv/bin/python scripts/collect_companion.py
 
 # Repeater: every 15 minutes (offset by 1 min for staggering)
-1,16,31,46 * * * * cd $MESHCORE && flock -w 60 /tmp/meshcore.lock .venv/bin/python scripts/collect_repeater.py
+1,16,31,46 * * * * cd $MESHCORE && .venv/bin/python scripts/collect_repeater.py
 
 # Charts: every 5 minutes (generates SVG charts from database)
 */5 * * * * cd $MESHCORE && .venv/bin/python scripts/render_charts.py
@@ -717,7 +715,7 @@ MESHCORE=/path/to/meshcore-stats
 
 **Notes:**
 - `cd $MESHCORE` is required because paths in the config are relative to the project root
-- `flock -w 60` waits up to 60 seconds for the lock, preventing USB serial conflicts
+- Serial port locking is handled automatically via `fcntl.flock()` in Python (no external `flock` needed)
 
 ## Adding New Metrics
 

@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from meshmon.env import get_config
 from meshmon import log
-from meshmon.meshcore_client import connect_from_env, run_command
+from meshmon.meshcore_client import connect_with_lock, run_command
 from meshmon.db import init_db, insert_metrics
 
 
@@ -39,138 +39,131 @@ async def collect_companion() -> int:
     cfg = get_config()
     ts = int(time.time())
 
-    log.debug("Connecting to companion node...")
-    mc = await connect_from_env()
-
-    if mc is None:
-        log.error("Failed to connect to companion node")
-        return 1
-
     # Metrics to insert (firmware field names)
     metrics: dict[str, float] = {}
     commands_succeeded = 0
 
-    # Commands are accessed via mc.commands
-    cmd = mc.commands
+    log.debug("Connecting to companion node...")
+    async with connect_with_lock() as mc:
+        if mc is None:
+            log.error("Failed to connect to companion node")
+            return 1
 
-    try:
-        # send_appstart (already called during connect, but call again to get self_info)
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.send_appstart(), "send_appstart"
-        )
-        if ok:
-            commands_succeeded += 1
-            log.debug(f"appstart: {evt_type}")
-        else:
-            log.error(f"appstart failed: {err}")
+        # Commands are accessed via mc.commands
+        cmd = mc.commands
 
-        # send_device_query
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.send_device_query(), "send_device_query"
-        )
-        if ok:
-            commands_succeeded += 1
-            log.debug(f"device_query: {payload}")
-        else:
-            log.error(f"device_query failed: {err}")
+        try:
+            # send_appstart (already called during connect, but call again to get self_info)
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.send_appstart(), "send_appstart"
+            )
+            if ok:
+                commands_succeeded += 1
+                log.debug(f"appstart: {evt_type}")
+            else:
+                log.error(f"appstart failed: {err}")
 
-        # get_bat
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.get_bat(), "get_bat"
-        )
-        if ok:
-            commands_succeeded += 1
-            log.debug(f"get_bat: {payload}")
-        else:
-            log.error(f"get_bat failed: {err}")
+            # send_device_query
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.send_device_query(), "send_device_query"
+            )
+            if ok:
+                commands_succeeded += 1
+                log.debug(f"device_query: {payload}")
+            else:
+                log.error(f"device_query failed: {err}")
 
-        # get_time
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.get_time(), "get_time"
-        )
-        if ok:
-            commands_succeeded += 1
-            log.debug(f"get_time: {payload}")
-        else:
-            log.error(f"get_time failed: {err}")
+            # get_bat
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.get_bat(), "get_bat"
+            )
+            if ok:
+                commands_succeeded += 1
+                log.debug(f"get_bat: {payload}")
+            else:
+                log.error(f"get_bat failed: {err}")
 
-        # get_self_telemetry
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.get_self_telemetry(), "get_self_telemetry"
-        )
-        if ok:
-            commands_succeeded += 1
-            log.debug(f"get_self_telemetry: {payload}")
-        else:
-            log.error(f"get_self_telemetry failed: {err}")
+            # get_time
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.get_time(), "get_time"
+            )
+            if ok:
+                commands_succeeded += 1
+                log.debug(f"get_time: {payload}")
+            else:
+                log.error(f"get_time failed: {err}")
 
-        # get_custom_vars
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.get_custom_vars(), "get_custom_vars"
-        )
-        if ok:
-            commands_succeeded += 1
-            log.debug(f"get_custom_vars: {payload}")
-        else:
-            log.debug(f"get_custom_vars failed: {err}")
+            # get_self_telemetry
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.get_self_telemetry(), "get_self_telemetry"
+            )
+            if ok:
+                commands_succeeded += 1
+                log.debug(f"get_self_telemetry: {payload}")
+            else:
+                log.error(f"get_self_telemetry failed: {err}")
 
-        # get_contacts - count contacts
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.get_contacts(), "get_contacts"
-        )
-        if ok:
-            commands_succeeded += 1
-            contacts_count = len(payload) if payload else 0
-            metrics["contacts"] = float(contacts_count)
-            log.debug(f"get_contacts: found {contacts_count} contacts")
-        else:
-            log.error(f"get_contacts failed: {err}")
+            # get_custom_vars
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.get_custom_vars(), "get_custom_vars"
+            )
+            if ok:
+                commands_succeeded += 1
+                log.debug(f"get_custom_vars: {payload}")
+            else:
+                log.debug(f"get_custom_vars failed: {err}")
 
-        # Get statistics - these contain the main metrics
-        # Core stats (battery_mv, uptime_secs, errors, queue_len)
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.get_stats_core(), "get_stats_core"
-        )
-        if ok and payload and isinstance(payload, dict):
-            commands_succeeded += 1
-            # Insert all numeric fields from stats_core
-            for key, value in payload.items():
-                if isinstance(value, (int, float)):
-                    metrics[key] = float(value)
-            log.debug(f"stats_core: {payload}")
+            # get_contacts - count contacts
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.get_contacts(), "get_contacts"
+            )
+            if ok:
+                commands_succeeded += 1
+                contacts_count = len(payload) if payload else 0
+                metrics["contacts"] = float(contacts_count)
+                log.debug(f"get_contacts: found {contacts_count} contacts")
+            else:
+                log.error(f"get_contacts failed: {err}")
 
-        # Radio stats (noise_floor, last_rssi, last_snr, tx_air_secs, rx_air_secs)
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.get_stats_radio(), "get_stats_radio"
-        )
-        if ok and payload and isinstance(payload, dict):
-            commands_succeeded += 1
-            for key, value in payload.items():
-                if isinstance(value, (int, float)):
-                    metrics[key] = float(value)
-            log.debug(f"stats_radio: {payload}")
+            # Get statistics - these contain the main metrics
+            # Core stats (battery_mv, uptime_secs, errors, queue_len)
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.get_stats_core(), "get_stats_core"
+            )
+            if ok and payload and isinstance(payload, dict):
+                commands_succeeded += 1
+                # Insert all numeric fields from stats_core
+                for key, value in payload.items():
+                    if isinstance(value, (int, float)):
+                        metrics[key] = float(value)
+                log.debug(f"stats_core: {payload}")
 
-        # Packet stats (recv, sent, flood_tx, direct_tx, flood_rx, direct_rx)
-        ok, evt_type, payload, err = await run_command(
-            mc, cmd.get_stats_packets(), "get_stats_packets"
-        )
-        if ok and payload and isinstance(payload, dict):
-            commands_succeeded += 1
-            for key, value in payload.items():
-                if isinstance(value, (int, float)):
-                    metrics[key] = float(value)
-            log.debug(f"stats_packets: {payload}")
+            # Radio stats (noise_floor, last_rssi, last_snr, tx_air_secs, rx_air_secs)
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.get_stats_radio(), "get_stats_radio"
+            )
+            if ok and payload and isinstance(payload, dict):
+                commands_succeeded += 1
+                for key, value in payload.items():
+                    if isinstance(value, (int, float)):
+                        metrics[key] = float(value)
+                log.debug(f"stats_radio: {payload}")
 
-    except Exception as e:
-        log.error(f"Error during collection: {e}")
+            # Packet stats (recv, sent, flood_tx, direct_tx, flood_rx, direct_rx)
+            ok, evt_type, payload, err = await run_command(
+                mc, cmd.get_stats_packets(), "get_stats_packets"
+            )
+            if ok and payload and isinstance(payload, dict):
+                commands_succeeded += 1
+                for key, value in payload.items():
+                    if isinstance(value, (int, float)):
+                        metrics[key] = float(value)
+                log.debug(f"stats_packets: {payload}")
 
-    finally:
-        # Close connection
-        if hasattr(mc, "disconnect"):
-            try:
-                await mc.disconnect()
-            except Exception:
-                pass
+        except Exception as e:
+            log.error(f"Error during collection: {e}")
+
+    # Connection closed and lock released by context manager
 
     # Print summary
     summary_parts = [f"ts={ts}"]
