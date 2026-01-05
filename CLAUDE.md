@@ -171,6 +171,101 @@ Phase 3: Render  → Static HTML site (inline SVG)
 Phase 4: Render  → Reports (monthly/yearly statistics)
 ```
 
+## Docker Architecture
+
+The project provides Docker containerization for easy deployment. Two containers work together:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Docker Compose                               │
+│  ┌─────────────────────┐    ┌─────────────────────────────────┐ │
+│  │   meshcore-stats    │    │           nginx                  │ │
+│  │  ┌───────────────┐  │    │                                  │ │
+│  │  │    Ofelia     │  │    │   Serves static site on :8080   │ │
+│  │  │  (scheduler)  │  │    │                                  │ │
+│  │  └───────┬───────┘  │    └──────────────▲──────────────────┘ │
+│  │          │          │                    │                    │
+│  │   ┌──────▼──────┐   │         ┌─────────┴─────────┐          │
+│  │   │   Python    │   │         │   output_data     │          │
+│  │   │   Scripts   │───┼────────►│   (named volume)  │          │
+│  │   └─────────────┘   │         └───────────────────┘          │
+│  │          │          │                                         │
+│  └──────────┼──────────┘                                         │
+│             │                                                     │
+│    ┌────────▼────────┐                                           │
+│    │  ./data/state   │                                           │
+│    │  (bind mount)   │                                           │
+│    └─────────────────┘                                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Container Files
+
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Multi-stage build: Python + Ofelia scheduler |
+| `docker-compose.yml` | Production deployment using published ghcr.io image |
+| `docker-compose.development.yml` | Development override for local builds |
+| `docker/ofelia.ini` | Scheduler configuration (cron jobs) |
+| `docker/nginx.conf` | nginx configuration for static site serving |
+| `.dockerignore` | Files excluded from Docker build context |
+
+### docker-compose.yml vs docker-compose.development.yml
+
+**Production** (`docker-compose.yml`):
+- Uses published image from `ghcr.io/jorijn/meshcore-stats`
+- Image version managed by release-please via `x-release-please-version` placeholder
+- Suitable for end users
+
+**Development** (`docker-compose.development.yml`):
+- Override file that builds locally instead of pulling from registry
+- Mounts `src/` and `scripts/` for live code changes
+- Usage: `docker compose -f docker-compose.yml -f docker-compose.development.yml up --build`
+
+### Ofelia Scheduler
+
+[Ofelia](https://github.com/mcuadros/ofelia) is a lightweight job scheduler designed for Docker. It replaces cron for container environments.
+
+Jobs configured in `docker/ofelia.ini`:
+- `collect-companion`: Every minute (with `no-overlap=true`)
+- `collect-repeater`: Every 15 minutes at :01, :16, :31, :46 (with `no-overlap=true`)
+- `render-charts`: Every 5 minutes
+- `render-site`: Every 5 minutes
+- `render-reports`: Daily at midnight
+- `db-maintenance`: Monthly at 3 AM on the 1st
+
+### GitHub Actions Workflow
+
+`.github/workflows/docker-publish.yml` builds and publishes Docker images:
+
+| Trigger | Tags Created |
+|---------|--------------|
+| Release | `X.Y.Z`, `X.Y`, `latest` |
+| Nightly (4 AM UTC) | Rebuilds all version tags + `nightly`, `nightly-YYYYMMDD` |
+| Manual | `sha-xxxxxx` |
+
+**Nightly rebuilds** ensure version tags always include the latest OS security patches. This is a common pattern used by official Docker images (nginx, postgres, node). Users needing reproducibility should pin by SHA digest or use dated nightly tags.
+
+All GitHub Actions are pinned by full SHA for security. Dependabot can be configured to update these automatically.
+
+### Version Placeholder
+
+The version in `docker-compose.yml` uses release-please's placeholder syntax:
+```yaml
+image: ghcr.io/jorijn/meshcore-stats:0.3.0 # x-release-please-version
+```
+
+This is automatically updated when a new release is created.
+
+### Agent Review Guidelines
+
+When reviewing Docker-related changes, always provide the **full plan or implementation** to review agents. Do not summarize or abbreviate - agents need complete context to provide accurate feedback.
+
+Relevant agents for Docker reviews:
+- **k8s-security-reviewer**: Container security, RBAC, secrets handling
+- **cicd-pipeline-specialist**: GitHub Actions workflows, build pipelines
+- **python-code-reviewer**: Dockerfile Python-specific issues (venv PATH, runtime libs)
+
 ## Directory Structure
 
 ```

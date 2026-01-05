@@ -112,13 +112,128 @@ MESHCORE=/home/user/meshcore-stats
 - `cd $MESHCORE` is required because paths in the config are relative to the project root
 - `flock` prevents USB serial conflicts when companion and repeater collection overlap
 
-### Docker / Container Usage
+### Docker Installation
 
-When running in Docker, you can skip the config file and pass environment variables directly:
+The recommended way to run MeshCore Stats is with Docker Compose. This provides automatic scheduling of all collection and rendering tasks.
+
+#### Quick Start
 
 ```bash
-docker run -e MESH_SERIAL_PORT=/dev/ttyUSB0 -e REPEATER_NAME="My Repeater" ...
+# Clone the repository
+git clone https://github.com/jorijn/meshcore-stats.git
+cd meshcore-stats
+
+# Create configuration
+cp meshcore.conf.example meshcore.conf
+# Edit meshcore.conf with your settings
+
+# Create data directory
+mkdir -p data/state
+
+# Start the containers
+docker compose up -d
+
+# View logs
+docker compose logs -f
 ```
+
+The web interface will be available at `http://localhost:8080`.
+
+#### Architecture
+
+The Docker setup uses two containers:
+
+| Container | Purpose |
+|-----------|---------|
+| `meshcore-stats` | Runs Ofelia scheduler for data collection and rendering |
+| `nginx` | Serves the static website |
+
+#### Configuration
+
+Configuration is loaded from `meshcore.conf` via the `env_file` directive. Key settings:
+
+```bash
+# Required: Serial device for companion node
+MESH_SERIAL_PORT=/dev/ttyUSB0  # Adjust for your system
+
+# Required: Repeater identity
+REPEATER_NAME="Your Repeater Name"
+REPEATER_PASSWORD="your-password"
+
+# Display names (shown in UI)
+REPEATER_DISPLAY_NAME="My Repeater"
+COMPANION_DISPLAY_NAME="My Companion"
+```
+
+See `meshcore.conf.example` for all available options.
+
+#### Serial Device Access
+
+The container needs access to your USB serial device. Update `docker-compose.yml` if your device path differs:
+
+```yaml
+devices:
+  - /dev/ttyACM0:/dev/ttyACM0:rwm  # Adjust path as needed
+```
+
+On the host, ensure the device is accessible:
+
+```bash
+# Add user to dialout group (Linux)
+sudo usermod -a -G dialout $USER
+# Log out and back in for changes to take effect
+```
+
+#### Development Mode
+
+For local development with live code changes:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.development.yml up --build
+```
+
+This mounts `src/` and `scripts/` into the container, so changes take effect immediately without rebuilding.
+
+#### Image Tags
+
+Images are published to `ghcr.io/jorijn/meshcore-stats`:
+
+| Tag | Description |
+|-----|-------------|
+| `X.Y.Z` | Specific version (e.g., `0.3.0`) |
+| `latest` | Latest release |
+| `nightly` | Latest release rebuilt with OS patches |
+| `nightly-YYYYMMDD` | Dated nightly build |
+
+Version tags are rebuilt nightly to include OS security patches. For reproducible deployments, pin by SHA digest:
+
+```yaml
+image: ghcr.io/jorijn/meshcore-stats@sha256:abc123...
+```
+
+#### Volumes
+
+| Path | Purpose |
+|------|---------|
+| `./data/state` | SQLite database and circuit breaker state |
+| `output_data` | Generated static site (shared with nginx) |
+
+#### Resource Limits
+
+Default resource limits in `docker-compose.yml`:
+
+| Container | CPU | Memory |
+|-----------|-----|--------|
+| meshcore-stats | 1.0 | 512MB |
+| nginx | 0.5 | 64MB |
+
+Adjust in `docker-compose.yml` if needed.
+
+#### Important Notes
+
+- **Single instance only**: SQLite uses WAL mode which requires exclusive access. Do not run multiple container instances.
+- **Persistent storage**: Mount `./data/state` to preserve your database across container restarts.
+- **Health checks**: Both containers have health checks. Use `docker compose ps` to verify status.
 
 Environment variables always take precedence over `meshcore.conf`.
 

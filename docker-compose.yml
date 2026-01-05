@@ -1,0 +1,138 @@
+# MeshCore Stats - Docker Compose Configuration
+#
+# Production deployment using published container image.
+# For local development, use: docker compose -f docker-compose.yml -f docker-compose.development.yml up
+#
+# Prerequisites:
+# 1. Copy meshcore.conf.example to meshcore.conf and configure
+# 2. Ensure your user has access to the serial device (dialout group)
+# 3. Create data directory: mkdir -p ./data/state
+
+services:
+  # ==========================================================================
+  # MeshCore Stats - Data collection and rendering
+  # ==========================================================================
+  meshcore-stats:
+    image: ghcr.io/jorijn/meshcore-stats:0.3.0 # x-release-please-version
+    container_name: meshcore-stats
+    restart: unless-stopped
+
+    # Load configuration from meshcore.conf
+    env_file:
+      - meshcore.conf
+
+    # Serial device for companion node communication
+    devices:
+      # Update to match your serial device (e.g., /dev/ttyACM0, /dev/cu.usbserial-*)
+      - /dev/ttyUSB0:/dev/ttyUSB0:rw
+
+    volumes:
+      # Persistent storage for SQLite database and circuit breaker state
+      - ./data/state:/data/state
+      # Shared volume for generated static site (used by nginx)
+      - output_data:/out
+
+    # Run as meshmon user (UID 1000)
+    user: "1000:1000"
+
+    # Add dialout group for serial port access
+    group_add:
+      - dialout
+
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+    # Logging limits to prevent disk exhaustion
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; sqlite3.connect('/data/state/metrics.db').execute('SELECT 1')"]
+      interval: 5m
+      timeout: 30s
+      start_period: 60s
+      retries: 3
+
+  # ==========================================================================
+  # nginx - Static site server
+  # ==========================================================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: meshcore-stats-nginx
+    restart: unless-stopped
+
+    # Run as nginx user (UID 101 in Alpine nginx image)
+    user: "101:101"
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+      # Mount generated static site from meshcore-stats container
+      - output_data:/usr/share/nginx/html:ro
+      # Custom nginx configuration
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # NET_BIND_SERVICE not needed for port 8080 (unprivileged)
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:noexec,nosuid,size=16m
+      - /var/run:noexec,nosuid,size=1m
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 64M
+        reservations:
+          cpus: "0.05"
+          memory: 16M
+
+    # Logging limits
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+
+    depends_on:
+      meshcore-stats:
+        condition: service_healthy
+
+# Named volume for sharing generated site between containers
+volumes:
+  output_data:
