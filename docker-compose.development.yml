@@ -23,7 +23,7 @@ services:
     # Changes to Python files take effect immediately (no rebuild needed)
     volumes:
       - ./data/state:/data/state
-      - output_data:/out
+      - ./out:/out
       # Development mounts (read-only to prevent accidental writes)
       - ./src:/app/src:ro
       - ./scripts:/app/scripts:ro

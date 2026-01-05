@@ -127,8 +127,10 @@ cd meshcore-stats
 cp meshcore.conf.example meshcore.conf
 # Edit meshcore.conf with your settings
 
-# Create data directory
-mkdir -p data/state
+# Create data directories with correct ownership for container (UID 1000)
+mkdir -p data/state out
+sudo chown -R 1000:1000 data out
+# Alternative: chmod -R 777 data out (less secure, use chown if possible)
 
 # Start the containers
 docker compose up -d
@@ -216,7 +218,9 @@ image: ghcr.io/jorijn/meshcore-stats@sha256:abc123...
 | Path | Purpose |
 |------|---------|
 | `./data/state` | SQLite database and circuit breaker state |
-| `output_data` | Generated static site (shared with nginx) |
+| `./out` | Generated static site (served by nginx) |
+
+Both directories must be writable by UID 1000 (the container user). See Quick Start for setup.
 
 #### Resource Limits
 
@@ -358,6 +362,34 @@ If repeater collection shows "cooldown active":
    rm data/state/repeater_circuit.json
    ```
 
+### Docker on macOS: Serial Devices Not Available
+
+Docker on macOS (including Docker Desktop and OrbStack) runs containers inside a Linux virtual machine. USB and serial devices connected to the Mac host cannot be passed through to this VM, so the `devices:` section in docker-compose.yml will fail with:
+
+```
+error gathering device information while adding custom device "/dev/cu.usbserial-0001": no such file or directory
+```
+
+**Workarounds:**
+
+1. **Use TCP transport**: Run a serial-to-TCP bridge on the host and configure the container to connect via TCP:
+   ```bash
+   # On macOS host, expose serial port over TCP (install socat via Homebrew)
+   socat TCP-LISTEN:5000,fork,reuseaddr OPEN:/dev/cu.usbserial-0001,rawer,nonblock,ispeed=115200,ospeed=115200
+   ```
+   Then configure in meshcore.conf:
+   ```bash
+   MESH_TRANSPORT=tcp
+   MESH_TCP_HOST=host.docker.internal
+   MESH_TCP_PORT=5000
+   ```
+
+2. **Run natively on macOS**: Use the cron-based setup instead of Docker (see "Cron Setup" section).
+
+3. **Use a Linux host**: Docker on Linux can pass through USB devices directly.
+
+Note: OrbStack has [USB passthrough on their roadmap](https://github.com/orbstack/orbstack/issues/89) but it is not yet available.
+
 ## Environment Variables Reference
 
 | Variable | Default | Description |
@@ -375,7 +407,6 @@ If repeater collection shows "cooldown active":
 | `REPEATER_NAME` | - | Repeater advertised name |
 | `REPEATER_KEY_PREFIX` | - | Repeater public key prefix |
 | `REPEATER_PASSWORD` | - | Repeater login password |
-| `REPEATER_FETCH_ACL` | 0 | Also fetch ACL from repeater |
 | **Display Names** | | |
 | `REPEATER_DISPLAY_NAME` | Repeater Node | Display name for repeater in UI |
 | `COMPANION_DISPLAY_NAME` | Companion Node | Display name for companion in UI |

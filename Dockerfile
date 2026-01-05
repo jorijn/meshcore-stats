@@ -90,14 +90,11 @@ COPY --chown=meshmon:meshmon docker/ofelia.ini /app/ofelia.ini
 # - PYTHONUNBUFFERED: Ensure logs are output immediately
 # - PYTHONDONTWRITEBYTECODE: Don't create .pyc files
 # - MPLCONFIGDIR: Matplotlib font cache directory
-# - STATE_DIR/OUT_DIR: Default paths for Docker volumes
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    MPLCONFIGDIR=/tmp/matplotlib \
-    STATE_DIR=/data/state \
-    OUT_DIR=/out
+    MPLCONFIGDIR=/tmp/matplotlib
 
 WORKDIR /app
 

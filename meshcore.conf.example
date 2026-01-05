@@ -2,55 +2,66 @@
 # Copy this file to meshcore.conf and customize for your setup:
 #   cp meshcore.conf.example meshcore.conf
 #
-# This file is automatically loaded by the scripts. No need to source it manually.
-# Environment variables always take precedence over this file (useful for Docker).
+# Format: KEY=value (no 'export' keyword, no spaces around '=')
+# This format is compatible with both Docker env_file and shell 'source' command.
+# Comments start with # and blank lines are ignored.
 
 # =============================================================================
 # Connection Settings
 # =============================================================================
 
-export MESH_TRANSPORT=serial
-export MESH_SERIAL_PORT=/dev/ttyUSB0      # Adjust for your system (e.g., /dev/ttyACM0, /dev/cu.usbserial-*)
-export MESH_SERIAL_BAUD=115200
-export MESH_DEBUG=0                        # Set to 1 for verbose meshcore debug output
+MESH_TRANSPORT=serial
+MESH_SERIAL_PORT=/dev/ttyUSB0
+# MESH_SERIAL_BAUD=115200
+# MESH_DEBUG=0
+
+# TCP transport (for macOS Docker or remote serial servers)
+# MESH_TRANSPORT=tcp
+# MESH_TCP_HOST=host.docker.internal
+# MESH_TCP_PORT=5000
+
+# BLE transport (Bluetooth Low Energy)
+# MESH_TRANSPORT=ble
+# MESH_BLE_ADDR=AA:BB:CC:DD:EE:FF
+# MESH_BLE_PIN=123456
 
 # =============================================================================
 # Remote Repeater Identity
 # =============================================================================
 # At least REPEATER_NAME or REPEATER_KEY_PREFIX is required to identify your repeater
 
-export REPEATER_NAME="Your Repeater Name"  # Advertised name shown in contacts
-# export REPEATER_KEY_PREFIX="a1b2c3"      # Alternative: hex prefix of public key
-export REPEATER_PASSWORD="your-password"   # Admin password for repeater login
+REPEATER_NAME=Your Repeater Name
+# REPEATER_KEY_PREFIX=a1b2c3
+REPEATER_PASSWORD=your-password
 
 # =============================================================================
 # Display Names (shown in UI)
 # =============================================================================
 
-export REPEATER_DISPLAY_NAME="My Repeater"
-export COMPANION_DISPLAY_NAME="My Companion"
+REPEATER_DISPLAY_NAME=My Repeater
+COMPANION_DISPLAY_NAME=My Companion
 
 # Public key prefixes (shown below node name in sidebar, e.g., "!a1b2c3d4")
-# export REPEATER_PUBKEY_PREFIX="!a1b2c3d4"
-# export COMPANION_PUBKEY_PREFIX="!e5f6g7h8"
+# REPEATER_PUBKEY_PREFIX=!a1b2c3d4
+# COMPANION_PUBKEY_PREFIX=!e5f6g7h8
 
 # =============================================================================
 # Location Metadata (for reports and sidebar display)
 # =============================================================================
 
-export REPORT_LOCATION_NAME="City, Country"      # Full location name for reports
-export REPORT_LOCATION_SHORT="City, XX"          # Short version for sidebar/meta
-export REPORT_LAT=0.0                            # Latitude in decimal degrees
-export REPORT_LON=0.0                            # Longitude in decimal degrees
-export REPORT_ELEV=0                             # Elevation
-export REPORT_ELEV_UNIT=m                        # "m" for meters, "ft" for feet
+REPORT_LOCATION_NAME=City, Country
+REPORT_LOCATION_SHORT=City, XX
+REPORT_LAT=0.0
+REPORT_LON=0.0
+REPORT_ELEV=0
+REPORT_ELEV_UNIT=m
 
 # =============================================================================
 # Hardware Info (shown in sidebar)
 # =============================================================================
 
-export REPEATER_HARDWARE="Your Repeater Model"   # e.g., "SenseCAP P1-Pro", "LILYGO T-Beam"
-export COMPANION_HARDWARE="Your Companion Model" # e.g., "Elecrow ThinkNode-M1", "Heltec V3"
+REPEATER_HARDWARE=Your Repeater Model
+COMPANION_HARDWARE=Your Companion Model
 
 # =============================================================================
 # Radio Configuration Presets
@@ -59,58 +70,54 @@ export COMPANION_HARDWARE="Your Companion Model" # e.g., "Elecrow ThinkNode-M1",
 # or set custom values. These are for display purposes only.
 
 # MeshCore EU/UK Narrow (default)
-export RADIO_FREQUENCY="869.618 MHz"
-export RADIO_BANDWIDTH="62.5 kHz"
-export RADIO_SPREAD_FACTOR="SF8"
-export RADIO_CODING_RATE="CR8"
+RADIO_FREQUENCY=869.618 MHz
+RADIO_BANDWIDTH=62.5 kHz
+RADIO_SPREAD_FACTOR=SF8
+RADIO_CODING_RATE=CR8
 
-# # MeshCore EU/UK Wide
-# export RADIO_FREQUENCY="869.525 MHz"
-# export RADIO_BANDWIDTH="250 kHz"
-# export RADIO_SPREAD_FACTOR="SF10"
-# export RADIO_CODING_RATE="CR5"
+# MeshCore EU/UK Wide
+# RADIO_FREQUENCY=869.525 MHz
+# RADIO_BANDWIDTH=250 kHz
+# RADIO_SPREAD_FACTOR=SF10
+# RADIO_CODING_RATE=CR5
 
-# # MeshCore US Standard
-# export RADIO_FREQUENCY="906.875 MHz"
-# export RADIO_BANDWIDTH="250 kHz"
-# export RADIO_SPREAD_FACTOR="SF10"
-# export RADIO_CODING_RATE="CR5"
+# MeshCore US Standard
+# RADIO_FREQUENCY=906.875 MHz
+# RADIO_BANDWIDTH=250 kHz
+# RADIO_SPREAD_FACTOR=SF10
+# RADIO_CODING_RATE=CR5
 
-# # MeshCore US Fast
-# export RADIO_FREQUENCY="906.875 MHz"
-# export RADIO_BANDWIDTH="500 kHz"
-# export RADIO_SPREAD_FACTOR="SF7"
-# export RADIO_CODING_RATE="CR5"
+# MeshCore US Fast
+# RADIO_FREQUENCY=906.875 MHz
+# RADIO_BANDWIDTH=500 kHz
+# RADIO_SPREAD_FACTOR=SF7
+# RADIO_CODING_RATE=CR5
 
-# # MeshCore ANZ (Australia/New Zealand)
-# export RADIO_FREQUENCY="917.0 MHz"
-# export RADIO_BANDWIDTH="250 kHz"
-# export RADIO_SPREAD_FACTOR="SF10"
-# export RADIO_CODING_RATE="CR5"
+# MeshCore ANZ (Australia/New Zealand)
+# RADIO_FREQUENCY=917.0 MHz
+# RADIO_BANDWIDTH=250 kHz
+# RADIO_SPREAD_FACTOR=SF10
+# RADIO_CODING_RATE=CR5
 
 # =============================================================================
 # Intervals and Timeouts
 # =============================================================================
 
-export COMPANION_STEP=60                   # Collection interval for companion (seconds)
-export REPEATER_STEP=900                   # Collection interval for repeater (seconds, 15min default)
-export REMOTE_TIMEOUT_S=10                 # Minimum timeout for LoRa requests
-export REMOTE_RETRY_ATTEMPTS=2             # Number of retry attempts
-export REMOTE_RETRY_BACKOFF_S=4            # Seconds between retries
+# COMPANION_STEP=60
+# REPEATER_STEP=900
+# REMOTE_TIMEOUT_S=10
+# REMOTE_RETRY_ATTEMPTS=2
+# REMOTE_RETRY_BACKOFF_S=4
 
 # Circuit breaker settings (prevents spamming LoRa when repeater is unreachable)
-export REMOTE_CB_FAILS=6                   # Failures before circuit breaker opens
-export REMOTE_CB_COOLDOWN_S=3600           # Cooldown period in seconds (1 hour)
+# REMOTE_CB_FAILS=6
+# REMOTE_CB_COOLDOWN_S=3600
 
 # =============================================================================
-# Paths
+# Paths (Native installation only)
 # =============================================================================
+# Docker: Leave these commented. The container uses /data/state and /out by default.
+# Native: Uncomment for local cron-based installation:
+# STATE_DIR=./data/state
+# OUT_DIR=./out
 
-export STATE_DIR=./data/state              # SQLite database and circuit breaker state
-export OUT_DIR=./out                       # Generated static site output
-
-# =============================================================================
-# Optional
-# =============================================================================
-
-export REPEATER_FETCH_ACL=0                # Set to 1 to fetch ACL from repeater

@@ -6,7 +6,8 @@
 # Prerequisites:
 # 1. Copy meshcore.conf.example to meshcore.conf and configure
 # 2. Ensure your user has access to the serial device (dialout group)
-# 3. Create data directory: mkdir -p ./data/state
+# 3. Create data directories with correct ownership:
+#    mkdir -p ./data/state ./out && sudo chown -R 1000:1000 ./data ./out
 
 services:
   # ==========================================================================
@@ -29,8 +30,8 @@ services:
     volumes:
       # Persistent storage for SQLite database and circuit breaker state
       - ./data/state:/data/state
-      # Shared volume for generated static site (used by nginx)
-      - output_data:/out
+      # Generated static site (served by nginx)
+      - ./out:/out
 
     # Run as meshmon user (UID 1000)
     user: "1000:1000"
@@ -89,7 +90,7 @@ services:
 
     volumes:
       # Mount generated static site from meshcore-stats container
-      - output_data:/usr/share/nginx/html:ro
+      - ./out:/usr/share/nginx/html:ro
       # Custom nginx configuration
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
@@ -101,8 +102,8 @@ services:
     # NET_BIND_SERVICE not needed for port 8080 (unprivileged)
     read_only: true
     tmpfs:
-      - /var/cache/nginx:noexec,nosuid,size=16m
-      - /var/run:noexec,nosuid,size=1m
+      - /var/cache/nginx:noexec,nosuid,size=16m,uid=101,gid=101
+      - /var/run:noexec,nosuid,size=1m,uid=101,gid=101
 
     # Resource limits
     deploy:
@@ -132,7 +133,3 @@ services:
     depends_on:
       meshcore-stats:
         condition: service_healthy
-
-# Named volume for sharing generated site between containers
-volumes:
-  output_data:
