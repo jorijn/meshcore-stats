@@ -47,6 +47,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
+      - /var/cache/fontconfig:noexec,nosuid,size=4m
 
     # Resource limits
     deploy:
