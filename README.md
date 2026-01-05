@@ -171,12 +171,17 @@ See `meshcore.conf.example` for all available options.
 
 #### Serial Device Access
 
-The container needs access to your USB serial device. Update `docker-compose.yml` if your device path differs:
+The container needs access to your USB serial device. To customize the device path without modifying the tracked `docker-compose.yml`, create a `docker-compose.override.yml` file (gitignored):
 
 ```yaml
-devices:
-  - /dev/ttyACM0:/dev/ttyACM0:rwm  # Adjust path as needed
+# docker-compose.override.yml - Local overrides (not tracked in git)
+services:
+  meshcore-stats:
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0:rw  # Your device path
 ```
+
+This file is automatically merged with `docker-compose.yml` when running `docker compose up`.
 
 On the host, ensure the device is accessible:
 
@@ -191,7 +196,7 @@ sudo usermod -a -G dialout $USER
 For local development with live code changes:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.development.yml up --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 This mounts `src/` and `scripts/` into the container, so changes take effect immediately without rebuilding.

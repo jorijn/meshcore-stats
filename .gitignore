@@ -17,6 +17,9 @@ build/
 .env
 meshcore.conf
 
+# Docker local overrides
+docker-compose.override.yml
+
 # Data directories (keep structure, ignore content)
 data/snapshots/companion/**/*.json
 data/snapshots/repeater/**/*.json

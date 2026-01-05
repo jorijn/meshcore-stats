@@ -205,22 +205,27 @@ The project provides Docker containerization for easy deployment. Two containers
 |------|---------|
 | `Dockerfile` | Multi-stage build: Python + Ofelia scheduler |
 | `docker-compose.yml` | Production deployment using published ghcr.io image |
-| `docker-compose.development.yml` | Development override for local builds |
+| `docker-compose.dev.yml` | Development override for local builds |
+| `docker-compose.override.yml` | Local overrides (gitignored) |
 | `docker/ofelia.ini` | Scheduler configuration (cron jobs) |
 | `docker/nginx.conf` | nginx configuration for static site serving |
 | `.dockerignore` | Files excluded from Docker build context |
 
-### docker-compose.yml vs docker-compose.development.yml
+### Docker Compose Files
 
 **Production** (`docker-compose.yml`):
 - Uses published image from `ghcr.io/jorijn/meshcore-stats`
 - Image version managed by release-please via `x-release-please-version` placeholder
 - Suitable for end users
 
-**Development** (`docker-compose.development.yml`):
+**Development** (`docker-compose.dev.yml`):
 - Override file that builds locally instead of pulling from registry
 - Mounts `src/` and `scripts/` for live code changes
-- Usage: `docker compose -f docker-compose.yml -f docker-compose.development.yml up --build`
+- Usage: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`
+
+**Local overrides** (`docker-compose.override.yml`):
+- Gitignored file for local customizations (e.g., device paths, env_file)
+- Automatically merged when running `docker compose up`
 
 ### Ofelia Scheduler
 
