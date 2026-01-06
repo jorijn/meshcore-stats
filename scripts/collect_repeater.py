@@ -32,10 +32,10 @@ from meshmon.meshcore_client import (
     get_contact_by_name,
     get_contact_by_key_prefix,
     extract_contact_info,
-    list_contacts_summary,
 )
 from meshmon.db import init_db, insert_metrics
 from meshmon.retry import get_repeater_circuit_breaker, with_retries
+from meshmon.telemetry import extract_lpp_from_payload, extract_telemetry_metrics
 
 
 async def find_repeater_contact(mc: Any) -> Optional[Any]:
@@ -143,8 +143,10 @@ async def query_repeater_with_retry(
 
 
 async def collect_repeater() -> int:
-    """
-    Collect data from remote repeater node.
+    """Collect data from remote repeater node.
+
+    Collects status metrics (battery, uptime, packet counters, etc.) and
+    optionally telemetry data (temperature, humidity, pressure) if enabled.
 
     Returns:
         Exit code (0 = success, 1 = error)
@@ -162,7 +164,8 @@ async def collect_repeater() -> int:
         return 0
 
     # Metrics to insert (firmware field names from req_status_sync)
-    metrics: dict[str, float] = {}
+    status_metrics: dict[str, float] = {}
+    telemetry_metrics: dict[str, float] = {}
     node_name = "unknown"
     status_ok = False
 
@@ -213,7 +216,7 @@ async def collect_repeater() -> int:
                 except Exception as e:
                     log.debug(f"Login not supported: {e}")
 
-            # Query status (using _sync version which returns payload directly)
+            # Phase 1: Status collection (affects circuit breaker)
             # Use timeout=0 to let the device suggest timeout, with min_timeout as floor
             log.debug("Querying repeater status...")
             success, payload, err = await query_repeater_with_retry(
@@ -227,18 +230,63 @@ async def collect_repeater() -> int:
                 # Insert all numeric fields from status response
                 for key, value in payload.items():
                     if isinstance(value, (int, float)):
-                        metrics[key] = float(value)
+                        status_metrics[key] = float(value)
                 log.debug(f"req_status_sync: {payload}")
             else:
                 log.warn(f"req_status_sync failed: {err}")
 
-            # Update circuit breaker
+            # Update circuit breaker based on status result
             if status_ok:
                 cb.record_success()
                 log.debug("Circuit breaker: recorded success")
             else:
                 cb.record_failure(cfg.remote_cb_fails, cfg.remote_cb_cooldown_s)
                 log.debug(f"Circuit breaker: recorded failure ({cb.consecutive_failures}/{cfg.remote_cb_fails})")
+
+            # CRITICAL: Store status metrics immediately before attempting telemetry
+            # This ensures critical data is saved even if telemetry fails
+            if status_ok and status_metrics:
+                try:
+                    inserted = insert_metrics(ts=ts, role="repeater", metrics=status_metrics)
+                    log.debug(f"Stored {inserted} status metrics (ts={ts})")
+                except Exception as e:
+                    log.error(f"Failed to store status metrics: {e}")
+                    return 1
+
+            # Phase 2: Telemetry collection (does NOT affect circuit breaker)
+            if cfg.telemetry_enabled and status_ok:
+                log.debug("Querying repeater telemetry...")
+                try:
+                    # Note: Telemetry uses its own retry settings and does NOT
+                    # affect circuit breaker. Status success proves the link is up;
+                    # telemetry failures are likely firmware/capability issues.
+                    telem_success, telem_payload, telem_err = await with_retries(
+                        lambda: cmd.req_telemetry_sync(
+                            contact, timeout=0, min_timeout=cfg.telemetry_timeout_s
+                        ),
+                        attempts=cfg.telemetry_retry_attempts,
+                        backoff_s=cfg.telemetry_retry_backoff_s,
+                        name="req_telemetry_sync",
+                    )
+
+                    if telem_success and telem_payload:
+                        log.debug(f"req_telemetry_sync: {telem_payload}")
+                        lpp_data = extract_lpp_from_payload(telem_payload)
+                        if lpp_data is not None:
+                            telemetry_metrics = extract_telemetry_metrics(lpp_data)
+                            log.debug(f"Extracted {len(telemetry_metrics)} telemetry metrics")
+
+                        # Store telemetry metrics
+                        if telemetry_metrics:
+                            try:
+                                inserted = insert_metrics(ts=ts, role="repeater", metrics=telemetry_metrics)
+                                log.debug(f"Stored {inserted} telemetry metrics")
+                            except Exception as e:
+                                log.warn(f"Failed to store telemetry metrics: {e}")
+                    else:
+                        log.warn(f"req_telemetry_sync failed: {telem_err}")
+                except Exception as e:
+                    log.warn(f"Telemetry collection error (continuing): {e}")
 
         except Exception as e:
             log.error(f"Error during collection: {e}")
@@ -248,27 +296,20 @@ async def collect_repeater() -> int:
 
     # Print summary
     summary_parts = [f"ts={ts}"]
-    if "bat" in metrics:
-        bat_v = metrics["bat"] / 1000.0
+    if "bat" in status_metrics:
+        bat_v = status_metrics["bat"] / 1000.0
         summary_parts.append(f"bat={bat_v:.2f}V")
-    if "uptime" in metrics:
-        uptime_days = metrics["uptime"] // 86400
+    if "uptime" in status_metrics:
+        uptime_days = status_metrics["uptime"] // 86400
         summary_parts.append(f"uptime={int(uptime_days)}d")
-    if "nb_recv" in metrics:
-        summary_parts.append(f"rx={int(metrics['nb_recv'])}")
-    if "nb_sent" in metrics:
-        summary_parts.append(f"tx={int(metrics['nb_sent'])}")
+    if "nb_recv" in status_metrics:
+        summary_parts.append(f"rx={int(status_metrics['nb_recv'])}")
+    if "nb_sent" in status_metrics:
+        summary_parts.append(f"tx={int(status_metrics['nb_sent'])}")
+    if telemetry_metrics:
+        summary_parts.append(f"telem={len(telemetry_metrics)}")
 
     log.info(f"Repeater ({node_name}): {', '.join(summary_parts)}")
-
-    # Write metrics to database
-    if status_ok and metrics:
-        try:
-            inserted = insert_metrics(ts=ts, role="repeater", metrics=metrics)
-            log.debug(f"Inserted {inserted} metrics to database (ts={ts})")
-        except Exception as e:
-            log.error(f"Failed to write metrics to database: {e}")
-            return 1
 
     return 0 if status_ok else 1
 

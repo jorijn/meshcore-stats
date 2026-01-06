@@ -114,6 +114,23 @@ RADIO_CODING_RATE=CR8
 # REMOTE_CB_COOLDOWN_S=3600
 
 # =============================================================================
+# Telemetry Collection (Environmental Sensors)
+# =============================================================================
+# Enable telemetry collection from repeater's environmental sensors
+# (temperature, humidity, barometric pressure, etc.)
+# Requires sensor board attached to repeater (e.g., BME280, BME680)
+# Default: 0 (disabled)
+# TELEMETRY_ENABLED=1
+
+# Telemetry-specific timeout and retry settings
+# Defaults match status settings. Separate config allows tuning if telemetry
+# proves problematic (e.g., firmware doesn't support it, sensor board missing).
+# You can reduce these if telemetry collection is causing issues.
+# TELEMETRY_TIMEOUT_S=10
+# TELEMETRY_RETRY_ATTEMPTS=2
+# TELEMETRY_RETRY_BACKOFF_S=4
+
+# =============================================================================
 # Paths (Native installation only)
 # =============================================================================
 # Docker: Leave these commented. The container uses /data/state and /out by default.

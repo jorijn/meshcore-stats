@@ -102,6 +102,84 @@ Returns a single dict with all status fields.
 
 ---
 
+## Telemetry Data
+
+Environmental telemetry is requested via `req_telemetry_sync(contact)` and returns
+Cayenne LPP formatted sensor data. This requires `TELEMETRY_ENABLED=1` and a sensor
+board attached to the repeater.
+
+### Payload Format
+
+Both `req_telemetry_sync()` and `get_self_telemetry()` return a dict containing the
+LPP data list and a public key prefix:
+
+```python
+{
+    'pubkey_pre': 'a5c14f5244d6',
+    'lpp': [
+        {'channel': 0, 'type': 'temperature', 'value': 23.5},
+        {'channel': 0, 'type': 'humidity', 'value': 45.2},
+    ]
+}
+```
+
+The `extract_lpp_from_payload()` helper in `src/meshmon/telemetry.py` handles
+extracting the `lpp` list from this wrapper format.
+
+### `req_telemetry_sync(contact)`
+
+Returns sensor readings from a remote node in Cayenne LPP format:
+
+```python
+[
+    {'channel': 0, 'type': 'temperature', 'value': 23.5},
+    {'channel': 0, 'type': 'humidity', 'value': 45.2},
+    {'channel': 0, 'type': 'barometer', 'value': 1013.25},
+    {'channel': 1, 'type': 'gps', 'value': {'latitude': 51.5, 'longitude': -0.1, 'altitude': 10}},
+]
+```
+
+**Common sensor types:**
+
+| Type | Unit | Description |
+|------|------|-------------|
+| `temperature` | Celsius | Temperature reading |
+| `humidity` | % | Relative humidity |
+| `barometer` | hPa/mbar | Barometric pressure |
+| `voltage` | V | Voltage reading |
+| `gps` | compound | GPS with `latitude`, `longitude`, `altitude` |
+
+**Stored as:**
+- `telemetry.temperature.0` - Temperature on channel 0
+- `telemetry.humidity.0` - Humidity on channel 0
+- `telemetry.gps.1.latitude` - GPS latitude on channel 1
+
+**Notes:**
+- Requires environmental sensor board (BME280, BME680, etc.) on repeater
+- Channel number distinguishes multiple sensors of the same type
+- Not all repeaters have environmental sensors attached
+- Telemetry collection does not affect circuit breaker state
+- Telemetry failures are logged as warnings and do not block status collection
+
+### `get_self_telemetry()`
+
+Returns self telemetry from the companion node's attached sensors.
+Same Cayenne LPP format as `req_telemetry_sync()`.
+
+```python
+[
+    {'channel': 0, 'type': 'temperature', 'value': 23.5},
+    {'channel': 0, 'type': 'humidity', 'value': 45.2},
+]
+```
+
+**Notes:**
+- Requires environmental sensor board attached to companion
+- Returns empty list if no sensors attached
+- Uses same format as repeater telemetry
+
+---
+
 ## Derived Metrics
 
 These are computed at query time, not stored:

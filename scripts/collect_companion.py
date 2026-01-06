@@ -27,6 +27,7 @@ from meshmon.env import get_config
 from meshmon import log
 from meshmon.meshcore_client import connect_with_lock, run_command
 from meshmon.db import init_db, insert_metrics
+from meshmon.telemetry import extract_lpp_from_payload, extract_telemetry_metrics
 
 
 async def collect_companion() -> int:
@@ -93,15 +94,26 @@ async def collect_companion() -> int:
             else:
                 log.error(f"get_time failed: {err}")
 
-            # get_self_telemetry
+            # get_self_telemetry - collect environmental sensor data
+            # Note: The call happens regardless of telemetry_enabled for device query completeness,
+            # but we only extract and store metrics if the feature is enabled.
             ok, evt_type, payload, err = await run_command(
                 mc, cmd.get_self_telemetry(), "get_self_telemetry"
             )
             if ok:
                 commands_succeeded += 1
                 log.debug(f"get_self_telemetry: {payload}")
+                # Extract and store telemetry if enabled
+                if cfg.telemetry_enabled:
+                    lpp_data = extract_lpp_from_payload(payload)
+                    if lpp_data is not None:
+                        telemetry_metrics = extract_telemetry_metrics(lpp_data)
+                        if telemetry_metrics:
+                            metrics.update(telemetry_metrics)
+                            log.debug(f"Extracted {len(telemetry_metrics)} telemetry metrics")
             else:
-                log.error(f"get_self_telemetry failed: {err}")
+                # Debug level because not all devices have sensors attached - this is expected
+                log.debug(f"get_self_telemetry failed: {err}")
 
             # get_custom_vars
             ok, evt_type, payload, err = await run_command(
@@ -176,6 +188,10 @@ async def collect_companion() -> int:
         summary_parts.append(f"rx={int(metrics['recv'])}")
     if "sent" in metrics:
         summary_parts.append(f"tx={int(metrics['sent'])}")
+    # Add telemetry count to summary if present
+    telemetry_count = sum(1 for k in metrics if k.startswith("telemetry."))
+    if telemetry_count > 0:
+        summary_parts.append(f"telem={telemetry_count}")
 
     log.info(f"Companion: {', '.join(summary_parts)}")
 
