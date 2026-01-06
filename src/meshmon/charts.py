@@ -516,19 +516,17 @@ def _inject_data_attributes(
         count=1
     )
 
-    # Add data-points to the main path element (the line, not the fill)
-    def add_data_to_id(match):
-        return f'<path{match.group(1)} data-points="{data_points_attr}"'
-
+    # Add data-points to the line path inside the #chart-line group
+    # matplotlib creates <g id="chart-line"><path d="..."></g>
     svg, count = re.subn(
-        r'<path([^>]*(?:id|gid)="chart-line"[^>]*)',
-        add_data_to_id,
+        r'(<g[^>]*id="chart-line"[^>]*>\s*<path\b)',
+        rf'\1 data-points="{data_points_attr}"',
         svg,
         count=1,
     )
 
     if count == 0:
-        # Look for the second path element (first is usually the fill area)
+        # Fallback: look for the second path element (first is usually the fill area)
         path_count = 0
 
         def add_data_to_path(match):
