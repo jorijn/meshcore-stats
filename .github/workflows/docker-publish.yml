@@ -33,6 +33,7 @@ permissions:
   packages: write
   id-token: write
   attestations: write
+  artifact-metadata: write
 
 concurrency:
   group: docker-${{ github.ref }}
