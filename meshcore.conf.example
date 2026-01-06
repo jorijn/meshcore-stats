@@ -7,6 +7,13 @@
 # Comments start with # and blank lines are ignored.
 
 # =============================================================================
+# Timezone (for Docker deployments)
+# =============================================================================
+# Set the timezone for timestamps in charts and reports.
+# Uses IANA timezone names: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+# TZ=Europe/Amsterdam
+
+# =============================================================================
 # Connection Settings
 # =============================================================================
 
