@@ -16,6 +16,8 @@ Always edit the source templates, then regenerate with `python scripts/render_si
 
 ## Running Commands
 
+**IMPORTANT: Always activate the virtual environment before running any Python commands.**
+
 ```bash
 cd /path/to/meshcore-stats
 source .venv/bin/activate
@@ -354,10 +356,16 @@ All configuration via `meshcore.conf` or environment variables. The config file 
 
 ### Timeouts & Retry
 - `REMOTE_TIMEOUT_S`: Minimum timeout for LoRa requests (default: 10)
-- `REMOTE_RETRY_ATTEMPTS`: Number of retry attempts (default: 5)
+- `REMOTE_RETRY_ATTEMPTS`: Number of retry attempts (default: 2)
 - `REMOTE_RETRY_BACKOFF_S`: Seconds between retries (default: 4)
 - `REMOTE_CB_FAILS`: Failures before circuit breaker opens (default: 6)
 - `REMOTE_CB_COOLDOWN_S`: Circuit breaker cooldown (default: 3600)
+
+### Telemetry Collection
+- `TELEMETRY_ENABLED`: Enable environmental telemetry collection from repeater (0/1, default: 0)
+- `TELEMETRY_TIMEOUT_S`: Timeout for telemetry requests (default: 10)
+- `TELEMETRY_RETRY_ATTEMPTS`: Retry attempts for telemetry (default: 2)
+- `TELEMETRY_RETRY_BACKOFF_S`: Backoff between telemetry retries (default: 4)
 
 ### Intervals
 - `COMPANION_STEP`: Collection interval for companion (default: 60s)
@@ -409,6 +417,12 @@ Metrics are classified as either **gauge** or **counter** in `src/meshmon/metric
   - Repeater: `nb_recv`, `nb_sent`, `airtime`, `rx_airtime`, `flood_dups`, `direct_dups`, `sent_flood`, `recv_flood`, `sent_direct`, `recv_direct`
 
 Counter metrics are converted to rates during chart rendering by calculating deltas between consecutive readings.
+
+- **TELEMETRY**: Environmental sensor data (when `TELEMETRY_ENABLED=1`):
+  - Stored with `telemetry.` prefix: `telemetry.temperature.0`, `telemetry.humidity.0`, `telemetry.barometer.0`
+  - Channel number distinguishes multiple sensors of the same type
+  - Compound values (e.g., GPS) stored as: `telemetry.gps.0.latitude`, `telemetry.gps.0.longitude`
+  - Telemetry collection does NOT affect circuit breaker state
 
 ## Database Schema
 

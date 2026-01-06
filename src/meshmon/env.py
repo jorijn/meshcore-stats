@@ -155,6 +155,14 @@ class Config:
         self.remote_cb_fails = get_int("REMOTE_CB_FAILS", 6)
         self.remote_cb_cooldown_s = get_int("REMOTE_CB_COOLDOWN_S", 3600)
 
+        # Telemetry collection (requires sensor board on repeater)
+        self.telemetry_enabled = get_bool("TELEMETRY_ENABLED", False)
+        # Separate settings allow tuning if telemetry proves problematic
+        # Defaults match status settings - tune down if needed
+        self.telemetry_timeout_s = get_int("TELEMETRY_TIMEOUT_S", 10)
+        self.telemetry_retry_attempts = get_int("TELEMETRY_RETRY_ATTEMPTS", 2)
+        self.telemetry_retry_backoff_s = get_int("TELEMETRY_RETRY_BACKOFF_S", 4)
+
         # Paths (defaults are Docker container paths; native installs override via config)
         self.state_dir = get_path("STATE_DIR", "/data/state")
         self.out_dir = get_path("OUT_DIR", "/out")
