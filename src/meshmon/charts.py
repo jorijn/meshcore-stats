@@ -167,6 +167,7 @@ def load_timeseries_from_db(
     end_time: datetime,
     lookback: timedelta,
     period: str,
+    all_metrics: Optional[dict[str, list[tuple[int, float]]]] = None,
 ) -> TimeSeries:
     """Load time series data from SQLite database.
 
@@ -179,6 +180,7 @@ def load_timeseries_from_db(
         end_time: End of the time range (typically now)
         lookback: How far back to look
         period: Period name for binning config ("day", "week", etc.)
+        all_metrics: Optional pre-fetched metrics dict for this period
 
     Returns:
         TimeSeries with extracted data points
@@ -188,7 +190,8 @@ def load_timeseries_from_db(
     end_ts = int(end_time.timestamp())
 
     # Fetch all metrics for this role/period (returns pivoted dict)
-    all_metrics = get_metrics_for_period(role, start_ts, end_ts)
+    if all_metrics is None:
+        all_metrics = get_metrics_for_period(role, start_ts, end_ts)
 
     # Get data for this specific metric
     metric_data = all_metrics.get(metric, [])
@@ -379,10 +382,22 @@ def render_chart_svg(
 
             # Plot area fill
             area_color = _hex_to_rgba(theme.area)
-            ax.fill_between(timestamps, values, alpha=area_color[3], color=f"#{theme.line}")
+            area = ax.fill_between(
+                timestamps,
+                values,
+                alpha=area_color[3],
+                color=f"#{theme.line}",
+            )
+            area.set_gid("chart-area")
 
             # Plot line
-            ax.plot(timestamps, values, color=f"#{theme.line}", linewidth=2)
+            (line,) = ax.plot(
+                timestamps,
+                values,
+                color=f"#{theme.line}",
+                linewidth=2,
+            )
+            line.set_gid("chart-line")
 
             # Set Y-axis limits and track actual values used
             if y_min is not None and y_max is not None:
@@ -458,7 +473,7 @@ def _inject_data_attributes(
 
     Adds:
     - data-metric, data-period, data-theme, data-x-start, data-x-end, data-y-min, data-y-max to root <svg>
-    - data-points JSON array to the chart path element
+    - data-points JSON array to the root <svg> and chart line path
 
     Args:
         svg: Raw SVG string
@@ -495,22 +510,35 @@ def _inject_data_attributes(
         r'<svg\b',
         f'<svg data-metric="{ts.metric}" data-period="{ts.period}" data-theme="{theme_name}" '
         f'data-x-start="{x_start_ts}" data-x-end="{x_end_ts}" '
-        f'data-y-min="{y_min_val}" data-y-max="{y_max_val}"',
+        f'data-y-min="{y_min_val}" data-y-max="{y_max_val}" '
+        f'data-points="{data_points_attr}"',
         svg,
         count=1
     )
 
     # Add data-points to the main path element (the line, not the fill)
-    # Look for the second path element (first is usually the fill area)
-    path_count = 0
-    def add_data_to_path(match):
-        nonlocal path_count
-        path_count += 1
-        if path_count == 2:  # The line path
-            return f'<path data-points="{data_points_attr}"'
-        return match.group(0)
+    def add_data_to_id(match):
+        return f'<path{match.group(1)} data-points="{data_points_attr}"'
 
-    svg = re.sub(r'<path\b', add_data_to_path, svg)
+    svg, count = re.subn(
+        r'<path([^>]*(?:id|gid)="chart-line"[^>]*)',
+        add_data_to_id,
+        svg,
+        count=1,
+    )
+
+    if count == 0:
+        # Look for the second path element (first is usually the fill area)
+        path_count = 0
+
+        def add_data_to_path(match):
+            nonlocal path_count
+            path_count += 1
+            if path_count == 2:  # The line path
+                return f'<path data-points="{data_points_attr}"'
+            return match.group(0)
+
+        svg = re.sub(r'<path\b', add_data_to_path, svg)
 
     return svg
 
@@ -558,9 +586,16 @@ def render_all_charts(
     for metric in metrics:
         all_stats[metric] = {}
 
-        for period in periods:
-            period_cfg = PERIOD_CONFIG[period]
+    for period in periods:
+        period_cfg = PERIOD_CONFIG[period]
+        x_end = now
+        x_start = now - period_cfg["lookback"]
 
+        start_ts = int(x_start.timestamp())
+        end_ts = int(x_end.timestamp())
+        all_metrics = get_metrics_for_period(role, start_ts, end_ts)
+
+        for metric in metrics:
             # Load time series from database
             ts = load_timeseries_from_db(
                 role=role,
@@ -568,6 +603,7 @@ def render_all_charts(
                 end_time=now,
                 lookback=period_cfg["lookback"],
                 period=period,
+                all_metrics=all_metrics,
             )
 
             # Calculate and store statistics
@@ -578,10 +614,6 @@ def render_all_charts(
             y_range = y_ranges.get(metric)
             y_min = y_range[0] if y_range else None
             y_max = y_range[1] if y_range else None
-
-            # Calculate X-axis range for full period padding
-            x_end = now
-            x_start = now - period_cfg["lookback"]
 
             # Render chart for each theme
             for theme_name in themes:

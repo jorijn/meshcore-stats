@@ -17,17 +17,12 @@ import calendar
 import json
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from pathlib import Path
 from typing import Any, Optional
 
 from .db import get_connection, get_metrics_for_period, VALID_ROLES
-from .env import get_config
 from .metrics import (
     is_counter_metric,
-    get_chart_metrics,
-    transform_value,
 )
-from . import log
 
 
 def _validate_role(role: str) -> str:
@@ -57,6 +52,32 @@ def get_metrics_for_role(role: str) -> list[str]:
         return REPEATER_REPORT_METRICS
     else:
         raise ValueError(f"Unknown role: {role}")
+
+
+REPORT_UNITS_RAW = {
+    "battery_mv": "mV",
+    "bat": "mV",
+    "bat_pct": "%",
+    "uptime": "s",
+    "uptime_secs": "s",
+    "last_rssi": "dBm",
+    "last_snr": "dB",
+    "noise_floor": "dBm",
+    "tx_queue_len": "count",
+    "contacts": "count",
+    "recv": "packets",
+    "sent": "packets",
+    "nb_recv": "packets",
+    "nb_sent": "packets",
+    "airtime": "s",
+    "rx_airtime": "s",
+    "flood_dups": "packets",
+    "direct_dups": "packets",
+    "sent_flood": "packets",
+    "recv_flood": "packets",
+    "sent_direct": "packets",
+    "recv_direct": "packets",
+}
 
 
 @dataclass
@@ -1116,9 +1137,13 @@ def format_yearly_txt(
         return format_yearly_txt_companion(agg, node_name, location)
 
 
-def _metric_stats_to_dict(stats: MetricStats) -> dict[str, Any]:
+def _metric_stats_to_dict(stats: MetricStats, metric: str) -> dict[str, Any]:
     """Convert MetricStats to JSON-serializable dict."""
     result: dict[str, Any] = {"count": stats.count}
+
+    unit = REPORT_UNITS_RAW.get(metric)
+    if unit:
+        result["unit"] = unit
 
     if stats.mean is not None:
         result["mean"] = round(stats.mean, 4)
@@ -1144,7 +1169,7 @@ def _daily_to_dict(daily: DailyAggregate) -> dict[str, Any]:
         "date": daily.date.isoformat(),
         "snapshot_count": daily.snapshot_count,
         "metrics": {
-            ds: _metric_stats_to_dict(stats)
+            ds: _metric_stats_to_dict(stats, ds)
             for ds, stats in daily.metrics.items()
             if stats.has_data
         },
@@ -1167,7 +1192,7 @@ def monthly_to_json(agg: MonthlyAggregate) -> dict[str, Any]:
         "role": agg.role,
         "days_with_data": len(agg.daily),
         "summary": {
-            ds: _metric_stats_to_dict(stats)
+            ds: _metric_stats_to_dict(stats, ds)
             for ds, stats in agg.summary.items()
             if stats.has_data
         },
@@ -1190,7 +1215,7 @@ def yearly_to_json(agg: YearlyAggregate) -> dict[str, Any]:
         "role": agg.role,
         "months_with_data": len(agg.monthly),
         "summary": {
-            ds: _metric_stats_to_dict(stats)
+            ds: _metric_stats_to_dict(stats, ds)
             for ds, stats in agg.summary.items()
             if stats.has_data
         },
@@ -1200,7 +1225,7 @@ def yearly_to_json(agg: YearlyAggregate) -> dict[str, Any]:
                 "month": m.month,
                 "days_with_data": len(m.daily),
                 "summary": {
-                    ds: _metric_stats_to_dict(stats)
+                    ds: _metric_stats_to_dict(stats, ds)
                     for ds, stats in m.summary.items()
                     if stats.has_data
                 },

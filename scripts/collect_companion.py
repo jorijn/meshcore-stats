@@ -74,16 +74,6 @@ async def collect_companion() -> int:
             else:
                 log.error(f"device_query failed: {err}")
 
-            # get_bat
-            ok, evt_type, payload, err = await run_command(
-                mc, cmd.get_bat(), "get_bat"
-            )
-            if ok:
-                commands_succeeded += 1
-                log.debug(f"get_bat: {payload}")
-            else:
-                log.error(f"get_bat failed: {err}")
-
             # get_time
             ok, evt_type, payload, err = await run_command(
                 mc, cmd.get_time(), "get_time"

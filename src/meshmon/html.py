@@ -588,8 +588,8 @@ def build_page_context(
     last_updated = None
     last_updated_iso = None
     if ts:
-        dt = datetime.fromtimestamp(ts)
-        last_updated = dt.strftime("%b %d, %Y at %H:%M UTC")
+        dt = datetime.fromtimestamp(ts).astimezone()
+        last_updated = dt.strftime("%b %d, %Y at %H:%M %Z")
         last_updated_iso = dt.isoformat()
 
     # Build metrics for sidebar
@@ -845,24 +845,24 @@ def build_monthly_table_data(
             airtime = m.get("airtime", MetricStats())
 
             # Convert mV to V for display
-            bat_v_mean = bat.mean / 1000.0 if bat.mean else None
-            bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
-            bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
+            bat_v_mean = bat.mean / 1000.0 if bat.mean is not None else None
+            bat_v_min = bat.min_value / 1000.0 if bat.min_value is not None else None
+            bat_v_max = bat.max_value / 1000.0 if bat.max_value is not None else None
 
             rows.append({
                 "is_summary": False,
                 "cells": [
                     {"value": f"{daily.date.day:02d}", "class": None},
-                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
-                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean is not None else "-", "class": None},
+                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean is not None else "-", "class": None},
                     {"value": _fmt_val_time(bat_v_min, bat.min_time), "class": "muted"},
                     {"value": _fmt_val_time(bat_v_max, bat.max_time), "class": "muted"},
-                    {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
-                    {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
-                    {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
-                    {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
-                    {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
-                    {"value": f"{airtime.total:,}" if airtime.total else "-", "class": None},
+                    {"value": f"{rssi.mean:.0f}" if rssi.mean is not None else "-", "class": None},
+                    {"value": f"{snr.mean:.1f}" if snr.mean is not None else "-", "class": None},
+                    {"value": f"{noise.mean:.0f}" if noise.mean is not None else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total is not None else "-", "class": "highlight"},
+                    {"value": f"{tx.total:,}" if tx.total is not None else "-", "class": None},
+                    {"value": f"{airtime.total:,}" if airtime.total is not None else "-", "class": None},
                 ],
             })
 
@@ -877,24 +877,24 @@ def build_monthly_table_data(
         tx = s.get("nb_sent", MetricStats())
         airtime = s.get("airtime", MetricStats())
 
-        bat_v_mean = bat.mean / 1000.0 if bat.mean else None
-        bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
-        bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
+        bat_v_mean = bat.mean / 1000.0 if bat.mean is not None else None
+        bat_v_min = bat.min_value / 1000.0 if bat.min_value is not None else None
+        bat_v_max = bat.max_value / 1000.0 if bat.max_value is not None else None
 
         rows.append({
             "is_summary": True,
             "cells": [
                 {"value": "", "class": None},
-                {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
-                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                {"value": f"{bat_v_mean:.2f}" if bat_v_mean is not None else "-", "class": None},
+                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean is not None else "-", "class": None},
                 {"value": _fmt_val_day(bat_v_min, bat.min_time), "class": "muted"},
                 {"value": _fmt_val_day(bat_v_max, bat.max_time), "class": "muted"},
-                {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
-                {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
-                {"value": f"{noise.mean:.0f}" if noise.mean else "-", "class": None},
-                {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
-                {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
-                {"value": f"{airtime.total:,}" if airtime.total else "-", "class": None},
+                {"value": f"{rssi.mean:.0f}" if rssi.mean is not None else "-", "class": None},
+                {"value": f"{snr.mean:.1f}" if snr.mean is not None else "-", "class": None},
+                {"value": f"{noise.mean:.0f}" if noise.mean is not None else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total is not None else "-", "class": "highlight"},
+                {"value": f"{tx.total:,}" if tx.total is not None else "-", "class": None},
+                {"value": f"{airtime.total:,}" if airtime.total is not None else "-", "class": None},
             ],
         })
 
@@ -928,21 +928,21 @@ def build_monthly_table_data(
             tx = m.get("sent", MetricStats())
 
             # Convert mV to V for display
-            bat_v_mean = bat.mean / 1000.0 if bat.mean else None
-            bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
-            bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
+            bat_v_mean = bat.mean / 1000.0 if bat.mean is not None else None
+            bat_v_min = bat.min_value / 1000.0 if bat.min_value is not None else None
+            bat_v_max = bat.max_value / 1000.0 if bat.max_value is not None else None
 
             rows.append({
                 "is_summary": False,
                 "cells": [
                     {"value": f"{daily.date.day:02d}", "class": None},
-                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
-                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean is not None else "-", "class": None},
+                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean is not None else "-", "class": None},
                     {"value": _fmt_val_time(bat_v_min, bat.min_time), "class": "muted"},
                     {"value": _fmt_val_time(bat_v_max, bat.max_time), "class": "muted"},
-                    {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
-                    {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
-                    {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                    {"value": f"{contacts.mean:.0f}" if contacts.mean is not None else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total is not None else "-", "class": "highlight"},
+                    {"value": f"{tx.total:,}" if tx.total is not None else "-", "class": None},
                 ],
             })
 
@@ -954,21 +954,21 @@ def build_monthly_table_data(
         rx = s.get("recv", MetricStats())
         tx = s.get("sent", MetricStats())
 
-        bat_v_mean = bat.mean / 1000.0 if bat.mean else None
-        bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
-        bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
+        bat_v_mean = bat.mean / 1000.0 if bat.mean is not None else None
+        bat_v_min = bat.min_value / 1000.0 if bat.min_value is not None else None
+        bat_v_max = bat.max_value / 1000.0 if bat.max_value is not None else None
 
         rows.append({
             "is_summary": True,
             "cells": [
                 {"value": "", "class": None},
-                {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
-                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                {"value": f"{bat_v_mean:.2f}" if bat_v_mean is not None else "-", "class": None},
+                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean is not None else "-", "class": None},
                 {"value": _fmt_val_day(bat_v_min, bat.min_time), "class": "muted"},
                 {"value": _fmt_val_day(bat_v_max, bat.max_time), "class": "muted"},
-                {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
-                {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
-                {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                {"value": f"{contacts.mean:.0f}" if contacts.mean is not None else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total is not None else "-", "class": "highlight"},
+                {"value": f"{tx.total:,}" if tx.total is not None else "-", "class": None},
             ],
         })
 
@@ -1033,23 +1033,23 @@ def build_yearly_table_data(
             tx = s.get("nb_sent", MetricStats())
 
             # Convert mV to V
-            bat_v_mean = bat.mean / 1000.0 if bat.mean else None
-            bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
-            bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
+            bat_v_mean = bat.mean / 1000.0 if bat.mean is not None else None
+            bat_v_min = bat.min_value / 1000.0 if bat.min_value is not None else None
+            bat_v_max = bat.max_value / 1000.0 if bat.max_value is not None else None
 
             rows.append({
                 "is_summary": False,
                 "cells": [
                     {"value": str(agg.year), "class": None},
                     {"value": f"{monthly.month:02d}", "class": None},
-                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
-                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean is not None else "-", "class": None},
+                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean is not None else "-", "class": None},
                     {"value": _fmt_val_day(bat_v_max, bat.max_time), "class": "muted"},
                     {"value": _fmt_val_day(bat_v_min, bat.min_time), "class": "muted"},
-                    {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
-                    {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
-                    {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
-                    {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                    {"value": f"{rssi.mean:.0f}" if rssi.mean is not None else "-", "class": None},
+                    {"value": f"{snr.mean:.1f}" if snr.mean is not None else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total is not None else "-", "class": "highlight"},
+                    {"value": f"{tx.total:,}" if tx.total is not None else "-", "class": None},
                 ],
             })
 
@@ -1062,23 +1062,23 @@ def build_yearly_table_data(
         rx = s.get("nb_recv", MetricStats())
         tx = s.get("nb_sent", MetricStats())
 
-        bat_v_mean = bat.mean / 1000.0 if bat.mean else None
-        bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
-        bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
+        bat_v_mean = bat.mean / 1000.0 if bat.mean is not None else None
+        bat_v_min = bat.min_value / 1000.0 if bat.min_value is not None else None
+        bat_v_max = bat.max_value / 1000.0 if bat.max_value is not None else None
 
         rows.append({
             "is_summary": True,
             "cells": [
                 {"value": "", "class": None},
                 {"value": "", "class": None},
-                {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
-                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                {"value": f"{bat_v_mean:.2f}" if bat_v_mean is not None else "-", "class": None},
+                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean is not None else "-", "class": None},
                 {"value": _fmt_val_month(bat_v_max, bat.max_time), "class": "muted"},
                 {"value": _fmt_val_month(bat_v_min, bat.min_time), "class": "muted"},
-                {"value": f"{rssi.mean:.0f}" if rssi.mean else "-", "class": None},
-                {"value": f"{snr.mean:.1f}" if snr.mean else "-", "class": None},
-                {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
-                {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                {"value": f"{rssi.mean:.0f}" if rssi.mean is not None else "-", "class": None},
+                {"value": f"{snr.mean:.1f}" if snr.mean is not None else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total is not None else "-", "class": "highlight"},
+                {"value": f"{tx.total:,}" if tx.total is not None else "-", "class": None},
             ],
         })
 
@@ -1113,22 +1113,22 @@ def build_yearly_table_data(
             tx = s.get("sent", MetricStats())
 
             # Convert mV to V
-            bat_v_mean = bat.mean / 1000.0 if bat.mean else None
-            bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
-            bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
+            bat_v_mean = bat.mean / 1000.0 if bat.mean is not None else None
+            bat_v_min = bat.min_value / 1000.0 if bat.min_value is not None else None
+            bat_v_max = bat.max_value / 1000.0 if bat.max_value is not None else None
 
             rows.append({
                 "is_summary": False,
                 "cells": [
                     {"value": str(agg.year), "class": None},
                     {"value": f"{monthly.month:02d}", "class": None},
-                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
-                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                    {"value": f"{bat_v_mean:.2f}" if bat_v_mean is not None else "-", "class": None},
+                    {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean is not None else "-", "class": None},
                     {"value": _fmt_val_day(bat_v_max, bat.max_time), "class": "muted"},
                     {"value": _fmt_val_day(bat_v_min, bat.min_time), "class": "muted"},
-                    {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
-                    {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
-                    {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                    {"value": f"{contacts.mean:.0f}" if contacts.mean is not None else "-", "class": None},
+                    {"value": f"{rx.total:,}" if rx.total is not None else "-", "class": "highlight"},
+                    {"value": f"{tx.total:,}" if tx.total is not None else "-", "class": None},
                 ],
             })
 
@@ -1140,22 +1140,22 @@ def build_yearly_table_data(
         rx = s.get("recv", MetricStats())
         tx = s.get("sent", MetricStats())
 
-        bat_v_mean = bat.mean / 1000.0 if bat.mean else None
-        bat_v_min = bat.min_value / 1000.0 if bat.min_value else None
-        bat_v_max = bat.max_value / 1000.0 if bat.max_value else None
+        bat_v_mean = bat.mean / 1000.0 if bat.mean is not None else None
+        bat_v_min = bat.min_value / 1000.0 if bat.min_value is not None else None
+        bat_v_max = bat.max_value / 1000.0 if bat.max_value is not None else None
 
         rows.append({
             "is_summary": True,
             "cells": [
                 {"value": "", "class": None},
                 {"value": "", "class": None},
-                {"value": f"{bat_v_mean:.2f}" if bat_v_mean else "-", "class": None},
-                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean else "-", "class": None},
+                {"value": f"{bat_v_mean:.2f}" if bat_v_mean is not None else "-", "class": None},
+                {"value": f"{bat_pct.mean:.0f}" if bat_pct.mean is not None else "-", "class": None},
                 {"value": _fmt_val_month(bat_v_max, bat.max_time), "class": "muted"},
                 {"value": _fmt_val_month(bat_v_min, bat.min_time), "class": "muted"},
-                {"value": f"{contacts.mean:.0f}" if contacts.mean else "-", "class": None},
-                {"value": f"{rx.total:,}" if rx.total else "-", "class": "highlight"},
-                {"value": f"{tx.total:,}" if tx.total else "-", "class": None},
+                {"value": f"{contacts.mean:.0f}" if contacts.mean is not None else "-", "class": None},
+                {"value": f"{rx.total:,}" if rx.total is not None else "-", "class": "highlight"},
+                {"value": f"{tx.total:,}" if tx.total is not None else "-", "class": None},
             ],
         })
 

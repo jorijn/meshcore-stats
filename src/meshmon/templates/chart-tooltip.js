@@ -58,7 +58,8 @@
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZoneName: 'short'
     };
 
     // For year view, include year
@@ -180,15 +181,23 @@
     const yMin = parseFloat(svg.dataset.yMin);
     const yMax = parseFloat(svg.dataset.yMax);
 
-    // Find the path with data-points
-    const path = svg.querySelector('path[data-points]');
+    // Find the primary line path for precise coordinates
+    const path =
+      svg.querySelector('path#chart-line') ||
+      svg.querySelector('path[gid="chart-line"]') ||
+      svg.querySelector('#chart-line path') ||
+      svg.querySelector('[gid="chart-line"] path') ||
+      svg.querySelector('path[data-points]');
     if (!path) return;
 
-    // Parse and cache data points and path coordinates on first access
-    if (!path._dataPoints) {
+    const pointsSource = path.dataset.points || svg.dataset.points;
+    if (!pointsSource) return;
+
+    // Parse and cache data points on first access
+    if (!svg._dataPoints) {
       try {
-        const json = path.dataset.points.replace(/&quot;/g, '"');
-        path._dataPoints = JSON.parse(json);
+        const json = pointsSource.replace(/&quot;/g, '"');
+        svg._dataPoints = JSON.parse(json);
       } catch (e) {
         console.warn('Failed to parse chart data:', e);
         return;
@@ -220,7 +229,7 @@
     const targetTs = xStart + clampedRelX * (xEnd - xStart);
 
     // Find closest data point by timestamp
-    const result = findClosestPoint(path._dataPoints, targetTs);
+    const result = findClosestPoint(svg._dataPoints, targetTs);
     if (!result) return;
 
     const { point } = result;
