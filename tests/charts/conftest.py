@@ -115,10 +115,13 @@ def normalize_svg_for_snapshot(svg: str) -> str:
     # 1. Normalize matplotlib-generated IDs (prefixed with random hex)
     svg = re.sub(r'id="[a-zA-Z0-9]+-[0-9a-f]+"', 'id="normalized"', svg)
     svg = re.sub(r'id="m[0-9a-f]{8,}"', 'id="normalized"', svg)
+    # Normalize clipPath IDs like id="p47c77a2a6e"
+    svg = re.sub(r'id="p[0-9a-f]{8,}"', 'id="normalized"', svg)
 
     # 2. Normalize url(#...) references to match
     svg = re.sub(r'url\(#[a-zA-Z0-9]+-[0-9a-f]+\)', 'url(#normalized)', svg)
     svg = re.sub(r'url\(#m[0-9a-f]{8,}\)', 'url(#normalized)', svg)
+    svg = re.sub(r'url\(#p[0-9a-f]{8,}\)', 'url(#normalized)', svg)
 
     # 3. Normalize clip-path IDs
     svg = re.sub(r'clip-path="url\(#[^)]+\)"', 'clip-path="url(#clip)"', svg)
@@ -126,11 +129,15 @@ def normalize_svg_for_snapshot(svg: str) -> str:
     # 4. Normalize xlink:href="#..." references
     svg = re.sub(r'xlink:href="#[a-zA-Z0-9]+-[0-9a-f]+"', 'xlink:href="#normalized"', svg)
     svg = re.sub(r'xlink:href="#m[0-9a-f]{8,}"', 'xlink:href="#normalized"', svg)
+    svg = re.sub(r'xlink:href="#p[0-9a-f]{8,}"', 'xlink:href="#normalized"', svg)
 
     # 5. Remove matplotlib version comment (changes between versions)
     svg = re.sub(r'<!-- Created with matplotlib.*?-->', '', svg)
 
-    # 6. Normalize whitespace (but preserve newlines for readability)
+    # 6. Remove dc:date timestamp (changes on each render)
+    svg = re.sub(r'<dc:date>[^<]+</dc:date>', '<dc:date>NORMALIZED</dc:date>', svg)
+
+    # 7. Normalize whitespace (but preserve newlines for readability)
     svg = re.sub(r'[ \t]+', ' ', svg)
     svg = re.sub(r' ?\n ?', '\n', svg)
 
