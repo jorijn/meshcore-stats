@@ -2,7 +2,7 @@
 
 This document tracks the inventory and review status of all tests in the MeshCore Stats project.
 
-**Total Test Count**: 961 test functions
+**Total Test Count**: 974 test functions (961 original + 13 new snapshot tests)
 
 ## Review Progress
 
@@ -17,6 +17,81 @@ This document tracks the inventory and review status of all tests in the MeshCor
 | Reports Tests | COMPLETED | 7 | 149 | 149/149 |
 | Client Tests | COMPLETED | 5 | 63 | 63/63 |
 | Integration Tests | COMPLETED | 4 | 22 | 22/22 |
+| Snapshot Tests | NEW | 2 | 13 | 13/13 |
+
+---
+
+## Snapshot Testing
+
+Snapshot tests compare generated output against saved baseline files to detect unintended changes.
+This is particularly useful for:
+- SVG chart rendering (visual regression testing)
+- Text report formatting (layout consistency)
+
+### Snapshot Infrastructure
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| SVG Snapshots | `tests/snapshots/svg/` | Baseline SVG chart files |
+| TXT Snapshots | `tests/snapshots/txt/` | Baseline text report files |
+| Shared Fixtures | `tests/snapshots/conftest.py` | Common snapshot utilities |
+| Generator Script | `scripts/generate_snapshots.py` | Regenerate all snapshots |
+
+### Usage
+
+**Running Snapshot Tests**:
+```bash
+# Run all snapshot tests
+pytest tests/charts/test_chart_render.py::TestSvgSnapshots tests/reports/test_snapshots.py
+
+# Run SVG snapshot tests only
+pytest tests/charts/test_chart_render.py::TestSvgSnapshots
+
+# Run TXT snapshot tests only
+pytest tests/reports/test_snapshots.py
+```
+
+**Updating Snapshots**:
+```bash
+# Update all snapshots (when intentional changes are made)
+UPDATE_SNAPSHOTS=1 pytest tests/charts/test_chart_render.py::TestSvgSnapshots tests/reports/test_snapshots.py
+
+# Or use the generator script
+python scripts/generate_snapshots.py
+```
+
+### SVG Snapshot Tests
+
+Located in `tests/charts/test_chart_render.py::TestSvgSnapshots`:
+
+| Test | Snapshot File | Description |
+|------|---------------|-------------|
+| `test_gauge_chart_light_theme` | `bat_day_light.svg` | Battery voltage chart, light theme |
+| `test_gauge_chart_dark_theme` | `bat_day_dark.svg` | Battery voltage chart, dark theme |
+| `test_counter_chart_light_theme` | `nb_recv_day_light.svg` | Packet rate chart, light theme |
+| `test_counter_chart_dark_theme` | `nb_recv_day_dark.svg` | Packet rate chart, dark theme |
+| `test_empty_chart_light_theme` | `empty_day_light.svg` | Empty chart with "No data available" |
+| `test_empty_chart_dark_theme` | `empty_day_dark.svg` | Empty chart, dark theme |
+| `test_single_point_chart` | `single_point_day_light.svg` | Chart with single data point |
+
+**Normalization**: SVG snapshots are normalized before comparison to handle:
+- Matplotlib-generated random IDs
+- URL references with dynamic identifiers
+- Matplotlib version comments
+- Whitespace variations
+
+### TXT Report Snapshot Tests
+
+Located in `tests/reports/test_snapshots.py::TestTxtReportSnapshots`:
+
+| Test | Snapshot File | Description |
+|------|---------------|-------------|
+| `test_monthly_report_repeater` | `monthly_report_repeater.txt` | Repeater monthly report |
+| `test_monthly_report_companion` | `monthly_report_companion.txt` | Companion monthly report |
+| `test_yearly_report_repeater` | `yearly_report_repeater.txt` | Repeater yearly report |
+| `test_yearly_report_companion` | `yearly_report_companion.txt` | Companion yearly report |
+| `test_empty_monthly_report` | `empty_monthly_report.txt` | Monthly report with no data |
+| `test_empty_yearly_report` | `empty_yearly_report.txt` | Yearly report with no data |
 
 ---
 
@@ -24,6 +99,7 @@ This document tracks the inventory and review status of all tests in the MeshCor
 
 ### Shared Configuration
 - `tests/conftest.py` - Main test fixtures (initialized_db, configured_env, etc.)
+- `tests/snapshots/conftest.py` - Snapshot testing fixtures (assert_snapshot_match, etc.)
 
 ### 1. Unit Tests (`tests/unit/`)
 
@@ -189,9 +265,15 @@ Tests for time series data structures.
 
 #### 5.4 `test_chart_render.py`
 Tests for chart rendering with matplotlib.
-- **Classes**: `TestRenderChartSvg`, `TestEmptyChartRendering`, `TestDataPointsInjection`, `TestYAxisLimits`, `TestXAxisLimits`, `TestChartThemes`, `TestSvgNormalization`
-- **Test Count**: 22
+- **Classes**: `TestRenderChartSvg`, `TestEmptyChartRendering`, `TestDataPointsInjection`, `TestYAxisLimits`, `TestXAxisLimits`, `TestChartThemes`, `TestSvgNormalization`, `TestSvgSnapshots`
+- **Test Count**: 29 (22 functional + 7 snapshot tests)
 - **Status**: REVIEWED - ALL PASS
+
+**Snapshot Tests** (new):
+- `TestSvgSnapshots` - Compares rendered SVG charts against saved snapshots to detect visual regressions
+- Snapshots stored in `tests/snapshots/svg/`
+- Update snapshots with: `UPDATE_SNAPSHOTS=1 pytest tests/charts/test_chart_render.py::TestSvgSnapshots`
+- Tests include: gauge charts (light/dark), counter charts (light/dark), empty charts, single-point charts
 
 #### 5.5 `test_chart_io.py`
 Tests for chart I/O operations.
@@ -281,6 +363,18 @@ Tests for WeeWX-style ASCII text report formatting.
 - **Classes**: `TestColumn`, `TestFormatRow`, `TestFormatSeparator`, `TestFormatMonthlyTxt`, `TestFormatYearlyTxt`, `TestFormatYearlyCompanionTxt`, `TestFormatMonthlyCompanionTxt`, `TestTextReportContent`, `TestCompanionFormatting`
 - **Test Count**: 36
 - **Status**: REVIEWED - ALL PASS
+
+#### 7.8 `test_snapshots.py` (new)
+Snapshot tests for text report formatting.
+- **Classes**: `TestTxtReportSnapshots`
+- **Test Count**: 6 snapshot tests
+- **Status**: NEW - Snapshot comparison tests
+
+**Snapshot Tests**:
+- `TestTxtReportSnapshots` - Compares generated TXT reports against saved snapshots
+- Snapshots stored in `tests/snapshots/txt/`
+- Update snapshots with: `UPDATE_SNAPSHOTS=1 pytest tests/reports/test_snapshots.py`
+- Tests include: monthly/yearly reports for both repeater and companion roles, empty reports
 
 ---
 

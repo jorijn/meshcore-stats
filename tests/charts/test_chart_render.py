@@ -1,7 +1,9 @@
 """Tests for SVG chart rendering."""
 
+import os
 import pytest
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from meshmon.charts import (
     render_chart_svg,
@@ -226,3 +228,190 @@ class TestSvgNormalization:
         normalized = normalize_svg_for_snapshot(svg)
 
         assert "Created with matplotlib" not in normalized
+
+
+class TestSvgSnapshots:
+    """Snapshot tests for SVG chart rendering.
+
+    These tests compare rendered SVG output against saved snapshots
+    to detect unintended changes in chart appearance.
+
+    To update snapshots, run: UPDATE_SNAPSHOTS=1 pytest tests/charts/test_chart_render.py
+    """
+
+    @pytest.fixture
+    def update_snapshots(self):
+        """Return True if snapshots should be updated."""
+        return os.environ.get("UPDATE_SNAPSHOTS", "").lower() in ("1", "true", "yes")
+
+    def _assert_snapshot_match(
+        self,
+        actual: str,
+        snapshot_path: Path,
+        update: bool,
+    ) -> None:
+        """Compare SVG against snapshot, with optional update mode."""
+        # Normalize for comparison
+        normalized = normalize_svg_for_snapshot(actual)
+
+        if update:
+            # Update mode: write normalized SVG to snapshot
+            snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            snapshot_path.write_text(normalized, encoding="utf-8")
+            pytest.skip(f"Snapshot updated: {snapshot_path}")
+        else:
+            # Compare mode
+            if not snapshot_path.exists():
+                # Create new snapshot if it doesn't exist
+                snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+                snapshot_path.write_text(normalized, encoding="utf-8")
+                pytest.fail(
+                    f"Snapshot created: {snapshot_path}\n"
+                    f"Run tests again to verify, or set UPDATE_SNAPSHOTS=1 to regenerate."
+                )
+
+            expected = snapshot_path.read_text(encoding="utf-8")
+
+            if normalized != expected:
+                # Show first difference for debugging
+                norm_lines = normalized.splitlines()
+                exp_lines = expected.splitlines()
+
+                diff_info = []
+                for i, (n, e) in enumerate(zip(norm_lines, exp_lines), 1):
+                    if n != e:
+                        diff_info.append(f"Line {i} differs:")
+                        diff_info.append(f"  Expected: {e[:100]}...")
+                        diff_info.append(f"  Actual:   {n[:100]}...")
+                        if len(diff_info) > 12:
+                            diff_info.append("  (more differences omitted)")
+                            break
+
+                if len(norm_lines) != len(exp_lines):
+                    diff_info.append(
+                        f"Line count: expected {len(exp_lines)}, got {len(norm_lines)}"
+                    )
+
+                pytest.fail(
+                    f"Snapshot mismatch: {snapshot_path}\n"
+                    f"Set UPDATE_SNAPSHOTS=1 to regenerate.\n\n"
+                    + "\n".join(diff_info)
+                )
+
+    def test_gauge_chart_light_theme(
+        self,
+        snapshot_gauge_timeseries,
+        light_theme,
+        snapshots_dir,
+        update_snapshots,
+    ):
+        """Gauge metric chart with light theme matches snapshot."""
+        svg = render_chart_svg(
+            snapshot_gauge_timeseries,
+            light_theme,
+            y_min=3.0,
+            y_max=4.2,
+        )
+
+        snapshot_path = snapshots_dir / "bat_day_light.svg"
+        self._assert_snapshot_match(svg, snapshot_path, update_snapshots)
+
+    def test_gauge_chart_dark_theme(
+        self,
+        snapshot_gauge_timeseries,
+        dark_theme,
+        snapshots_dir,
+        update_snapshots,
+    ):
+        """Gauge metric chart with dark theme matches snapshot."""
+        svg = render_chart_svg(
+            snapshot_gauge_timeseries,
+            dark_theme,
+            y_min=3.0,
+            y_max=4.2,
+        )
+
+        snapshot_path = snapshots_dir / "bat_day_dark.svg"
+        self._assert_snapshot_match(svg, snapshot_path, update_snapshots)
+
+    def test_counter_chart_light_theme(
+        self,
+        snapshot_counter_timeseries,
+        light_theme,
+        snapshots_dir,
+        update_snapshots,
+    ):
+        """Counter metric (rate) chart with light theme matches snapshot."""
+        svg = render_chart_svg(
+            snapshot_counter_timeseries,
+            light_theme,
+        )
+
+        snapshot_path = snapshots_dir / "nb_recv_day_light.svg"
+        self._assert_snapshot_match(svg, snapshot_path, update_snapshots)
+
+    def test_counter_chart_dark_theme(
+        self,
+        snapshot_counter_timeseries,
+        dark_theme,
+        snapshots_dir,
+        update_snapshots,
+    ):
+        """Counter metric (rate) chart with dark theme matches snapshot."""
+        svg = render_chart_svg(
+            snapshot_counter_timeseries,
+            dark_theme,
+        )
+
+        snapshot_path = snapshots_dir / "nb_recv_day_dark.svg"
+        self._assert_snapshot_match(svg, snapshot_path, update_snapshots)
+
+    def test_empty_chart_light_theme(
+        self,
+        snapshot_empty_timeseries,
+        light_theme,
+        snapshots_dir,
+        update_snapshots,
+    ):
+        """Empty chart with 'No data available' matches snapshot."""
+        svg = render_chart_svg(
+            snapshot_empty_timeseries,
+            light_theme,
+        )
+
+        snapshot_path = snapshots_dir / "empty_day_light.svg"
+        self._assert_snapshot_match(svg, snapshot_path, update_snapshots)
+
+    def test_empty_chart_dark_theme(
+        self,
+        snapshot_empty_timeseries,
+        dark_theme,
+        snapshots_dir,
+        update_snapshots,
+    ):
+        """Empty chart with dark theme matches snapshot."""
+        svg = render_chart_svg(
+            snapshot_empty_timeseries,
+            dark_theme,
+        )
+
+        snapshot_path = snapshots_dir / "empty_day_dark.svg"
+        self._assert_snapshot_match(svg, snapshot_path, update_snapshots)
+
+    def test_single_point_chart(
+        self,
+        snapshot_single_point_timeseries,
+        light_theme,
+        snapshots_dir,
+        update_snapshots,
+    ):
+        """Chart with single data point matches snapshot."""
+        svg = render_chart_svg(
+            snapshot_single_point_timeseries,
+            light_theme,
+            y_min=3.0,
+            y_max=4.2,
+        )
+
+        snapshot_path = snapshots_dir / "single_point_day_light.svg"
+        self._assert_snapshot_match(svg, snapshot_path, update_snapshots)

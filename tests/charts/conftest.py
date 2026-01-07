@@ -186,3 +186,114 @@ def sample_raw_points():
         (now - timedelta(minutes=30), 3.82),
         (now, 3.85),
     ]
+
+
+# --- Deterministic fixtures for snapshot testing ---
+# These use fixed timestamps to produce consistent SVG output
+
+
+@pytest.fixture
+def snapshot_base_time():
+    """Fixed base time for deterministic snapshot tests.
+
+    Uses 2024-01-15 12:00:00 UTC as a stable reference point.
+    """
+    return datetime(2024, 1, 15, 12, 0, 0)
+
+
+@pytest.fixture
+def snapshot_gauge_timeseries(snapshot_base_time):
+    """Deterministic gauge time series for snapshot testing.
+
+    Creates a battery voltage pattern over 24 hours with fixed timestamps.
+    """
+    points = []
+    for i in range(24):
+        ts = snapshot_base_time - timedelta(hours=23 - i)
+        # Simulate battery voltage pattern (higher during day, lower at night)
+        value = 3.7 + 0.3 * abs(12 - i) / 12
+        points.append(DataPoint(timestamp=ts, value=value))
+
+    return TimeSeries(
+        metric="bat",
+        role="repeater",
+        period="day",
+        points=points,
+    )
+
+
+@pytest.fixture
+def snapshot_counter_timeseries(snapshot_base_time):
+    """Deterministic counter time series for snapshot testing.
+
+    Creates a packet rate pattern over 24 hours with fixed timestamps.
+    This represents rate values (already converted from counter deltas).
+    """
+    points = []
+    for i in range(24):
+        ts = snapshot_base_time - timedelta(hours=23 - i)
+        # Simulate packet rate - higher during day hours (6-18)
+        hour = (i + 12) % 24  # Convert to actual hour of day
+        if 6 <= hour <= 18:
+            value = 2.0 + (hour - 6) * 0.3  # 2.0 to 5.6 packets/min
+        else:
+            value = 0.5 + (hour % 6) * 0.1  # 0.5 to 1.1 packets/min (night)
+        points.append(DataPoint(timestamp=ts, value=value))
+
+    return TimeSeries(
+        metric="nb_recv",
+        role="repeater",
+        period="day",
+        points=points,
+    )
+
+
+@pytest.fixture
+def snapshot_empty_timeseries():
+    """Empty time series for snapshot testing."""
+    return TimeSeries(
+        metric="bat",
+        role="repeater",
+        period="day",
+        points=[],
+    )
+
+
+@pytest.fixture
+def snapshot_single_point_timeseries(snapshot_base_time):
+    """Time series with single data point for snapshot testing."""
+    return TimeSeries(
+        metric="bat",
+        role="repeater",
+        period="day",
+        points=[DataPoint(timestamp=snapshot_base_time, value=3.85)],
+    )
+
+
+def normalize_svg_for_snapshot_full(svg: str) -> str:
+    """Extended SVG normalization for full snapshot comparison.
+
+    In addition to standard normalization, this also:
+    - Removes timestamps from data-points to allow content-only comparison
+    - Normalizes floating point precision
+
+    Used when you want to compare the visual structure but not exact data values.
+    """
+    # Apply standard normalization first
+    svg = normalize_svg_for_snapshot(svg)
+
+    # Normalize data-points timestamps (keep structure, normalize values)
+    # This allows charts with different base times to still match structure
+    svg = re.sub(r'"ts":\s*\d+', '"ts":0', svg)
+
+    # Normalize floating point values to 2 decimal places in attributes
+    def normalize_float(match):
+        try:
+            val = float(match.group(1))
+            return f'{val:.2f}'
+        except ValueError:
+            return match.group(0)
+
+    svg = re.sub(r'(\d+\.\d{3,})', normalize_float, svg)
+
+    return svg
