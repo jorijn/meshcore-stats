@@ -164,14 +164,15 @@ For environments where Docker is not available.
 
 - Python 3.10+
 - SQLite3
+- [uv](https://github.com/astral-sh/uv)
 
 #### Setup
 
 ```bash
 cd meshcore-stats
-python3 -m venv .venv
+uv venv
 source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
 cp meshcore.conf.example meshcore.conf
 # Edit meshcore.conf with your settings
 ```
