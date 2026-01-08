@@ -14,8 +14,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      MPLCONFIGDIR: ${{ runner.temp }}/matplotlib
     strategy:
       fail-fast: false
       matrix:
@@ -37,8 +35,10 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --extra dev
 
-      - name: Prepare matplotlib cache
-        run: mkdir -p "$MPLCONFIGDIR"
+      - name: Set up matplotlib cache
+        run: |
+          echo "MPLCONFIGDIR=$RUNNER_TEMP/matplotlib" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/matplotlib"
 
       - name: Run tests with coverage
         run: |
