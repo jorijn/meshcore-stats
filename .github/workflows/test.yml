@@ -44,34 +44,50 @@ jobs:
             --cov-report=html \
             --cov-report=term-missing \
             --cov-fail-under=95 \
+            --junitxml=test-results.xml \
             -n auto \
             --tb=short \
             -q
 
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo "### Coverage (Python ${{ matrix.python-version }})"
+            if [ -f .coverage ]; then
+              uv run coverage report -m
+            else
+              echo "No coverage data found."
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload coverage HTML report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: failure()
+        if: always() && matrix.python-version == '3.12'
         with:
-          name: coverage-report-${{ matrix.python-version }}
+          name: coverage-report-html-${{ matrix.python-version }}
           path: htmlcov/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload coverage XML report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && matrix.python-version == '3.12'
+        with:
+          name: coverage-report-xml-${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: failure()
+        if: always()
         with:
           name: test-results-${{ matrix.python-version }}
-          path: |
-            .pytest_cache/
-            test-results.xml
+          path: test-results.xml
+          if-no-files-found: warn
           retention-days: 7
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
-        if: matrix.python-version == '3.12'
-        with:
-          file: coverage.xml
-          fail_ci_if_error: false
 
   lint:
     runs-on: ubuntu-latest
