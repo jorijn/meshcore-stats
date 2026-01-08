@@ -110,34 +110,65 @@ def normalize_svg_for_snapshot(svg: str) -> str:
     """Normalize SVG for deterministic snapshot comparison.
 
     Handles matplotlib's dynamic ID generation while preserving
-    semantic content that affects chart appearance.
+    semantic content that affects chart appearance. Uses sequential
+    normalized IDs to preserve relationships between definitions
+    and references.
+
+    IMPORTANT: Each ID type gets its own prefix to maintain uniqueness:
+    - tick_N: matplotlib tick marks (m[0-9a-f]{8,})
+    - clip_N: clipPath definitions (p[0-9a-f]{8,})
+    - glyph_N: font glyph definitions (DejaVuSans-XX)
+
+    This ensures that:
+    1. All IDs remain unique (no duplicates)
+    2. References (xlink:href, url(#...)) correctly resolve
+    3. SVG renders identically to the original
     """
-    # 1. Normalize matplotlib-generated IDs (prefixed with random hex)
-    svg = re.sub(r'id="[a-zA-Z0-9]+-[0-9a-f]+"', 'id="normalized"', svg)
-    svg = re.sub(r'id="m[0-9a-f]{8,}"', 'id="normalized"', svg)
-    # Normalize clipPath IDs like id="p47c77a2a6e"
-    svg = re.sub(r'id="p[0-9a-f]{8,}"', 'id="normalized"', svg)
+    # Patterns for matplotlib's random IDs, each with its own prefix
+    # to maintain uniqueness across different ID types
+    id_type_patterns = [
+        (r'm[0-9a-f]{8,}', 'tick'),      # matplotlib tick marks
+        (r'p[0-9a-f]{8,}', 'clip'),      # matplotlib clipPaths
+        (r'DejaVuSans-[0-9a-f]+', 'glyph'),  # font glyphs (hex-named)
+    ]
 
-    # 2. Normalize url(#...) references to match
-    svg = re.sub(r'url\(#[a-zA-Z0-9]+-[0-9a-f]+\)', 'url(#normalized)', svg)
-    svg = re.sub(r'url\(#m[0-9a-f]{8,}\)', 'url(#normalized)', svg)
-    svg = re.sub(r'url\(#p[0-9a-f]{8,}\)', 'url(#normalized)', svg)
+    # Find all IDs in the document
+    all_ids = re.findall(r'id="([^"]+)"', svg)
 
-    # 3. Normalize clip-path IDs
-    svg = re.sub(r'clip-path="url\(#[^)]+\)"', 'clip-path="url(#clip)"', svg)
+    # Create mapping for IDs that match random patterns
+    # Use separate counters per type to ensure predictable naming
+    id_mapping = {}
+    type_counters = {prefix: 0 for _, prefix in id_type_patterns}
 
-    # 4. Normalize xlink:href="#..." references
-    svg = re.sub(r'xlink:href="#[a-zA-Z0-9]+-[0-9a-f]+"', 'xlink:href="#normalized"', svg)
-    svg = re.sub(r'xlink:href="#m[0-9a-f]{8,}"', 'xlink:href="#normalized"', svg)
-    svg = re.sub(r'xlink:href="#p[0-9a-f]{8,}"', 'xlink:href="#normalized"', svg)
+    for id_val in all_ids:
+        if id_val in id_mapping:
+            continue
+        for pattern, prefix in id_type_patterns:
+            if re.fullmatch(pattern, id_val):
+                new_id = f"{prefix}_{type_counters[prefix]}"
+                id_mapping[id_val] = new_id
+                type_counters[prefix] += 1
+                break
 
-    # 5. Remove matplotlib version comment (changes between versions)
+    # Replace all occurrences of mapped IDs (definitions and references)
+    # Process in a deterministic order (sorted by original ID) for consistency
+    for old_id, new_id in sorted(id_mapping.items()):
+        # Replace id definitions
+        svg = svg.replace(f'id="{old_id}"', f'id="{new_id}"')
+        # Replace url(#...) references
+        svg = svg.replace(f'url(#{old_id})', f'url(#{new_id})')
+        # Replace xlink:href references
+        svg = svg.replace(f'xlink:href="#{old_id}"', f'xlink:href="#{new_id}"')
+        # Replace href references (SVG 2.0 style without xlink prefix)
+        svg = svg.replace(f'href="#{old_id}"', f'href="#{new_id}"')
+
+    # Remove matplotlib version comment (changes between versions)
     svg = re.sub(r'<!-- Created with matplotlib.*?-->', '', svg)
 
-    # 6. Remove dc:date timestamp (changes on each render)
+    # Normalize dc:date timestamp (changes on each render)
     svg = re.sub(r'<dc:date>[^<]+</dc:date>', '<dc:date>NORMALIZED</dc:date>', svg)
 
-    # 7. Normalize whitespace (but preserve newlines for readability)
+    # Normalize whitespace (but preserve newlines for readability)
     svg = re.sub(r'[ \t]+', ' ', svg)
     svg = re.sub(r' ?\n ?', '\n', svg)
 
