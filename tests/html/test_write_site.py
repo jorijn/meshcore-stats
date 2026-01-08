@@ -2,7 +2,6 @@
 
 import time
 
-
 import pytest
 
 from meshmon.db import get_latest_metrics
