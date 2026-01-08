@@ -1,7 +1,8 @@
 """Tests for with_retries async function."""
 
-import pytest
 import asyncio
+
+import pytest
 
 from meshmon.retry import with_retries
 
@@ -251,7 +252,7 @@ class TestWithRetriesExceptionTypes:
     async def test_handles_timeout_error(self):
         """Handles asyncio.TimeoutError correctly."""
         async def fn():
-            raise asyncio.TimeoutError("timeout")
+            raise TimeoutError("timeout")
 
         success, _, exception = await with_retries(fn, attempts=1)
 

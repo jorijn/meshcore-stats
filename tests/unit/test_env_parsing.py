@@ -1,19 +1,18 @@
 """Tests for environment variable parsing functions."""
 
-import os
-import pytest
 from pathlib import Path
-from unittest.mock import patch, mock_open
+
+import pytest
 
 from meshmon.env import (
-    _parse_config_value,
-    get_str,
-    get_int,
-    get_bool,
-    get_float,
-    get_path,
     Config,
+    _parse_config_value,
+    get_bool,
     get_config,
+    get_float,
+    get_int,
+    get_path,
+    get_str,
 )
 
 

@@ -1,6 +1,5 @@
 """Tests for telemetry data extraction from Cayenne LPP format."""
 
-import pytest
 from meshmon.telemetry import extract_lpp_from_payload, extract_telemetry_metrics
 
 

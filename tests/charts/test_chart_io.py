@@ -1,12 +1,13 @@
 """Tests for chart statistics I/O functions."""
 
-import pytest
 import json
 from pathlib import Path
 
+import pytest
+
 from meshmon.charts import (
-    save_chart_stats,
     load_chart_stats,
+    save_chart_stats,
 )
 
 

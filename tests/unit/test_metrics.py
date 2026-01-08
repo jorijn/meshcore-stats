@@ -1,17 +1,18 @@
 """Tests for metrics configuration and helper functions."""
 
 import pytest
+
 from meshmon.metrics import (
-    MetricConfig,
-    METRIC_CONFIG,
     COMPANION_CHART_METRICS,
+    METRIC_CONFIG,
     REPEATER_CHART_METRICS,
+    MetricConfig,
     get_chart_metrics,
-    get_metric_config,
-    is_counter_metric,
     get_graph_scale,
+    get_metric_config,
     get_metric_label,
     get_metric_unit,
+    is_counter_metric,
     transform_value,
 )
 

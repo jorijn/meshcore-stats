@@ -1,13 +1,13 @@
 """Tests for write_site and related output functions."""
 
-import pytest
-from pathlib import Path
 
-from meshmon.html import (
-    write_site,
-    copy_static_assets,
-)
+import pytest
+
 from meshmon.db import get_latest_metrics
+from meshmon.html import (
+    copy_static_assets,
+    write_site,
+)
 
 
 @pytest.fixture

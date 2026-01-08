@@ -1,12 +1,13 @@
 """Tests for database insert functions."""
 
-import pytest
 import time
 
+import pytest
+
 from meshmon.db import (
+    get_connection,
     insert_metric,
     insert_metrics,
-    get_connection,
 )
 
 

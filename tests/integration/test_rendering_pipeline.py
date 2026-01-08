@@ -1,8 +1,8 @@
 """Integration tests for chart and HTML rendering pipeline."""
 
+import contextlib
+
 import pytest
-from pathlib import Path
-import time
 
 
 @pytest.mark.integration
@@ -60,7 +60,7 @@ class TestChartRenderingPipeline:
 
     def test_chart_statistics_calculated(self, populated_db_with_history, full_integration_env):
         """Should calculate correct statistics for charts."""
-        from meshmon.charts import render_all_charts, load_chart_stats, save_chart_stats
+        from meshmon.charts import load_chart_stats, render_all_charts, save_chart_stats
 
         # Render charts
         charts, stats = render_all_charts("repeater")
@@ -73,10 +73,10 @@ class TestChartRenderingPipeline:
 
         # Check that stats have expected structure
         # Stats are nested: {metric_name: {period: {min, max, avg, current}}}
-        for metric_name, metric_stats in loaded_stats.items():
+        for _metric_name, metric_stats in loaded_stats.items():
             if metric_stats:  # Skip empty stats
                 # Each metric has period keys like 'day', 'week', 'month', 'year'
-                for period, period_stats in metric_stats.items():
+                for _period, period_stats in metric_stats.items():
                     if period_stats:
                         assert "min" in period_stats
                         assert "max" in period_stats
@@ -89,9 +89,9 @@ class TestHtmlRenderingPipeline:
 
     def test_renders_site_pages(self, populated_db_with_history, full_integration_env):
         """Should render all HTML site pages."""
-        from meshmon.html import write_site, copy_static_assets
         from meshmon.charts import render_all_charts, save_chart_stats
         from meshmon.db import get_latest_metrics
+        from meshmon.html import write_site
 
         out_dir = full_integration_env["out_dir"]
 
@@ -131,9 +131,9 @@ class TestHtmlRenderingPipeline:
 
     def test_html_contains_chart_data(self, populated_db_with_history, full_integration_env):
         """HTML should contain embedded chart SVGs."""
-        from meshmon.html import write_site
         from meshmon.charts import render_all_charts, save_chart_stats
         from meshmon.db import get_latest_metrics
+        from meshmon.html import write_site
 
         out_dir = full_integration_env["out_dir"]
 
@@ -161,9 +161,9 @@ class TestHtmlRenderingPipeline:
         self, populated_db_with_history, full_integration_env
     ):
         """HTML should have correct status indicator based on data freshness."""
-        from meshmon.html import write_site
         from meshmon.charts import render_all_charts, save_chart_stats
         from meshmon.db import get_latest_metrics
+        from meshmon.html import write_site
 
         out_dir = full_integration_env["out_dir"]
 
@@ -193,9 +193,9 @@ class TestFullRenderingChain:
         self, populated_db_with_history, full_integration_env
     ):
         """Complete chain: database metrics -> charts -> HTML site."""
-        from meshmon.db import get_metric_count, get_latest_metrics
         from meshmon.charts import render_all_charts, save_chart_stats
-        from meshmon.html import write_site, copy_static_assets
+        from meshmon.db import get_latest_metrics, get_metric_count
+        from meshmon.html import copy_static_assets, write_site
 
         out_dir = full_integration_env["out_dir"]
 
@@ -236,11 +236,11 @@ class TestFullRenderingChain:
 
     def test_empty_database_renders_gracefully(self, full_integration_env):
         """Should handle empty database gracefully."""
-        from meshmon.db import init_db, get_metric_count, get_latest_metrics
         from meshmon.charts import render_all_charts, save_chart_stats
-        from meshmon.html import write_site, copy_static_assets
+        from meshmon.db import get_latest_metrics, get_metric_count, init_db
+        from meshmon.html import copy_static_assets, write_site
 
-        out_dir = full_integration_env["out_dir"]
+        full_integration_env["out_dir"]
 
         # Initialize empty database
         init_db()
@@ -263,9 +263,6 @@ class TestFullRenderingChain:
         repeater_row = get_latest_metrics("repeater")
 
         # Site rendering might fail or show "no data" - verify it handles gracefully
-        try:
+        # Some implementations might raise an exception for empty data - acceptable
+        with contextlib.suppress(Exception):
             write_site(companion_row, repeater_row)
-        except Exception:
-            # Some implementations might raise an exception for empty data
-            # That's acceptable behavior
-            pass

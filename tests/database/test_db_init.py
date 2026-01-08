@@ -1,14 +1,13 @@
 """Tests for database initialization and migrations."""
 
-import pytest
 import sqlite3
-from pathlib import Path
+
+import pytest
 
 from meshmon.db import (
-    init_db,
-    get_connection,
     _get_schema_version,
-    MIGRATIONS_DIR,
+    get_connection,
+    init_db,
 )
 
 
@@ -145,11 +144,13 @@ class TestGetConnection:
 
     def test_readonly_mode(self, initialized_db):
         """Read-only mode prevents writes."""
-        with get_connection(initialized_db, readonly=True) as conn:
-            with pytest.raises(sqlite3.OperationalError):
-                conn.execute(
-                    "INSERT INTO metrics (ts, role, metric, value) VALUES (1, 'companion', 'test', 1.0)"
-                )
+        with (
+            get_connection(initialized_db, readonly=True) as conn,
+            pytest.raises(sqlite3.OperationalError),
+        ):
+            conn.execute(
+                "INSERT INTO metrics (ts, role, metric, value) VALUES (1, 'companion', 'test', 1.0)"
+            )
 
 
 class TestMigrationsDirectory:

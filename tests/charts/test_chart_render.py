@@ -1,15 +1,16 @@
 """Tests for SVG chart rendering."""
 
 import os
-import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from meshmon.charts import (
-    render_chart_svg,
     CHART_THEMES,
     DataPoint,
     TimeSeries,
+    render_chart_svg,
 )
 
 from .conftest import extract_svg_data_attributes, normalize_svg_for_snapshot
@@ -278,7 +279,7 @@ class TestSvgSnapshots:
                 exp_lines = expected.splitlines()
 
                 diff_info = []
-                for i, (n, e) in enumerate(zip(norm_lines, exp_lines), 1):
+                for i, (n, e) in enumerate(zip(norm_lines, exp_lines, strict=False), 1):
                     if n != e:
                         diff_info.append(f"Line {i} differs:")
                         diff_info.append(f"  Expected: {e[:100]}...")

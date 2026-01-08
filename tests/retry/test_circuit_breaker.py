@@ -1,9 +1,7 @@
 """Tests for CircuitBreaker class."""
 
-import pytest
 import json
 import time
-from pathlib import Path
 
 from meshmon.retry import CircuitBreaker
 

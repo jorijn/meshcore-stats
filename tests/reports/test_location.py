@@ -1,11 +1,10 @@
 """Tests for location formatting functions."""
 
-import pytest
 
 from meshmon.reports import (
+    LocationInfo,
     format_lat_lon,
     format_lat_lon_dms,
-    LocationInfo,
 )
 
 

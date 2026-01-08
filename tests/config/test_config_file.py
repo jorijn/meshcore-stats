@@ -1,10 +1,8 @@
 """Tests for meshcore.conf file parsing."""
 
-import pytest
 from unittest.mock import patch
-from pathlib import Path
 
-from meshmon.env import _parse_config_value, _load_config_file
+from meshmon.env import _parse_config_value
 
 
 class TestParseConfigValueDetailed:

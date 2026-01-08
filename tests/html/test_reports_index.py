@@ -1,7 +1,7 @@
 """Tests for reports index page generation."""
 
+
 import pytest
-from pathlib import Path
 
 from meshmon.html import render_reports_index
 

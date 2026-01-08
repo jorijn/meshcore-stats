@@ -1,7 +1,8 @@
 """Tests for page context building."""
 
-import pytest
 import time
+
+import pytest
 
 from meshmon.html import (
     build_page_context,

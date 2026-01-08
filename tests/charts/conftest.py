@@ -1,16 +1,16 @@
 """Fixtures for chart tests."""
 
-import pytest
-import re
 import json
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from meshmon.charts import (
+    CHART_THEMES,
     DataPoint,
     TimeSeries,
-    ChartTheme,
-    CHART_THEMES,
 )
 
 
@@ -272,10 +272,11 @@ def snapshot_counter_timeseries(snapshot_base_time):
         ts = snapshot_base_time - timedelta(hours=23 - i)
         # Simulate packet rate - higher during day hours (6-18)
         hour = (i + 12) % 24  # Convert to actual hour of day
-        if 6 <= hour <= 18:
-            value = 2.0 + (hour - 6) * 0.3  # 2.0 to 5.6 packets/min
-        else:
-            value = 0.5 + (hour % 6) * 0.1  # 0.5 to 1.1 packets/min (night)
+        value = (
+            2.0 + (hour - 6) * 0.3  # 2.0 to 5.6 packets/min
+            if 6 <= hour <= 18
+            else 0.5 + (hour % 6) * 0.1  # 0.5 to 1.1 packets/min (night)
+        )
         points.append(DataPoint(timestamp=ts, value=value))
 
     return TimeSeries(

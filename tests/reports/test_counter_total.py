@@ -1,7 +1,8 @@
 """Tests for counter total computation with reboot handling."""
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 from meshmon.reports import compute_counter_total
 

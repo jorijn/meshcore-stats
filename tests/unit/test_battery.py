@@ -1,7 +1,8 @@
 """Tests for battery voltage to percentage conversion."""
 
 import pytest
-from meshmon.battery import voltage_to_percentage, VOLTAGE_TABLE
+
+from meshmon.battery import VOLTAGE_TABLE, voltage_to_percentage
 
 
 class TestVoltageToPercentage:

@@ -2,16 +2,17 @@
 
 import asyncio
 import fcntl
+from collections.abc import AsyncIterator, Coroutine
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Coroutine, Optional
+from typing import Any
 
-from .env import get_config
 from . import log
+from .env import get_config
 
 # Try to import meshcore - will fail gracefully if not installed
 try:
-    from meshcore import MeshCore, EventType
+    from meshcore import EventType, MeshCore
     MESHCORE_AVAILABLE = True
 except ImportError:
     MESHCORE_AVAILABLE = False
@@ -19,7 +20,7 @@ except ImportError:
     EventType = None
 
 
-def auto_detect_serial_port() -> Optional[str]:
+def auto_detect_serial_port() -> str | None:
     """
     Auto-detect a suitable serial port for MeshCore device.
     Prefers /dev/ttyACM* or /dev/ttyUSB* devices.
@@ -52,7 +53,7 @@ def auto_detect_serial_port() -> Optional[str]:
     return port.device
 
 
-async def connect_from_env() -> Optional[Any]:
+async def connect_from_env() -> Any | None:
     """
     Connect to MeshCore device using environment configuration.
 
@@ -127,19 +128,19 @@ async def _acquire_lock_async(
         try:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             return
-        except BlockingIOError:
+        except BlockingIOError as err:
             if loop.time() >= deadline:
                 raise TimeoutError(
                     f"Could not acquire serial lock within {timeout}s. "
                     "Another process may be using the serial port."
-                )
+                ) from err
             await asyncio.sleep(poll_interval)
 
 
 @asynccontextmanager
 async def connect_with_lock(
     lock_timeout: float = 60.0,
-) -> AsyncIterator[Optional[Any]]:
+) -> AsyncIterator[Any | None]:
     """Connect to MeshCore with serial port locking to prevent concurrent access.
 
     For serial transport: Acquires exclusive file lock before connecting.
@@ -162,7 +163,7 @@ async def connect_with_lock(
             lock_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Use 'a' mode: doesn't truncate, creates if missing
-            lock_file = open(lock_path, "a")
+            lock_file = open(lock_path, "a")  # noqa: SIM115 - must stay open for lock
             try:
                 await _acquire_lock_async(lock_file, timeout=lock_timeout)
                 log.debug(f"Acquired serial lock: {lock_path}")
@@ -193,7 +194,7 @@ async def run_command(
     mc: Any,
     cmd_coro: Coroutine,
     name: str,
-) -> tuple[bool, Optional[str], Optional[dict], Optional[str]]:
+) -> tuple[bool, str | None, dict | None, str | None]:
     """
     Run a MeshCore command and capture result.
 
@@ -218,10 +219,7 @@ async def run_command(
         # Extract event type name
         event_type_name = None
         if hasattr(event, "type"):
-            if hasattr(event.type, "name"):
-                event_type_name = event.type.name
-            else:
-                event_type_name = str(event.type)
+            event_type_name = event.type.name if hasattr(event.type, "name") else str(event.type)
 
         # Check for error
         if EventType and hasattr(event, "type") and event.type == EventType.ERROR:
@@ -246,13 +244,13 @@ async def run_command(
         log.debug(f"Command {name} returned: {event_type_name}")
         return (True, event_type_name, payload, None)
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return (False, None, None, "Timeout")
     except Exception as e:
         return (False, None, None, str(e))
 
 
-def get_contact_by_name(mc: Any, name: str) -> Optional[Any]:
+def get_contact_by_name(mc: Any, name: str) -> Any | None:
     """
     Find a contact by advertised name.
 
@@ -276,7 +274,7 @@ def get_contact_by_name(mc: Any, name: str) -> Optional[Any]:
         return None
 
 
-def get_contact_by_key_prefix(mc: Any, prefix: str) -> Optional[Any]:
+def get_contact_by_key_prefix(mc: Any, prefix: str) -> Any | None:
     """
     Find a contact by public key prefix.
 

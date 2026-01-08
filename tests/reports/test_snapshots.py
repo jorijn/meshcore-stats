@@ -7,18 +7,19 @@ To update snapshots, run: UPDATE_SNAPSHOTS=1 pytest tests/reports/test_snapshots
 """
 
 import os
-import pytest
 from datetime import date, datetime
 from pathlib import Path
 
+import pytest
+
 from meshmon.reports import (
-    format_monthly_txt,
-    format_yearly_txt,
+    DailyAggregate,
+    LocationInfo,
+    MetricStats,
     MonthlyAggregate,
     YearlyAggregate,
-    DailyAggregate,
-    MetricStats,
-    LocationInfo,
+    format_monthly_txt,
+    format_yearly_txt,
 )
 
 
@@ -420,7 +421,7 @@ class TestTxtReportSnapshots:
                 expected_lines = expected.splitlines()
 
                 diff_info = []
-                for i, (a, e) in enumerate(zip(actual_lines, expected_lines), 1):
+                for i, (a, e) in enumerate(zip(actual_lines, expected_lines, strict=False), 1):
                     if a != e:
                         diff_info.append(f"Line {i} differs:")
                         diff_info.append(f"  Expected: '{e}'")

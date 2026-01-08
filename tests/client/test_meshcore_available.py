@@ -1,7 +1,8 @@
 """Tests for MESHCORE_AVAILABLE flag handling."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 
 
 class TestMeshcoreAvailableTrue:
@@ -13,6 +14,7 @@ class TestMeshcoreAvailableTrue:
         monkeypatch.setattr("meshmon.meshcore_client.MESHCORE_AVAILABLE", True)
 
         from meshmon.meshcore_client import run_command
+
         from .conftest import make_mock_event
 
         event = make_mock_event("SELF_INFO", {"bat": 3850})
@@ -126,7 +128,6 @@ class TestMeshcoreImportFallback:
         monkeypatch.setattr("meshmon.meshcore_client.MESHCORE_AVAILABLE", True)
         monkeypatch.setattr("meshmon.meshcore_client.EventType", None)
 
-        from meshmon.meshcore_client import run_command
 
         # When EventType is None, the error check should be skipped
         # This is tested by the run_command success tests which mock EventType

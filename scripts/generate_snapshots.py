@@ -10,26 +10,26 @@ Usage:
 
 import re
 import sys
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from meshmon.charts import (
-    render_chart_svg,
     CHART_THEMES,
     DataPoint,
     TimeSeries,
+    render_chart_svg,
 )
 from meshmon.reports import (
-    format_monthly_txt,
-    format_yearly_txt,
+    DailyAggregate,
+    LocationInfo,
+    MetricStats,
     MonthlyAggregate,
     YearlyAggregate,
-    DailyAggregate,
-    MetricStats,
-    LocationInfo,
+    format_monthly_txt,
+    format_yearly_txt,
 )
 
 
@@ -92,10 +92,7 @@ def generate_svg_snapshots():
     for i in range(24):
         ts = base_time - timedelta(hours=23 - i)
         hour = (i + 12) % 24
-        if 6 <= hour <= 18:
-            value = 2.0 + (hour - 6) * 0.3
-        else:
-            value = 0.5 + (hour % 6) * 0.1
+        value = 2.0 + (hour - 6) * 0.3 if 6 <= hour <= 18 else 0.5 + hour % 6 * 0.1
         counter_points.append(DataPoint(timestamp=ts, value=value))
 
     counter_ts = TimeSeries(

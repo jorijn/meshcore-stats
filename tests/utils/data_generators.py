@@ -1,8 +1,8 @@
 """Utilities for generating test data."""
 
 import random
+from collections.abc import Iterator
 from datetime import datetime, timedelta
-from typing import Iterator
 
 
 def generate_timeseries(

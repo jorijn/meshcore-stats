@@ -1,17 +1,16 @@
 """Tests for database migration system."""
 
-import pytest
 import sqlite3
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 from meshmon.db import (
+    _apply_migrations,
     _get_migration_files,
     _get_schema_version,
     _set_schema_version,
-    _apply_migrations,
     get_schema_version,
-    MIGRATIONS_DIR,
 )
 
 
@@ -39,7 +38,7 @@ class TestGetMigrationFiles:
         """Each migration should have a Path object."""
         migrations = _get_migration_files()
 
-        for version, path in migrations:
+        for _version, path in migrations:
             assert isinstance(path, Path)
             assert path.exists()
             assert path.suffix == ".sql"

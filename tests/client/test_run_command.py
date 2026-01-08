@@ -1,8 +1,8 @@
 """Tests for run_command function."""
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-import asyncio
 
 from meshmon.meshcore_client import run_command
 
@@ -165,7 +165,7 @@ class TestRunCommandFailure:
         monkeypatch.setattr("meshmon.meshcore_client.MESHCORE_AVAILABLE", True)
 
         async def cmd():
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
         success, _, _, error = await run_command(
             mock_meshcore_client, cmd(), "test"

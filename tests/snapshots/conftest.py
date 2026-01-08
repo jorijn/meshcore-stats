@@ -5,8 +5,9 @@ Supports updating snapshots via UPDATE_SNAPSHOTS=1 environment variable.
 """
 
 import os
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture
@@ -77,7 +78,7 @@ def assert_snapshot_match(
             expected_lines = expected.splitlines()
 
             diff_info = []
-            for i, (a, e) in enumerate(zip(actual_lines, expected_lines), 1):
+            for i, (a, e) in enumerate(zip(actual_lines, expected_lines, strict=False), 1):
                 if a != e:
                     diff_info.append(f"Line {i}:")
                     diff_info.append(f"  Expected: {e[:100]}...")

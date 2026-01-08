@@ -1,20 +1,19 @@
 """Tests for HTML formatting functions in html.py."""
 
-import pytest
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from meshmon.html import (
-    _format_stat_value,
-    _load_svg_content,
-    _fmt_val_time,
+    STATUS_ONLINE_THRESHOLD,
+    STATUS_STALE_THRESHOLD,
     _fmt_val_day,
     _fmt_val_month,
     _fmt_val_plain,
+    _fmt_val_time,
+    _format_stat_value,
+    _load_svg_content,
     get_status,
-    STATUS_ONLINE_THRESHOLD,
-    STATUS_STALE_THRESHOLD,
 )
 
 

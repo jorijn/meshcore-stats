@@ -1,13 +1,12 @@
 """Tests for metrics builder functions."""
 
-import pytest
 
 from meshmon.html import (
-    build_repeater_metrics,
+    _build_traffic_table_rows,
     build_companion_metrics,
     build_node_details,
     build_radio_config,
-    _build_traffic_table_rows,
+    build_repeater_metrics,
 )
 
 

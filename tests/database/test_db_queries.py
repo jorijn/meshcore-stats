@@ -1,15 +1,16 @@
 """Tests for database query functions."""
 
-import pytest
 import time
 
+import pytest
+
 from meshmon.db import (
-    insert_metrics,
-    get_metrics_for_period,
+    get_available_metrics,
+    get_distinct_timestamps,
     get_latest_metrics,
     get_metric_count,
-    get_distinct_timestamps,
-    get_available_metrics,
+    get_metrics_for_period,
+    insert_metrics,
 )
 
 

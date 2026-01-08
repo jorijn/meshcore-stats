@@ -1,16 +1,14 @@
 """Tests for environment variable parsing and Config class."""
 
+
 import pytest
-from pathlib import Path
 
 from meshmon.env import (
-    get_str,
-    get_int,
-    get_bool,
-    get_float,
-    get_path,
     Config,
+    get_bool,
     get_config,
+    get_int,
+    get_str,
 )
 
 

@@ -1,6 +1,7 @@
 """Telemetry data extraction from Cayenne LPP format."""
 
 from typing import Any
+
 from . import log
 
 __all__ = ["extract_lpp_from_payload", "extract_telemetry_metrics"]
@@ -83,9 +84,7 @@ def extract_telemetry_metrics(lpp_data: Any) -> dict[str, float]:
 
         # Note: Check bool before int because bool is a subclass of int in Python.
         # Some sensors may report digital on/off values as booleans.
-        if isinstance(value, bool):
-            metrics[base_key] = float(value)
-        elif isinstance(value, (int, float)):
+        if isinstance(value, (bool, int, float)):
             metrics[base_key] = float(value)
         elif isinstance(value, dict):
             for subkey, subval in value.items():
@@ -94,9 +93,7 @@ def extract_telemetry_metrics(lpp_data: Any) -> dict[str, float]:
                 subkey_clean = subkey.strip().lower().replace(" ", "_")
                 if not subkey_clean:
                     continue
-                if isinstance(subval, bool):
-                    metrics[f"{base_key}.{subkey_clean}"] = float(subval)
-                elif isinstance(subval, (int, float)):
+                if isinstance(subval, (bool, int, float)):
                     metrics[f"{base_key}.{subkey_clean}"] = float(subval)
 
     return metrics

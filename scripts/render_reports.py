@@ -25,14 +25,24 @@ import calendar
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from meshmon import log
 from meshmon.db import init_db
 from meshmon.env import get_config
-from meshmon import log
+from meshmon.html import render_report_page, render_reports_index
+from meshmon.reports import (
+    LocationInfo,
+    aggregate_monthly,
+    aggregate_yearly,
+    format_monthly_txt,
+    format_yearly_txt,
+    get_available_periods,
+    monthly_to_json,
+    yearly_to_json,
+)
 
 
 def safe_write(path: Path, content: str) -> bool:
@@ -48,22 +58,9 @@ def safe_write(path: Path, content: str) -> bool:
     try:
         path.write_text(content, encoding="utf-8")
         return True
-    except IOError as e:
+    except OSError as e:
         log.error(f"Failed to write {path}: {e}")
         return False
-
-
-from meshmon.reports import (
-    LocationInfo,
-    aggregate_monthly,
-    aggregate_yearly,
-    format_monthly_txt,
-    format_yearly_txt,
-    get_available_periods,
-    monthly_to_json,
-    yearly_to_json,
-)
-from meshmon.html import render_report_page, render_reports_index
 
 
 def get_node_name(role: str) -> str:
@@ -91,8 +88,8 @@ def render_monthly_report(
     role: str,
     year: int,
     month: int,
-    prev_period: Optional[tuple[int, int]] = None,
-    next_period: Optional[tuple[int, int]] = None,
+    prev_period: tuple[int, int] | None = None,
+    next_period: tuple[int, int] | None = None,
 ) -> None:
     """Render monthly report in all formats.
 
@@ -152,8 +149,8 @@ def render_monthly_report(
 def render_yearly_report(
     role: str,
     year: int,
-    prev_year: Optional[int] = None,
-    next_year: Optional[int] = None,
+    prev_year: int | None = None,
+    next_year: int | None = None,
 ) -> None:
     """Render yearly report in all formats.
 

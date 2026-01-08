@@ -1,16 +1,14 @@
 """Tests for shared formatting functions."""
 
-import pytest
-from freezegun import freeze_time
 from meshmon.formatters import (
-    format_time,
-    format_value,
-    format_number,
-    format_duration,
-    format_uptime,
-    format_voltage_with_pct,
     format_compact_number,
+    format_duration,
     format_duration_compact,
+    format_number,
+    format_time,
+    format_uptime,
+    format_value,
+    format_voltage_with_pct,
 )
 
 

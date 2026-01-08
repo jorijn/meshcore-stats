@@ -1,13 +1,12 @@
 """Tests for database maintenance functions."""
 
-import pytest
-import sqlite3
 import os
+import sqlite3
 
 from meshmon.db import (
-    vacuum_db,
     get_db_path,
     init_db,
+    vacuum_db,
 )
 
 
@@ -34,7 +33,7 @@ class TestVacuumDb:
 
         # Check that database stats were updated
         conn = sqlite3.connect(initialized_db)
-        cursor = conn.execute("SELECT * FROM sqlite_stat1")
+        conn.execute("SELECT * FROM sqlite_stat1")
         # After ANALYZE, sqlite_stat1 should have entries if tables have data
         conn.close()
 

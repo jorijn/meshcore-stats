@@ -1,22 +1,22 @@
 """Tests for chart helper functions in charts.py."""
 
 import json
-import pytest
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
+
+import pytest
 
 from meshmon.charts import (
-    _hex_to_rgba,
-    _aggregate_bins,
-    _configure_x_axis,
-    _inject_data_attributes,
-    DataPoint,
-    TimeSeries,
-    ChartStatistics,
-    calculate_statistics,
-    ChartTheme,
     CHART_THEMES,
     PERIOD_CONFIG,
+    ChartStatistics,
+    DataPoint,
+    TimeSeries,
+    _aggregate_bins,
+    _configure_x_axis,
+    _hex_to_rgba,
+    _inject_data_attributes,
+    calculate_statistics,
 )
 
 
@@ -464,6 +464,6 @@ class TestPeriodConfig:
 
     def test_all_periods_have_lookback(self):
         """All periods have lookback duration defined."""
-        for period, cfg in PERIOD_CONFIG.items():
+        for _period, cfg in PERIOD_CONFIG.items():
             assert "lookback" in cfg
             assert isinstance(cfg["lookback"], timedelta)

@@ -23,10 +23,10 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from meshmon.env import get_config
 from meshmon import log
-from meshmon.meshcore_client import connect_with_lock, run_command
 from meshmon.db import init_db, insert_metrics
+from meshmon.env import get_config
+from meshmon.meshcore_client import connect_with_lock, run_command
 from meshmon.telemetry import extract_lpp_from_payload, extract_telemetry_metrics
 
 

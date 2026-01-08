@@ -4,7 +4,6 @@ import os
 import re
 import warnings
 from pathlib import Path
-from typing import Optional
 
 
 def _parse_config_value(value: str) -> str:
@@ -79,14 +78,14 @@ def _load_config_file() -> None:
                     os.environ[key] = value
 
     except (OSError, UnicodeDecodeError) as e:
-        warnings.warn(f"Failed to load {config_path}: {e}")
+        warnings.warn(f"Failed to load {config_path}: {e}", stacklevel=2)
 
 
 # Load config file at module import time, before Config is instantiated
 _load_config_file()
 
 
-def get_str(key: str, default: Optional[str] = None) -> Optional[str]:
+def get_str(key: str, default: str | None = None) -> str | None:
     """Get string env var."""
     return os.environ.get(key, default)
 
@@ -203,7 +202,7 @@ class Config:
 
 
 # Global config instance
-_config: Optional[Config] = None
+_config: Config | None = None
 
 
 def get_config() -> Config:

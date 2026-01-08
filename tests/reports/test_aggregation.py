@@ -1,16 +1,15 @@
 """Tests for report data aggregation functions."""
 
-import pytest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
+from meshmon.db import insert_metrics
 from meshmon.reports import (
+    DailyAggregate,
     aggregate_daily,
     aggregate_monthly,
     aggregate_yearly,
     get_rows_for_date,
-    DailyAggregate,
 )
-from meshmon.db import insert_metrics
 
 
 class TestGetRowsForDate:

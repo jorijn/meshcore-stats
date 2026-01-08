@@ -1,19 +1,16 @@
 """Tests for HTML builder functions in html.py."""
 
-import pytest
-from datetime import datetime
-from unittest.mock import patch, MagicMock
 
 from meshmon.html import (
+    COMPANION_CHART_GROUPS,
+    PERIOD_CONFIG,
+    REPEATER_CHART_GROUPS,
     _build_traffic_table_rows,
+    build_companion_metrics,
     build_node_details,
     build_radio_config,
     build_repeater_metrics,
-    build_companion_metrics,
     get_jinja_env,
-    REPEATER_CHART_GROUPS,
-    COMPANION_CHART_GROUPS,
-    PERIOD_CONFIG,
 )
 
 
@@ -384,6 +381,6 @@ class TestChartGroupConstants:
         assert "month" in PERIOD_CONFIG
         assert "year" in PERIOD_CONFIG
 
-        for period, (title, subtitle) in PERIOD_CONFIG.items():
+        for _period, (title, subtitle) in PERIOD_CONFIG.items():
             assert isinstance(title, str)
             assert isinstance(subtitle, str)

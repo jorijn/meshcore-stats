@@ -1,19 +1,20 @@
 """Tests for WeeWX-style ASCII text report formatting."""
 
-import pytest
 from datetime import date
 
+import pytest
+
 from meshmon.reports import (
-    format_monthly_txt,
-    format_yearly_txt,
     Column,
-    _format_row,
-    _format_separator,
+    DailyAggregate,
+    LocationInfo,
+    MetricStats,
     MonthlyAggregate,
     YearlyAggregate,
-    DailyAggregate,
-    MetricStats,
-    LocationInfo,
+    _format_row,
+    _format_separator,
+    format_monthly_txt,
+    format_yearly_txt,
 )
 
 
@@ -573,9 +574,9 @@ class TestTextReportContent:
 
         # Find lines that start with day numbers (data rows)
         # These are the actual data rows that should be aligned
-        data_lines = [l for l in lines if l.strip() and l.strip()[:2].isdigit()]
+        data_lines = [line for line in lines if line.strip() and line.strip()[:2].isdigit()]
         if len(data_lines) >= 2:
-            lengths = [len(l) for l in data_lines]
+            lengths = [len(line) for line in data_lines]
             # Data rows should be same length (well aligned)
             assert max(lengths) - min(lengths) < 10
 

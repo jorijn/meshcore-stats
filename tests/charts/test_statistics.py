@@ -1,13 +1,14 @@
 """Tests for chart statistics calculation."""
 
-import pytest
 from datetime import datetime, timedelta
 
+import pytest
+
 from meshmon.charts import (
-    calculate_statistics,
     ChartStatistics,
     DataPoint,
     TimeSeries,
+    calculate_statistics,
 )
 
 

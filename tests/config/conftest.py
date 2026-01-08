@@ -1,7 +1,8 @@
 """Fixtures for configuration tests."""
 
-import pytest
 import os
+
+import pytest
 
 
 @pytest.fixture

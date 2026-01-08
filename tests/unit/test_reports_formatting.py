@@ -1,21 +1,22 @@
 """Tests for reports formatting functions in reports.py."""
 
-import pytest
 from datetime import datetime
 
+import pytest
+
 from meshmon.reports import (
-    format_lat_lon,
-    format_lat_lon_dms,
-    LocationInfo,
     Column,
+    LocationInfo,
+    MetricStats,
+    _compute_counter_stats,
+    _compute_gauge_stats,
     _format_row,
     _format_separator,
     _get_bat_v,
-    MetricStats,
-    compute_counter_total,
-    _compute_gauge_stats,
-    _compute_counter_stats,
     _validate_role,
+    compute_counter_total,
+    format_lat_lon,
+    format_lat_lon_dms,
 )
 
 

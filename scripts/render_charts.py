@@ -12,9 +12,9 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from meshmon.db import init_db, get_metric_count
 from meshmon import log
 from meshmon.charts import render_all_charts, save_chart_stats
+from meshmon.db import get_metric_count, init_db
 
 
 def main():

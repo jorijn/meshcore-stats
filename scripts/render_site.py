@@ -13,9 +13,9 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from meshmon.db import init_db, get_latest_metrics
-from meshmon.env import get_config
 from meshmon import log
+from meshmon.db import get_latest_metrics, init_db
+from meshmon.env import get_config
 from meshmon.html import write_site
 
 

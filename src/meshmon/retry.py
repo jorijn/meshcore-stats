@@ -3,11 +3,12 @@
 import asyncio
 import json
 import time
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Optional, TypeVar
+from typing import Any, TypeVar
 
-from .env import get_config
 from . import log
+from .env import get_config
 
 T = TypeVar("T")
 
@@ -88,7 +89,7 @@ async def with_retries(
     attempts: int = 2,
     backoff_s: float = 4.0,
     name: str = "operation",
-) -> tuple[bool, Optional[T], Optional[Exception]]:
+) -> tuple[bool, T | None, Exception | None]:
     """
     Execute async function with retries.
 
@@ -101,7 +102,7 @@ async def with_retries(
     Returns:
         (success, result, last_exception)
     """
-    last_exception: Optional[Exception] = None
+    last_exception: Exception | None = None
 
     for attempt in range(1, attempts + 1):
         try:

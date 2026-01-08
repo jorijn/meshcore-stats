@@ -1,17 +1,18 @@
 """Tests for report table building functions."""
 
-import pytest
 from datetime import date
+
+import pytest
 
 from meshmon.html import (
     build_monthly_table_data,
     build_yearly_table_data,
 )
 from meshmon.reports import (
-    MonthlyAggregate,
-    YearlyAggregate,
     DailyAggregate,
     MetricStats,
+    MonthlyAggregate,
+    YearlyAggregate,
 )
 
 

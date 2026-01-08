@@ -3,15 +3,15 @@
 import pytest
 
 from meshmon.db import (
-    _validate_role,
     VALID_ROLES,
-    insert_metric,
-    insert_metrics,
-    get_metrics_for_period,
+    _validate_role,
+    get_available_metrics,
+    get_distinct_timestamps,
     get_latest_metrics,
     get_metric_count,
-    get_distinct_timestamps,
-    get_available_metrics,
+    get_metrics_for_period,
+    insert_metric,
+    insert_metrics,
 )
 
 

@@ -18,27 +18,28 @@ Outputs:
 import asyncio
 import sys
 import time
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from meshmon.env import get_config
 from meshmon import log
+from meshmon.db import init_db, insert_metrics
+from meshmon.env import get_config
 from meshmon.meshcore_client import (
     connect_with_lock,
-    run_command,
-    get_contact_by_name,
-    get_contact_by_key_prefix,
     extract_contact_info,
+    get_contact_by_key_prefix,
+    get_contact_by_name,
+    run_command,
 )
-from meshmon.db import init_db, insert_metrics
 from meshmon.retry import get_repeater_circuit_breaker, with_retries
 from meshmon.telemetry import extract_lpp_from_payload, extract_telemetry_metrics
 
 
-async def find_repeater_contact(mc: Any) -> Optional[Any]:
+async def find_repeater_contact(mc: Any) -> Any | None:
     """
     Find the repeater contact by name or key prefix.
 
@@ -69,7 +70,7 @@ async def find_repeater_contact(mc: Any) -> Optional[Any]:
             return contact
 
         # Manual search in payload dict
-        for pk, c in contacts_dict.items():
+        for _pk, c in contacts_dict.items():
             if isinstance(c, dict):
                 name = c.get("adv_name", "")
                 if name and name.lower() == cfg.repeater_name.lower():
@@ -105,7 +106,7 @@ async def query_repeater_with_retry(
     contact: Any,
     command_name: str,
     command_coro_fn: Callable[[], Coroutine[Any, Any, Any]],
-) -> tuple[bool, Optional[dict], Optional[str]]:
+) -> tuple[bool, dict | None, str | None]:
     """
     Query repeater with retry logic.
 

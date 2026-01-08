@@ -19,14 +19,14 @@ Migration system:
 
 import sqlite3
 from collections import defaultdict
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any
 
+from . import log
 from .battery import voltage_to_percentage
 from .env import get_config
-from . import log
-
 
 # Path to migrations directory (relative to this file)
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
@@ -176,7 +176,7 @@ def get_db_path() -> Path:
     return cfg.state_dir / "metrics.db"
 
 
-def init_db(db_path: Optional[Path] = None) -> None:
+def init_db(db_path: Path | None = None) -> None:
     """Initialize database with schema and apply pending migrations.
 
     Creates tables if they don't exist. Safe to call multiple times.
@@ -212,7 +212,7 @@ def init_db(db_path: Optional[Path] = None) -> None:
 
 @contextmanager
 def get_connection(
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
     readonly: bool = False
 ) -> Iterator[sqlite3.Connection]:
     """Context manager for database connections.
@@ -259,7 +259,7 @@ def insert_metric(
     role: str,
     metric: str,
     value: float,
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
 ) -> bool:
     """Insert a single metric value.
 
@@ -293,7 +293,7 @@ def insert_metrics(
     ts: int,
     role: str,
     metrics: dict[str, Any],
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
 ) -> int:
     """Insert multiple metrics from a dict (e.g., firmware status response).
 
@@ -348,7 +348,7 @@ def get_metrics_for_period(
     role: str,
     start_ts: int,
     end_ts: int,
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
 ) -> dict[str, list[tuple[int, float]]]:
     """Fetch all metrics for a role within a time range.
 
@@ -403,8 +403,8 @@ def get_metrics_for_period(
 
 def get_latest_metrics(
     role: str,
-    db_path: Optional[Path] = None,
-) -> Optional[dict[str, Any]]:
+    db_path: Path | None = None,
+) -> dict[str, Any] | None:
     """Get the most recent metrics for a role.
 
     Returns all metrics at the most recent timestamp as a flat dict.
@@ -455,7 +455,7 @@ def get_latest_metrics(
 
 def get_metric_count(
     role: str,
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
 ) -> int:
     """Get total number of metric rows for a role.
 
@@ -481,7 +481,7 @@ def get_metric_count(
 
 def get_distinct_timestamps(
     role: str,
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
 ) -> int:
     """Get count of distinct timestamps for a role.
 
@@ -506,7 +506,7 @@ def get_distinct_timestamps(
 
 def get_available_metrics(
     role: str,
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
 ) -> list[str]:
     """Get list of all metric names stored for a role.
 
@@ -529,7 +529,7 @@ def get_available_metrics(
         return [row["metric"] for row in cursor]
 
 
-def vacuum_db(db_path: Optional[Path] = None) -> None:
+def vacuum_db(db_path: Path | None = None) -> None:
     """Compact database and rebuild indexes.
 
     Should be run periodically (e.g., weekly via cron).

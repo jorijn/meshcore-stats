@@ -1,11 +1,12 @@
 """Tests for chart data transformations (counter-to-rate, etc.)."""
 
-import pytest
 from datetime import datetime, timedelta
 
+import pytest
+
 from meshmon.charts import (
-    load_timeseries_from_db,
     PERIOD_CONFIG,
+    load_timeseries_from_db,
 )
 from meshmon.db import insert_metrics
 

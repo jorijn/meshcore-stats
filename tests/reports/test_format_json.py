@@ -1,16 +1,17 @@
 """Tests for JSON report formatting."""
 
-import pytest
 import json
-from datetime import datetime, date
+from datetime import date
+
+import pytest
 
 from meshmon.reports import (
-    monthly_to_json,
-    yearly_to_json,
-    MonthlyAggregate,
-    YearlyAggregate,
     DailyAggregate,
     MetricStats,
+    MonthlyAggregate,
+    YearlyAggregate,
+    monthly_to_json,
+    yearly_to_json,
 )
 
 

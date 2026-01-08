@@ -1,7 +1,8 @@
 """Tests for TimeSeries data class and loading."""
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 from meshmon.charts import (
     DataPoint,

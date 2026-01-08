@@ -10,23 +10,23 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for server-side rendering
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 
+matplotlib.use('Agg')  # Non-interactive backend for server-side rendering
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+
+from . import log
 from .db import get_metrics_for_period
 from .env import get_config
 from .metrics import (
     get_chart_metrics,
-    is_counter_metric,
     get_graph_scale,
+    is_counter_metric,
     transform_value,
 )
-from . import log
-
 
 # Type alias for theme names
 ThemeName = Literal["light", "dark"]
@@ -134,12 +134,12 @@ class TimeSeries:
 class ChartStatistics:
     """Statistics for a time series (min/avg/max/current)."""
 
-    min_value: Optional[float] = None
-    avg_value: Optional[float] = None
-    max_value: Optional[float] = None
-    current_value: Optional[float] = None
+    min_value: float | None = None
+    avg_value: float | None = None
+    max_value: float | None = None
+    current_value: float | None = None
 
-    def to_dict(self) -> dict[str, Optional[float]]:
+    def to_dict(self) -> dict[str, float | None]:
         """Convert to dict matching existing chart_stats.json format."""
         return {
             "min": self.min_value,
@@ -167,7 +167,7 @@ def load_timeseries_from_db(
     end_time: datetime,
     lookback: timedelta,
     period: str,
-    all_metrics: Optional[dict[str, list[tuple[int, float]]]] = None,
+    all_metrics: dict[str, list[tuple[int, float]]] | None = None,
 ) -> TimeSeries:
     """Load time series data from SQLite database.
 
@@ -318,10 +318,10 @@ def render_chart_svg(
     theme: ChartTheme,
     width: int = 800,
     height: int = 280,
-    y_min: Optional[float] = None,
-    y_max: Optional[float] = None,
-    x_start: Optional[datetime] = None,
-    x_end: Optional[datetime] = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
+    x_start: datetime | None = None,
+    x_end: datetime | None = None,
 ) -> str:
     """Render time series as SVG using matplotlib.
 
@@ -464,10 +464,10 @@ def _inject_data_attributes(
     svg: str,
     ts: TimeSeries,
     theme_name: str,
-    x_start: Optional[datetime] = None,
-    x_end: Optional[datetime] = None,
-    y_min: Optional[float] = None,
-    y_max: Optional[float] = None,
+    x_start: datetime | None = None,
+    x_end: datetime | None = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
 ) -> str:
     """Inject data-* attributes into SVG for tooltip support.
 
@@ -543,7 +543,7 @@ def _inject_data_attributes(
 
 def render_all_charts(
     role: str,
-    metrics: Optional[list[str]] = None,
+    metrics: list[str] | None = None,
 ) -> tuple[list[Path], dict[str, dict[str, dict[str, Any]]]]:
     """Render all charts for a role in both light and dark themes.
 

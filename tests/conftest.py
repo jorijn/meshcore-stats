@@ -1,8 +1,9 @@
 """Root fixtures for all tests."""
 
 import os
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture(autouse=True)
@@ -137,8 +138,9 @@ def initialized_db(db_path, configured_env, monkeypatch):
 @pytest.fixture
 def populated_db(initialized_db, sample_companion_metrics, sample_repeater_metrics):
     """Database with 7 days of sample data."""
-    from meshmon.db import insert_metrics
     import time
+
+    from meshmon.db import insert_metrics
 
     now = int(time.time())
     day_seconds = 86400

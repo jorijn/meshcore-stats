@@ -1,8 +1,8 @@
 """Fixtures for reports tests."""
 
+from datetime import date, datetime, timedelta
+
 import pytest
-from datetime import datetime, date, timedelta
-from pathlib import Path
 
 
 @pytest.fixture

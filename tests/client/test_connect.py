@@ -1,15 +1,14 @@
 """Tests for MeshCore connection functions."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from pathlib import Path
 
 from meshmon.meshcore_client import (
+    _acquire_lock_async,
     auto_detect_serial_port,
     connect_from_env,
     connect_with_lock,
-    _acquire_lock_async,
-    MESHCORE_AVAILABLE,
 )
 
 
@@ -100,7 +99,7 @@ class TestConnectFromEnv:
 
         monkeypatch.setattr("meshmon.meshcore_client.MeshCore", mock_meshcore)
 
-        result = await connect_from_env()
+        await connect_from_env()
 
         mock_create.assert_called_once()
 
@@ -121,7 +120,7 @@ class TestConnectFromEnv:
 
         monkeypatch.setattr("meshmon.meshcore_client.MeshCore", mock_meshcore)
 
-        result = await connect_from_env()
+        await connect_from_env()
 
         mock_create.assert_called_once()
 
@@ -175,7 +174,7 @@ class TestConnectFromEnv:
 
         monkeypatch.setattr("meshmon.meshcore_client.MeshCore", mock_meshcore)
 
-        result = await connect_from_env()
+        await connect_from_env()
 
         mock_create.assert_called_once()
 
@@ -214,7 +213,7 @@ class TestConnectFromEnv:
 
         monkeypatch.setattr("meshmon.meshcore_client.MeshCore", mock_meshcore)
 
-        result = await connect_from_env()
+        await connect_from_env()
 
         mock_create.assert_called_once()
 
@@ -301,7 +300,7 @@ class TestConnectWithLock:
 
         monkeypatch.setattr("meshmon.meshcore_client.MeshCore", mock_meshcore)
 
-        async with connect_with_lock() as mc:
+        async with connect_with_lock():
             # Lock file should exist while connected
             lock_path = cfg.state_dir / "serial.lock"
             assert lock_path.exists()
@@ -328,7 +327,7 @@ class TestConnectWithLock:
 
         lock_path = cfg.state_dir / "serial.lock"
 
-        async with connect_with_lock() as mc:
+        async with connect_with_lock():
             # Lock file should not exist for TCP
             assert not lock_path.exists()
 
@@ -406,26 +405,25 @@ class TestAcquireLockAsync:
         lock_file = tmp_path / "test.lock"
 
         # Hold the lock in this process
-        holder = open(lock_file, "w")
+        holder = open(lock_file, "w")  # noqa: SIM115 - must stay open for lock
         fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
 
         try:
             # Try to acquire with different file handle
-            with open(lock_file, "a") as f:
-                with pytest.raises(TimeoutError):
-                    await _acquire_lock_async(f, timeout=0.2, poll_interval=0.05)
+            with open(lock_file, "a") as f, pytest.raises(TimeoutError):
+                await _acquire_lock_async(f, timeout=0.2, poll_interval=0.05)
         finally:
             holder.close()
 
     @pytest.mark.asyncio
     async def test_waits_for_lock_release(self, tmp_path):
         """Waits and acquires when lock released."""
-        import fcntl
         import asyncio
+        import fcntl
 
         lock_file = tmp_path / "test.lock"
 
-        holder = open(lock_file, "w")
+        holder = open(lock_file, "w")  # noqa: SIM115 - must stay open for lock
         fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
 
         async def release_later():

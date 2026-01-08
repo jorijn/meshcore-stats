@@ -1,6 +1,5 @@
 """Tests for contact lookup functions."""
 
-import pytest
 from unittest.mock import MagicMock
 
 

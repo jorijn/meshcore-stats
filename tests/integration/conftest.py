@@ -1,9 +1,9 @@
 """Integration test fixtures."""
 
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock
 import time
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 @pytest.fixture

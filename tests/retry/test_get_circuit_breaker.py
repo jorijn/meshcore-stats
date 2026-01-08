@@ -1,9 +1,7 @@
 """Tests for get_repeater_circuit_breaker function."""
 
-import pytest
-from pathlib import Path
 
-from meshmon.retry import get_repeater_circuit_breaker, CircuitBreaker
+from meshmon.retry import CircuitBreaker, get_repeater_circuit_breaker
 
 
 class TestGetRepeaterCircuitBreaker:

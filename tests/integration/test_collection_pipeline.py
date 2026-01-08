@@ -1,9 +1,9 @@
 """Integration tests for data collection pipeline."""
 
-import pytest
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock, patch
-import asyncio
+from unittest.mock import patch
+
+import pytest
 
 
 @pytest.mark.integration
@@ -30,14 +30,15 @@ class TestCompanionCollectionPipeline:
             mock_connect_with_lock,
         ):
             # Initialize database
-            from meshmon.db import init_db, get_latest_metrics
+            from meshmon.db import get_latest_metrics, init_db
 
             init_db()
 
             # Import and run collection (inline to avoid import issues)
             # Note: We import the function directly rather than the script
-            from meshmon.db import insert_metrics
             import time
+
+            from meshmon.db import insert_metrics
 
             # Simulate collection logic
             ts = int(time.time())
@@ -92,7 +93,7 @@ class TestCompanionCollectionPipeline:
             "meshmon.meshcore_client.connect_with_lock",
             mock_connect_with_lock_failing,
         ):
-            from meshmon.db import init_db, get_latest_metrics
+            from meshmon.db import get_latest_metrics, init_db
 
             init_db()
 
@@ -114,8 +115,9 @@ class TestCollectionWithCircuitBreaker:
         self, full_integration_env, monkeypatch
     ):
         """Collection should be skipped when circuit breaker is open."""
-        from meshmon.retry import CircuitBreaker
         import time
+
+        from meshmon.retry import CircuitBreaker
 
         # Create an open circuit breaker
         state_dir = full_integration_env["state_dir"]
@@ -133,8 +135,8 @@ class TestCollectionWithCircuitBreaker:
     @pytest.mark.asyncio
     async def test_circuit_breaker_records_failure(self, full_integration_env, monkeypatch):
         """Circuit breaker should record failures."""
+
         from meshmon.retry import CircuitBreaker
-        import time
 
         state_dir = full_integration_env["state_dir"]
         cb = CircuitBreaker(state_dir / "test_circuit.json")
@@ -155,8 +157,9 @@ class TestCollectionWithCircuitBreaker:
     @pytest.mark.asyncio
     async def test_circuit_breaker_state_persists(self, full_integration_env):
         """Circuit breaker state should persist to disk."""
-        from meshmon.retry import CircuitBreaker
         import time
+
+        from meshmon.retry import CircuitBreaker
 
         state_dir = full_integration_env["state_dir"]
         state_file = state_dir / "persist_test_circuit.json"

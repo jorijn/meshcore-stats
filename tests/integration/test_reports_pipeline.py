@@ -1,10 +1,10 @@
 """Integration tests for report generation pipeline."""
 
-import pytest
-from pathlib import Path
 import json
 import time
 from datetime import datetime
+
+import pytest
 
 
 @pytest.mark.integration
@@ -13,8 +13,8 @@ class TestReportGenerationPipeline:
 
     def test_generates_monthly_reports(self, populated_db_with_history, full_integration_env):
         """Should generate monthly reports for available data."""
-        from meshmon.reports import aggregate_monthly, format_monthly_txt, get_available_periods
         from meshmon.html import render_report_page
+        from meshmon.reports import aggregate_monthly, format_monthly_txt, get_available_periods
 
         # Get available periods
         periods = get_available_periods("repeater")
@@ -52,8 +52,8 @@ class TestReportGenerationPipeline:
 
     def test_generates_yearly_reports(self, populated_db_with_history, full_integration_env):
         """Should generate yearly reports for available data."""
-        from meshmon.reports import aggregate_yearly, format_yearly_txt, get_available_periods
         from meshmon.html import render_report_page
+        from meshmon.reports import aggregate_yearly, format_yearly_txt, get_available_periods
 
         # Get available periods
         periods = get_available_periods("repeater")
@@ -93,9 +93,9 @@ class TestReportGenerationPipeline:
         from meshmon.reports import (
             aggregate_monthly,
             aggregate_yearly,
+            get_available_periods,
             monthly_to_json,
             yearly_to_json,
-            get_available_periods,
         )
 
         periods = get_available_periods("repeater")
@@ -125,14 +125,14 @@ class TestReportGenerationPipeline:
 
     def test_report_files_created(self, populated_db_with_history, full_integration_env):
         """Should create report files in correct directory structure."""
+        from meshmon.html import render_report_page
         from meshmon.reports import (
+            LocationInfo,
             aggregate_monthly,
             format_monthly_txt,
-            monthly_to_json,
             get_available_periods,
-            LocationInfo,
+            monthly_to_json,
         )
-        from meshmon.html import render_report_page
 
         out_dir = full_integration_env["out_dir"]
 
@@ -173,9 +173,10 @@ class TestReportsIndex:
 
     def test_generates_reports_index(self, populated_db_with_history, full_integration_env):
         """Should generate reports index with all available periods."""
-        from meshmon.reports import get_available_periods
-        from meshmon.html import render_reports_index
         import calendar
+
+        from meshmon.html import render_reports_index
+        from meshmon.reports import get_available_periods
 
         out_dir = full_integration_env["out_dir"]
 
@@ -232,7 +233,7 @@ class TestCounterAggregation:
     def test_counter_aggregation_handles_reboots(self, full_integration_env):
         """Counter aggregation should correctly handle device reboots."""
         from meshmon.db import init_db, insert_metrics
-        from meshmon.reports import aggregate_daily, compute_counter_total
+        from meshmon.reports import aggregate_daily
 
         init_db()
 
@@ -294,14 +295,14 @@ class TestReportConsistency:
         self, populated_db_with_history, full_integration_env
     ):
         """TXT, JSON, and HTML reports should contain consistent data."""
+        from meshmon.html import render_report_page
         from meshmon.reports import (
+            LocationInfo,
             aggregate_monthly,
             format_monthly_txt,
-            monthly_to_json,
             get_available_periods,
-            LocationInfo,
+            monthly_to_json,
         )
-        from meshmon.html import render_report_page
 
         periods = get_available_periods("repeater")
         year, month = periods[-1]
