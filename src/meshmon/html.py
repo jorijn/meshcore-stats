@@ -697,7 +697,7 @@ def render_node_page(
     env = get_jinja_env()
     context = build_page_context(role, period, row, at_root)
     template = env.get_template("node.html")
-    return template.render(**context)
+    return str(template.render(**context))
 
 
 def copy_static_assets():
@@ -1257,7 +1257,7 @@ def render_report_page(
     }
 
     template = env.get_template("report.html")
-    return template.render(**context)
+    return str(template.render(**context))
 
 
 def render_reports_index(report_sections: list[dict]) -> str:
@@ -1294,4 +1294,4 @@ def render_reports_index(report_sections: list[dict]) -> str:
     }
 
     template = env.get_template("report_index.html")
-    return template.render(**context)
+    return str(template.render(**context))
