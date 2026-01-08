@@ -11,6 +11,8 @@ from meshmon.charts import (
     calculate_statistics,
 )
 
+BASE_TIME = datetime(2024, 1, 1, 0, 0, 0)
+
 
 class TestCalculateStatistics:
     """Tests for calculate_statistics function."""
@@ -113,7 +115,7 @@ class TestStatisticsWithVariousData:
 
     def test_constant_values(self):
         """All same values gives min=avg=max."""
-        now = datetime.now()
+        now = BASE_TIME
         points = [DataPoint(timestamp=now + timedelta(hours=i), value=5.0) for i in range(10)]
         ts = TimeSeries(metric="test", role="companion", period="day", points=points)
 
@@ -125,7 +127,7 @@ class TestStatisticsWithVariousData:
 
     def test_increasing_values(self):
         """Increasing values have correct stats."""
-        now = datetime.now()
+        now = BASE_TIME
         points = [DataPoint(timestamp=now + timedelta(hours=i), value=float(i)) for i in range(10)]
         ts = TimeSeries(metric="test", role="companion", period="day", points=points)
 
@@ -138,7 +140,7 @@ class TestStatisticsWithVariousData:
 
     def test_negative_values(self):
         """Handles negative values correctly."""
-        now = datetime.now()
+        now = BASE_TIME
         points = [
             DataPoint(timestamp=now, value=-10.0),
             DataPoint(timestamp=now + timedelta(hours=1), value=-5.0),
@@ -154,7 +156,7 @@ class TestStatisticsWithVariousData:
 
     def test_large_values(self):
         """Handles large values correctly."""
-        now = datetime.now()
+        now = BASE_TIME
         points = [
             DataPoint(timestamp=now, value=1e10),
             DataPoint(timestamp=now + timedelta(hours=1), value=1e11),
@@ -168,7 +170,7 @@ class TestStatisticsWithVariousData:
 
     def test_small_decimal_values(self):
         """Handles small decimal values correctly."""
-        now = datetime.now()
+        now = BASE_TIME
         points = [
             DataPoint(timestamp=now, value=0.001),
             DataPoint(timestamp=now + timedelta(hours=1), value=0.002),

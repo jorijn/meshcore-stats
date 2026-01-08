@@ -1,5 +1,7 @@
 """Tests for Jinja2 environment and custom filters."""
 
+import re
+
 import pytest
 from jinja2 import Environment
 
@@ -32,9 +34,7 @@ class TestGetJinjaEnv:
         """Returns the same environment instance (cached)."""
         env1 = get_jinja_env()
         env2 = get_jinja_env()
-        # Implementation may or may not cache - just verify both work
-        assert env1 is not None
-        assert env2 is not None
+        assert env1 is env2
 
 
 class TestJinjaFilters:
@@ -54,16 +54,14 @@ class TestJinjaFilters:
         template = env.from_string("{{ value|format_number }}")
 
         result = template.render(value=1234567)
-        # Should have some separator
-        assert "1234567" not in result or len(result) > 7
+        assert result == "1,234,567"
 
     def test_format_number_handles_none(self, env):
         """format_number handles None gracefully."""
         template = env.from_string("{{ value|format_number }}")
 
         result = template.render(value=None)
-        # Should return dash or empty string for None
-        assert result in ["-", "N/A", "None", "", " - "]
+        assert result == "N/A"
 
     def test_format_time_filter_exists(self, env):
         """format_time filter is registered."""
@@ -73,19 +71,16 @@ class TestJinjaFilters:
         """format_time formats Unix timestamp."""
         template = env.from_string("{{ value|format_time }}")
 
-        # Use a recent timestamp
-        import time
-        ts = int(time.time()) - 3600
+        ts = 1704067200
         result = template.render(value=ts)
-        # Should produce some formatted time string
-        assert len(result) > 0
+        assert re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", result)
 
     def test_format_time_handles_none(self, env):
         """format_time handles None gracefully."""
         template = env.from_string("{{ value|format_time }}")
 
         result = template.render(value=None)
-        assert result in ["-", "N/A", "None", "", " - "]
+        assert result == "N/A"
 
     def test_format_uptime_filter_exists(self, env):
         """format_uptime filter is registered."""
@@ -97,8 +92,7 @@ class TestJinjaFilters:
 
         # 1 day, 2 hours, 30 minutes = 95400 seconds
         result = template.render(value=95400)
-        # Should produce some duration output
-        assert len(result) > 0
+        assert result == "1d 2h 30m"
 
     def test_format_duration_filter_exists(self, env):
         """format_duration filter is registered."""

@@ -72,15 +72,27 @@ class TestBuildMonthlyTableData:
         # Should have 2 data rows + 1 summary row = 3 total
         data_rows = [r for r in rows if not r.get("is_summary", False)]
         assert len(data_rows) == 2
+        assert len(rows) == 3
+        assert rows[-1]["is_summary"] is True
 
     def test_headers_have_labels(self, sample_monthly_aggregate):
         """Headers include label information."""
         _, headers, _ = build_monthly_table_data(sample_monthly_aggregate, "repeater")
 
-        assert len(headers) > 0
-        for header in headers:
-            assert isinstance(header, dict)
-            assert "label" in header or "name" in header or "key" in header
+        expected_labels = [
+            "Day",
+            "Avg V",
+            "Avg %",
+            "Min V",
+            "Max V",
+            "RSSI",
+            "SNR",
+            "Noise",
+            "RX",
+            "TX",
+            "Secs",
+        ]
+        assert [header["label"] for header in headers] == expected_labels
 
     def test_rows_have_date(self, sample_monthly_aggregate):
         """Each data row includes date information via cells."""
@@ -93,6 +105,20 @@ class TestBuildMonthlyTableData:
             assert "cells" in row
             # First cell should be the day
             assert len(row["cells"]) > 0
+        assert [row["cells"][0]["value"] for row in data_rows] == ["01", "02"]
+
+    def test_daily_row_values(self, sample_monthly_aggregate):
+        """Daily rows include formatted values and placeholders."""
+        _, _, rows = build_monthly_table_data(sample_monthly_aggregate, "repeater")
+        first_row = next(r for r in rows if not r.get("is_summary", False))
+        cells = first_row["cells"]
+
+        assert cells[0]["value"] == "01"
+        assert cells[1]["value"] == "3.80"
+        assert cells[2]["value"] == "-"
+        assert cells[5]["value"] == "-87"
+        assert cells[6]["value"] == "-"
+        assert cells[8]["value"] == "720"
 
     def test_handles_empty_aggregate(self):
         """Handles aggregate with no daily data."""
@@ -162,29 +188,45 @@ class TestBuildYearlyTableData:
         # Should have 2 data rows + 1 summary row
         data_rows = [r for r in rows if not r.get("is_summary", False)]
         assert len(data_rows) == 2
+        assert len(rows) == 3
+        assert rows[-1]["is_summary"] is True
 
     def test_headers_have_labels(self, sample_yearly_aggregate):
         """Headers include label information."""
         _, headers, _ = build_yearly_table_data(sample_yearly_aggregate, "repeater")
 
-        assert len(headers) > 0
-        for header in headers:
-            assert isinstance(header, dict)
-            assert "label" in header or "name" in header or "key" in header
+        expected_labels = [
+            "Year",
+            "Mo",
+            "Volt",
+            "%",
+            "High",
+            "Low",
+            "RSSI",
+            "SNR",
+            "RX",
+            "TX",
+        ]
+        assert [header["label"] for header in headers] == expected_labels
 
     def test_rows_have_month(self, sample_yearly_aggregate):
         """Each row includes month information."""
         _, _, rows = build_yearly_table_data(sample_yearly_aggregate, "repeater")
 
-        for row in rows:
-            assert isinstance(row, dict)
-            # Row should have month name or number
-            has_month = (
-                "month" in row
-                or any("month" in str(v).lower() or "jan" in str(v).lower() or "feb" in str(v).lower()
-                       for v in row.values())
-            )
-            assert has_month or len(row) > 0  # At minimum should have data
+        data_rows = [r for r in rows if not r.get("is_summary", False)]
+        months = [row["cells"][1]["value"] for row in data_rows]
+        assert months == ["01", "02"]
+
+    def test_yearly_row_values(self, sample_yearly_aggregate):
+        """Yearly rows include formatted values and placeholders."""
+        _, _, rows = build_yearly_table_data(sample_yearly_aggregate, "repeater")
+        first_row = next(r for r in rows if not r.get("is_summary", False))
+        cells = first_row["cells"]
+
+        assert cells[0]["value"] == "2024"
+        assert cells[1]["value"] == "01"
+        assert cells[2]["value"] == "3.75"
+        assert cells[3]["value"] == "-"
 
     def test_handles_empty_aggregate(self):
         """Handles aggregate with no monthly data."""
@@ -231,11 +273,13 @@ class TestTableColumnGroups:
         """Column groups have expected structure."""
         column_groups, _, _ = build_monthly_table_data(monthly_aggregate_with_data, "repeater")
 
-        for group in column_groups:
-            assert isinstance(group, dict)
-            # Should have label and span info
-            assert "label" in group or "name" in group
-            assert "span" in group or "colspan" in group or "columns" in group
+        assert column_groups == [
+            {"label": "", "colspan": 1},
+            {"label": "Battery", "colspan": 4},
+            {"label": "Signal", "colspan": 3},
+            {"label": "Packets", "colspan": 2},
+            {"label": "Air", "colspan": 1},
+        ]
 
     def test_column_groups_span_matches_headers(self, monthly_aggregate_with_data):
         """Column group spans should add up to header count."""
@@ -246,9 +290,7 @@ class TestTableColumnGroups:
             for g in column_groups
         )
 
-        # Total span should match or be close to header count
-        # (implementation may vary in how headers are structured)
-        assert total_span > 0 or len(headers) > 0
+        assert total_span == len(headers)
 
 
 class TestTableRolesHandling:
@@ -283,6 +325,16 @@ class TestTableRolesHandling:
         # 1 data row + summary row
         data_rows = [r for r in rows if not r.get("is_summary", False)]
         assert len(data_rows) == 1
+        assert [header["label"] for header in headers] == [
+            "Day",
+            "Avg V",
+            "Avg %",
+            "Min V",
+            "Max V",
+            "Contacts",
+            "RX",
+            "TX",
+        ]
 
     def test_different_roles_different_columns(self, companion_aggregate):
         """Different roles may have different column structures."""
@@ -308,3 +360,4 @@ class TestTableRolesHandling:
         # Both should return valid data
         assert len(companion_result) == 3
         assert len(repeater_result) == 3
+        assert [h["label"] for h in companion_result[1]] != [h["label"] for h in repeater_result[1]]

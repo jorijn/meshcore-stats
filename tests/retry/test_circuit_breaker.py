@@ -1,9 +1,24 @@
 """Tests for CircuitBreaker class."""
 
 import json
-import time
+
+import pytest
 
 from meshmon.retry import CircuitBreaker
+
+BASE_TS = 1704067200
+
+
+@pytest.fixture
+def time_controller(monkeypatch):
+    """Control time.time() within meshmon.retry."""
+    state = {"now": BASE_TS}
+
+    def _time():
+        return state["now"]
+
+    monkeypatch.setattr("meshmon.retry.time.time", _time)
+    return state
 
 
 class TestCircuitBreakerInit:
@@ -25,12 +40,12 @@ class TestCircuitBreakerInit:
         assert cb.cooldown_until == 0
         assert cb.last_success > 0
 
-    def test_loads_open_circuit_state(self, open_circuit):
+    def test_loads_open_circuit_state(self, open_circuit, time_controller):
         """Loads open circuit state correctly."""
         cb = CircuitBreaker(open_circuit)
 
         assert cb.consecutive_failures == 10
-        assert cb.cooldown_until > time.time()
+        assert cb.cooldown_until == BASE_TS + 3600
         assert cb.is_open() is True
 
     def test_handles_corrupted_file(self, corrupted_state_file):
@@ -74,24 +89,24 @@ class TestCircuitBreakerIsOpen:
 
         assert cb.is_open() is False
 
-    def test_open_circuit_returns_true(self, open_circuit):
+    def test_open_circuit_returns_true(self, open_circuit, time_controller):
         """Open circuit (in cooldown) returns True."""
         cb = CircuitBreaker(open_circuit)
 
         assert cb.is_open() is True
 
-    def test_expired_cooldown_returns_false(self, expired_cooldown_circuit):
+    def test_expired_cooldown_returns_false(self, expired_cooldown_circuit, time_controller):
         """Expired cooldown returns False (circuit closes)."""
         cb = CircuitBreaker(expired_cooldown_circuit)
 
         assert cb.is_open() is False
 
-    def test_cooldown_expiry(self, circuit_state_file):
+    def test_cooldown_expiry(self, circuit_state_file, time_controller):
         """Circuit closes when cooldown expires."""
-        # Set cooldown to 0.1 seconds from now
+        # Set cooldown to 10 seconds from now
         state = {
             "consecutive_failures": 10,
-            "cooldown_until": time.time() + 0.1,
+            "cooldown_until": BASE_TS + 10,
             "last_success": 0,
         }
         circuit_state_file.write_text(json.dumps(state))
@@ -99,7 +114,7 @@ class TestCircuitBreakerIsOpen:
         cb = CircuitBreaker(circuit_state_file)
         assert cb.is_open() is True
 
-        time.sleep(0.15)
+        time_controller["now"] = BASE_TS + 11
         assert cb.is_open() is False
 
 
@@ -112,11 +127,11 @@ class TestCooldownRemaining:
 
         assert cb.cooldown_remaining() == 0
 
-    def test_returns_seconds_when_open(self, circuit_state_file):
+    def test_returns_seconds_when_open(self, circuit_state_file, time_controller):
         """Returns remaining seconds when in cooldown."""
         state = {
             "consecutive_failures": 10,
-            "cooldown_until": time.time() + 100,
+            "cooldown_until": BASE_TS + 100,
             "last_success": 0,
         }
         circuit_state_file.write_text(json.dumps(state))
@@ -124,7 +139,7 @@ class TestCooldownRemaining:
         cb = CircuitBreaker(circuit_state_file)
         remaining = cb.cooldown_remaining()
 
-        assert 98 <= remaining <= 100
+        assert remaining == 100
 
     def test_returns_zero_when_expired(self, expired_cooldown_circuit):
         """Returns 0 when cooldown has expired."""
@@ -132,7 +147,7 @@ class TestCooldownRemaining:
 
         assert cb.cooldown_remaining() == 0
 
-    def test_returns_integer(self, open_circuit):
+    def test_returns_integer(self, open_circuit, time_controller):
         """Returns an integer, not float."""
         cb = CircuitBreaker(open_circuit)
 
@@ -156,14 +171,13 @@ class TestRecordSuccess:
 
         assert cb.consecutive_failures == 0
 
-    def test_updates_last_success(self, circuit_state_file):
+    def test_updates_last_success(self, circuit_state_file, time_controller):
         """Success updates last_success timestamp."""
         cb = CircuitBreaker(circuit_state_file)
-        before = time.time()
+        time_controller["now"] = BASE_TS + 5
         cb.record_success()
-        after = time.time()
 
-        assert before <= cb.last_success <= after
+        assert cb.last_success == BASE_TS + 5
 
     def test_persists_to_file(self, circuit_state_file):
         """Success state is persisted to file."""
@@ -195,7 +209,7 @@ class TestRecordFailure:
 
         assert cb.consecutive_failures == 1
 
-    def test_opens_circuit_at_threshold(self, circuit_state_file):
+    def test_opens_circuit_at_threshold(self, circuit_state_file, time_controller):
         """Circuit opens when failures reach threshold."""
         cb = CircuitBreaker(circuit_state_file)
 
@@ -204,9 +218,9 @@ class TestRecordFailure:
             cb.record_failure(max_failures=5, cooldown_s=3600)
 
         assert cb.is_open() is True
-        assert cb.cooldown_until > time.time()
+        assert cb.cooldown_until == BASE_TS + 3600
 
-    def test_does_not_open_before_threshold(self, circuit_state_file):
+    def test_does_not_open_before_threshold(self, circuit_state_file, time_controller):
         """Circuit stays closed before reaching threshold."""
         cb = CircuitBreaker(circuit_state_file)
 
@@ -215,18 +229,15 @@ class TestRecordFailure:
 
         assert cb.is_open() is False
 
-    def test_cooldown_duration(self, circuit_state_file):
+    def test_cooldown_duration(self, circuit_state_file, time_controller):
         """Cooldown is set to specified duration."""
         cb = CircuitBreaker(circuit_state_file)
 
-        before = time.time()
         for _ in range(5):
             cb.record_failure(max_failures=5, cooldown_s=100)
-        after = time.time()
 
         # Cooldown should be ~100 seconds from now
-        assert cb.cooldown_until >= before + 100
-        assert cb.cooldown_until <= after + 100
+        assert cb.cooldown_until == BASE_TS + 100
 
     def test_persists_to_file(self, circuit_state_file):
         """Failure state is persisted to file."""
@@ -251,14 +262,14 @@ class TestToDict:
         assert "is_open" in d
         assert "cooldown_remaining_s" in d
 
-    def test_is_open_reflects_state(self, open_circuit):
+    def test_is_open_reflects_state(self, open_circuit, time_controller):
         """is_open in dict reflects actual circuit state."""
         cb = CircuitBreaker(open_circuit)
         d = cb.to_dict()
 
         assert d["is_open"] is True
 
-    def test_cooldown_remaining_reflects_state(self, open_circuit):
+    def test_cooldown_remaining_reflects_state(self, open_circuit, time_controller):
         """cooldown_remaining_s reflects actual remaining time."""
         cb = CircuitBreaker(open_circuit)
         d = cb.to_dict()
@@ -301,7 +312,7 @@ class TestStatePersistence:
         cb2 = CircuitBreaker(circuit_state_file)
         assert cb2.consecutive_failures == 0
 
-    def test_open_state_survives_reload(self, circuit_state_file):
+    def test_open_state_survives_reload(self, circuit_state_file, time_controller):
         """Open circuit state persists across instances."""
         cb1 = CircuitBreaker(circuit_state_file)
         for _ in range(10):

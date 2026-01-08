@@ -26,40 +26,36 @@ class TestFormatLatLon:
     def test_north_east(self):
         """Positive lat/lon formats as N/E."""
         lat_str, lon_str = format_lat_lon(51.5074, 0.1278)
-        assert "N" in lat_str
-        assert "E" in lon_str
-        assert "51" in lat_str
+        assert lat_str == "51-30.44 N"
+        assert lon_str == "000-07.67 E"
 
     def test_south_west(self):
         """Negative lat/lon formats as S/W."""
         lat_str, lon_str = format_lat_lon(-33.8688, -151.2093)
-        assert "S" in lat_str
-        assert "W" in lon_str
+        assert lat_str == "33-52.13 S"
+        assert lon_str == "151-12.56 W"
 
     def test_degrees_minutes_format(self):
         """Output is in DD-MM.MM format."""
         lat_str, lon_str = format_lat_lon(51.5074, -0.1278)
-        # Latitude: 51°30.44'N -> 51-30.44 N
-        assert "-" in lat_str
-        # Longitude: 0°7.67'W -> 000-07.67 W
-        assert "-" in lon_str
+        assert lat_str == "51-30.44 N"
+        assert lon_str == "000-07.67 W"
 
     def test_zero_coordinates(self):
         """Zero coordinates at equator/prime meridian."""
         lat_str, lon_str = format_lat_lon(0.0, 0.0)
-        assert "N" in lat_str  # 0 is treated as North
-        assert "E" in lon_str  # 0 is treated as East
-        assert "00-00.00" in lat_str
+        assert lat_str == "00-00.00 N"
+        assert lon_str == "000-00.00 E"
 
     def test_latitude_format_width(self):
         """Latitude degrees is 2 digits."""
         lat_str, _ = format_lat_lon(5.5, 0.0)
-        assert lat_str.startswith("05")
+        assert lat_str == "05-30.00 N"
 
     def test_longitude_format_width(self):
         """Longitude degrees is 3 digits."""
         _, lon_str = format_lat_lon(0.0, 5.5)
-        assert lon_str.startswith("005")
+        assert lon_str == "005-30.00 E"
 
 
 class TestFormatLatLonDms:
@@ -68,31 +64,27 @@ class TestFormatLatLonDms:
     def test_basic_format(self):
         """Returns combined DMS string."""
         result = format_lat_lon_dms(51.5074, -0.1278)
-        assert "°" in result
-        assert "'" in result
-        assert '"' in result
+        assert result == "51°30'26\"N  000°07'40\"W"
 
     def test_north_east_directions(self):
         """Positive coordinates show N and E."""
         result = format_lat_lon_dms(51.5074, 0.1278)
-        assert "N" in result
-        assert "E" in result
+        assert result == "51°30'26\"N  000°07'40\"E"
 
     def test_south_west_directions(self):
         """Negative coordinates show S and W."""
         result = format_lat_lon_dms(-33.8688, -151.2093)
-        assert "S" in result
-        assert "W" in result
+        assert result == "33°52'07\"S  151°12'33\"W"
 
     def test_lat_two_digit_degrees(self):
         """Latitude has 2-digit degrees."""
         result = format_lat_lon_dms(5.0, 0.0)
-        assert "05°" in result
+        assert result == "05°00'00\"N  000°00'00\"E"
 
     def test_lon_three_digit_degrees(self):
         """Longitude has 3-digit degrees."""
         result = format_lat_lon_dms(0.0, 5.0)
-        assert "005°" in result
+        assert result == "00°00'00\"N  005°00'00\"E"
 
 
 class TestLocationInfo:
@@ -108,9 +100,11 @@ class TestLocationInfo:
         )
         header = loc.format_header()
 
-        assert "NAME: Test Station" in header
-        assert "COORDS:" in header
-        assert "ELEV: 11 meters" in header
+        assert (
+            header
+            == "NAME: Test Station\n"
+            "COORDS: 51°30'26\"N  000°07'40\"W    ELEV: 11 meters"
+        )
 
     def test_format_header_with_coordinates(self):
         """Header includes DMS coordinates."""
@@ -121,8 +115,11 @@ class TestLocationInfo:
             elev=0.0,
         )
         header = loc.format_header()
-        # Should contain degrees-minutes-seconds format
-        assert "°" in header
+        assert (
+            header
+            == "NAME: Test\n"
+            "COORDS: 51°30'26\"N  000°07'40\"W    ELEV: 0 meters"
+        )
 
 
 class TestColumn:
@@ -180,9 +177,7 @@ class TestFormatRow:
         values = [1, 3.14, 12345]
         result = _format_row(cols, values)
 
-        assert "   1" in result
-        assert "3.1" in result
-        assert "12,345" in result
+        assert result == "   1   3.1  12,345"
 
     def test_total_width(self):
         """Row has correct total width."""

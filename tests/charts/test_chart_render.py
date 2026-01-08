@@ -3,6 +3,7 @@
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -14,6 +15,14 @@ from meshmon.charts import (
 )
 
 from .conftest import extract_svg_data_attributes, normalize_svg_for_snapshot
+
+
+def _svg_viewbox_dims(svg: str) -> tuple[float, float]:
+    root = ET.fromstring(svg)
+    viewbox = root.attrib.get("viewBox")
+    assert viewbox is not None
+    _, _, width, height = viewbox.split()
+    return float(width), float(height)
 
 
 class TestRenderChartSvg:
@@ -34,10 +43,14 @@ class TestRenderChartSvg:
 
     def test_respects_width_height(self, sample_timeseries, light_theme):
         """SVG respects specified dimensions."""
-        svg = render_chart_svg(sample_timeseries, light_theme, width=600, height=200)
+        svg_default = render_chart_svg(sample_timeseries, light_theme)
+        svg_small = render_chart_svg(sample_timeseries, light_theme, width=600, height=200)
 
-        # Check viewBox or dimensions in SVG attributes
-        assert "600" in svg or "viewBox" in svg
+        default_w, default_h = _svg_viewbox_dims(svg_default)
+        small_w, small_h = _svg_viewbox_dims(svg_small)
+
+        assert small_w < default_w
+        assert small_h < default_h
 
     def test_uses_theme_colors(self, sample_timeseries, light_theme, dark_theme):
         """Different themes produce different colors."""
@@ -97,6 +110,8 @@ class TestDataPointsInjection:
         for point in data["points"]:
             assert "ts" in point
             assert "v" in point
+            assert isinstance(point["ts"], int)
+            assert isinstance(point["v"], (int, float))
 
     def test_includes_metadata_attributes(self, sample_timeseries, light_theme):
         """SVG includes metric, period, theme attributes."""

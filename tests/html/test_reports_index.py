@@ -56,14 +56,13 @@ class TestRenderReportsIndex:
         """Index page includes title."""
         html = render_reports_index(sample_report_sections)
 
-        assert "<title>" in html
-        assert "Report" in html or "report" in html
+        assert "Reports Archive" in html
 
     def test_includes_year(self, configured_env, sample_report_sections):
         """Lists available years."""
         html = render_reports_index(sample_report_sections)
 
-        assert "2024" in html
+        assert "/reports/repeater/2024/" in html
 
     def test_handles_empty_sections(self, configured_env):
         """Handles empty report sections."""
@@ -76,8 +75,21 @@ class TestRenderReportsIndex:
         """Includes role names in output."""
         html = render_reports_index(sample_report_sections)
 
-        # Should mention both roles
-        assert "repeater" in html.lower() or "Repeater" in html
+        assert "Repeater" in html
+        assert "Companion" in html
+
+    def test_includes_descriptions(self, configured_env, sample_report_sections, monkeypatch):
+        """Includes role descriptions from config."""
+        monkeypatch.setenv("REPEATER_DISPLAY_NAME", "Alpha Repeater")
+        monkeypatch.setenv("COMPANION_DISPLAY_NAME", "Beta Node")
+        monkeypatch.setenv("REPORT_LOCATION_SHORT", "Test Ridge")
+        import meshmon.env
+        meshmon.env._config = None
+
+        html = render_reports_index(sample_report_sections)
+
+        assert "Alpha Repeater — Remote node in Test Ridge" in html
+        assert "Beta Node — Local USB-connected node" in html
 
     def test_includes_css_reference(self, configured_env, sample_report_sections):
         """Includes reference to stylesheet."""
@@ -95,4 +107,4 @@ class TestRenderReportsIndex:
         html = render_reports_index(sections)
 
         assert isinstance(html, str)
-        assert "</html>" in html
+        assert "No reports available yet." in html

@@ -99,6 +99,7 @@ class TestFindRepeaterContact:
             contact = await module.find_repeater_contact(mc)
 
             assert contact is not None
+            assert contact["public_key"] == "abc123def456"
             mock_get.assert_called_once()
 
     @pytest.mark.asyncio
@@ -148,6 +149,7 @@ class TestFindRepeaterContact:
             contact = await module.find_repeater_contact(mc)
 
             assert contact is not None
+            assert contact["adv_name"] == "MyRepeater"
 
     @pytest.mark.asyncio
     async def test_returns_none_when_not_found(self, configured_env, monkeypatch):
@@ -205,13 +207,17 @@ class TestCircuitBreakerIntegration:
         mock_cb.is_open.return_value = True
         mock_cb.cooldown_remaining.return_value = 1800
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock") as mock_connect,
+        ):
             exit_code = await module.collect_repeater()
 
             # Should return 0 (not an error, just skipped)
             assert exit_code == 0
             # Should not have tried to connect
             mock_cb.is_open.assert_called_once()
+            mock_connect.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_records_success_on_successful_status(
@@ -247,6 +253,7 @@ class TestCircuitBreakerIntegration:
             await module.collect_repeater()
 
             mock_cb.record_success.assert_called_once()
+            mock_cb.record_failure.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_records_failure_on_status_timeout(
@@ -281,6 +288,7 @@ class TestCircuitBreakerIntegration:
             exit_code = await module.collect_repeater()
 
             mock_cb.record_failure.assert_called_once()
+            mock_cb.record_success.assert_not_called()
             assert exit_code == 1
 
 
@@ -312,7 +320,7 @@ class TestCollectRepeaterExitCodes:
             patch.object(module, "run_command") as mock_run,
             patch.object(module, "find_repeater_contact") as mock_find,
             patch.object(module, "query_repeater_with_retry") as mock_query,
-            patch.object(module, "insert_metrics", return_value=3),
+            patch.object(module, "insert_metrics") as mock_insert,
         ):
             mock_run.return_value = (True, "OK", {}, None)
             mock_find.return_value = {"adv_name": "TestRepeater"}
@@ -325,6 +333,11 @@ class TestCollectRepeaterExitCodes:
             exit_code = await module.collect_repeater()
 
         assert exit_code == 0
+        mock_insert.assert_called_once()
+        insert_kwargs = mock_insert.call_args.kwargs
+        assert insert_kwargs["role"] == "repeater"
+        assert insert_kwargs["metrics"]["bat"] == 3850
+        assert insert_kwargs["metrics"]["nb_recv"] == 100
 
     @pytest.mark.asyncio
     async def test_returns_one_on_connection_failure(

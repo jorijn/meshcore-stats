@@ -507,12 +507,18 @@ def aggregate_yearly(role: str, year: int) -> YearlyAggregate:
     """
     agg = YearlyAggregate(year=year, role=role)
     metrics = get_metrics_for_role(role)
+    today = date.today()
 
-    # Process month by month to limit memory usage
-    for month in range(1, 13):
-        # Don't aggregate future months
-        if date(year, month, 1) > date.today():
-            break
+    periods = get_available_periods(role)
+    months_with_data = sorted({month for y, month in periods if y == year})
+
+    if year > today.year:
+        months_with_data = []
+    elif year == today.year:
+        months_with_data = [month for month in months_with_data if month <= today.month]
+
+    # Process only months that have data to avoid unnecessary daily scans.
+    for month in months_with_data:
         monthly = aggregate_monthly(role, year, month)
         if monthly.daily:  # Has data
             agg.monthly.append(monthly)

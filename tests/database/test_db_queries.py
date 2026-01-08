@@ -1,7 +1,5 @@
 """Tests for database query functions."""
 
-import time
-
 import pytest
 
 from meshmon.db import (
@@ -13,13 +11,15 @@ from meshmon.db import (
     insert_metrics,
 )
 
+BASE_TS = 1704067200
+
 
 class TestGetMetricsForPeriod:
     """Tests for get_metrics_for_period function."""
 
     def test_returns_dict_by_metric(self, initialized_db):
         """Returns dict with metric names as keys."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {
             "battery_mv": 3850.0,
             "contacts": 5,
@@ -35,7 +35,7 @@ class TestGetMetricsForPeriod:
 
     def test_returns_timestamp_value_tuples(self, initialized_db):
         """Each metric has list of (ts, value) tuples."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"test": 1.0}, initialized_db)
 
         result = get_metrics_for_period(
@@ -47,7 +47,7 @@ class TestGetMetricsForPeriod:
 
     def test_sorted_by_timestamp(self, initialized_db):
         """Results are sorted by timestamp ascending."""
-        base_ts = int(time.time())
+        base_ts = BASE_TS
 
         # Insert out of order
         insert_metrics(base_ts + 200, "companion", {"test": 3.0}, initialized_db)
@@ -63,7 +63,7 @@ class TestGetMetricsForPeriod:
 
     def test_respects_time_range(self, initialized_db):
         """Only returns data within specified time range."""
-        base_ts = int(time.time())
+        base_ts = BASE_TS
 
         insert_metrics(base_ts - 200, "companion", {"test": 1.0}, initialized_db)  # Outside
         insert_metrics(base_ts, "companion", {"test": 2.0}, initialized_db)  # Inside
@@ -78,7 +78,7 @@ class TestGetMetricsForPeriod:
 
     def test_filters_by_role(self, initialized_db):
         """Only returns data for specified role."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"test": 1.0}, initialized_db)
         insert_metrics(ts, "repeater", {"test": 2.0}, initialized_db)
 
@@ -90,7 +90,7 @@ class TestGetMetricsForPeriod:
 
     def test_computes_bat_pct(self, initialized_db):
         """Computes bat_pct from battery voltage."""
-        ts = int(time.time())
+        ts = BASE_TS
         # 4200 mV = 4.2V = 100%
         insert_metrics(ts, "companion", {"battery_mv": 4200.0}, initialized_db)
 
@@ -103,7 +103,7 @@ class TestGetMetricsForPeriod:
 
     def test_bat_pct_for_repeater(self, initialized_db):
         """Computes bat_pct for repeater using 'bat' field."""
-        ts = int(time.time())
+        ts = BASE_TS
         # 3000 mV = 3.0V = 0%
         insert_metrics(ts, "repeater", {"bat": 3000.0}, initialized_db)
 
@@ -133,7 +133,7 @@ class TestGetLatestMetrics:
 
     def test_returns_most_recent(self, initialized_db):
         """Returns metrics at most recent timestamp."""
-        base_ts = int(time.time())
+        base_ts = BASE_TS
 
         insert_metrics(base_ts, "companion", {"test": 1.0}, initialized_db)
         insert_metrics(base_ts + 100, "companion", {"test": 2.0}, initialized_db)
@@ -145,7 +145,7 @@ class TestGetLatestMetrics:
 
     def test_includes_ts(self, initialized_db):
         """Result includes 'ts' key with timestamp."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"test": 1.0}, initialized_db)
 
         result = get_latest_metrics("companion", initialized_db)
@@ -155,7 +155,7 @@ class TestGetLatestMetrics:
 
     def test_includes_all_metrics(self, initialized_db):
         """Result includes all metrics at that timestamp."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {
             "battery_mv": 3850.0,
             "contacts": 5,
@@ -170,7 +170,7 @@ class TestGetLatestMetrics:
 
     def test_computes_bat_pct(self, initialized_db):
         """Computes bat_pct from battery voltage."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"battery_mv": 3820.0}, initialized_db)
 
         result = get_latest_metrics("companion", initialized_db)
@@ -186,7 +186,7 @@ class TestGetLatestMetrics:
 
     def test_filters_by_role(self, initialized_db):
         """Only returns data for specified role."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"test": 1.0}, initialized_db)
         insert_metrics(ts + 100, "repeater", {"test": 2.0}, initialized_db)
 
@@ -206,7 +206,7 @@ class TestGetMetricCount:
 
     def test_counts_rows(self, initialized_db):
         """Counts total metric rows for role."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"a": 1.0, "b": 2.0, "c": 3.0}, initialized_db)
 
         count = get_metric_count("companion", initialized_db)
@@ -215,7 +215,7 @@ class TestGetMetricCount:
 
     def test_filters_by_role(self, initialized_db):
         """Only counts rows for specified role."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"a": 1.0}, initialized_db)
         insert_metrics(ts, "repeater", {"b": 2.0, "c": 3.0}, initialized_db)
 
@@ -238,7 +238,7 @@ class TestGetDistinctTimestamps:
 
     def test_counts_unique_timestamps(self, initialized_db):
         """Counts distinct timestamps."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"a": 1.0, "b": 2.0}, initialized_db)  # 1 ts
         insert_metrics(ts + 100, "companion", {"a": 3.0}, initialized_db)  # 2nd ts
 
@@ -248,7 +248,7 @@ class TestGetDistinctTimestamps:
 
     def test_filters_by_role(self, initialized_db):
         """Only counts timestamps for specified role."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"a": 1.0}, initialized_db)
         insert_metrics(ts + 100, "companion", {"a": 2.0}, initialized_db)
         insert_metrics(ts, "repeater", {"a": 3.0}, initialized_db)
@@ -267,7 +267,7 @@ class TestGetAvailableMetrics:
 
     def test_returns_metric_names(self, initialized_db):
         """Returns list of distinct metric names."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {
             "battery_mv": 3850.0,
             "contacts": 5,
@@ -282,7 +282,7 @@ class TestGetAvailableMetrics:
 
     def test_sorted_alphabetically(self, initialized_db):
         """Metrics are sorted alphabetically."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {
             "zebra": 1.0,
             "apple": 2.0,
@@ -295,7 +295,7 @@ class TestGetAvailableMetrics:
 
     def test_filters_by_role(self, initialized_db):
         """Only returns metrics for specified role."""
-        ts = int(time.time())
+        ts = BASE_TS
         insert_metrics(ts, "companion", {"companion_metric": 1.0}, initialized_db)
         insert_metrics(ts, "repeater", {"repeater_metric": 2.0}, initialized_db)
 

@@ -96,8 +96,8 @@ class TestBuildNodeDetails:
         result = build_node_details("repeater")
 
         # Should have hardware in one of the items
-        labels = [item.get("label", "").lower() for item in result]
-        assert "hardware" in labels
+        hardware = next(item for item in result if item.get("label") == "Hardware")
+        assert hardware["value"] == "Test LoRa Device"
 
     def test_different_roles(self, configured_env):
         """Different roles return details."""
@@ -132,8 +132,8 @@ class TestBuildRadioConfig:
 
         result = build_radio_config()
 
-        values = [item.get("value", "") for item in result]
-        assert any("869" in str(v) for v in values)
+        freq = next(item for item in result if item.get("label") == "Frequency")
+        assert freq["value"] == "869.618 MHz"
 
     def test_handles_missing_config(self, configured_env):
         """Returns list even with default config."""
@@ -167,6 +167,9 @@ class TestBuildTrafficTableRows:
             assert "label" in row
             assert "rx" in row
             assert "tx" in row
+            assert "rx_raw" in row
+            assert "tx_raw" in row
+            assert "unit" in row
 
     def test_handles_empty_list(self):
         """Handles empty traffic metrics list."""

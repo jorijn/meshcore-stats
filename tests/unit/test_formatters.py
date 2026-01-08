@@ -1,5 +1,7 @@
 """Tests for shared formatting functions."""
 
+from datetime import datetime
+
 from meshmon.formatters import (
     format_compact_number,
     format_duration,
@@ -21,14 +23,9 @@ class TestFormatTime:
 
     def test_valid_timestamp(self):
         """Valid timestamp formats correctly."""
-        import time
-        # Use a recent timestamp and verify it produces a datetime string
-        ts = int(time.time()) - 3600  # 1 hour ago
+        ts = int(datetime(2024, 1, 2, 3, 4, 5).timestamp())
         result = format_time(ts)
-        # Should produce a datetime string with format YYYY-MM-DD HH:MM:SS
-        assert len(result) == 19  # "2024-06-15 14:30:45" format
-        assert "-" in result
-        assert ":" in result
+        assert result == "2024-01-02 03:04:05"
 
     def test_zero_timestamp(self):
         """Zero timestamp (epoch) formats correctly."""
@@ -108,41 +105,34 @@ class TestFormatDuration:
         assert format_duration(0) == "0s"
 
     def test_seconds_only(self):
-        """Less than a minute shows seconds only (with 0h 0m prefix)."""
+        """Less than a minute shows seconds only."""
         result = format_duration(45)
-        assert "45s" in result
+        assert result == "45s"
 
     def test_minutes_and_seconds(self):
         """Minutes and seconds format."""
         result = format_duration(125)  # 2m 5s
-        assert "2m" in result
-        assert "5s" in result
+        assert result == "2m 5s"
 
     def test_hours_minutes_seconds(self):
         """Hours, minutes, and seconds format."""
         result = format_duration(3725)  # 1h 2m 5s
-        assert "1h" in result
-        assert "2m" in result
-        assert "5s" in result
+        assert result == "1h 2m 5s"
 
     def test_days_hours_minutes_seconds(self):
         """Full duration with days."""
         result = format_duration(90125)  # 1d 1h 2m 5s
-        assert "1d" in result
-        assert "1h" in result
-        assert "2m" in result
-        assert "5s" in result
+        assert result == "1d 1h 2m 5s"
 
     def test_exact_day(self):
         """Exactly one day."""
         result = format_duration(86400)
-        assert "1d" in result
-        assert "0h" in result
+        assert result == "1d 0h 0m 0s"
 
     def test_multiple_days(self):
         """Multiple days."""
         result = format_duration(172800)  # 2 days
-        assert "2d" in result
+        assert result == "2d 0h 0m 0s"
 
 
 class TestFormatUptime:
@@ -167,23 +157,17 @@ class TestFormatUptime:
     def test_hours_and_minutes(self):
         """Hours and minutes format."""
         result = format_uptime(3720)  # 1h 2m
-        assert "1h" in result
-        assert "2m" in result
+        assert result == "1h 2m"
 
     def test_days_hours_minutes(self):
         """Days, hours, and minutes format (no seconds in uptime)."""
         result = format_uptime(90120)  # 1d 1h 2m
-        assert "1d" in result
-        assert "1h" in result
-        assert "2m" in result
-        # Seconds not included in uptime format
-        assert "s" not in result
+        assert result == "1d 1h 2m"
 
     def test_exact_hour(self):
         """Exactly one hour shows 0m."""
         result = format_uptime(3600)
-        assert "1h" in result
-        assert "0m" in result
+        assert result == "1h 0m"
 
 
 class TestFormatVoltageWithPct:

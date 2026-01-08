@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from meshmon.html import (
     STATUS_ONLINE_THRESHOLD,
     STATUS_STALE_THRESHOLD,
@@ -16,6 +18,21 @@ from meshmon.html import (
     get_status,
 )
 
+BASE_NOW = datetime(2024, 1, 2, 12, 0, 0)
+
+
+@pytest.fixture
+def fixed_now(monkeypatch):
+    """Freeze meshmon.html datetime.now() for deterministic status tests."""
+    import meshmon.html
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return BASE_NOW if tz is None else BASE_NOW.astimezone(tz)
+
+    monkeypatch.setattr(meshmon.html, "datetime", FixedDatetime)
+    return BASE_NOW
 
 class TestFormatStatValue:
     """Test _format_stat_value function."""
@@ -125,7 +142,7 @@ class TestFmtValTime:
 
     def test_none_returns_dash(self):
         """None value returns dash."""
-        assert _fmt_val_time(None, datetime.now()) == "-"
+        assert _fmt_val_time(None, BASE_NOW) == "-"
 
     def test_formats_value_with_time(self):
         """Formats value with time in small tag."""
@@ -157,7 +174,7 @@ class TestFmtValDay:
 
     def test_none_returns_dash(self):
         """None value returns dash."""
-        assert _fmt_val_day(None, datetime.now()) == "-"
+        assert _fmt_val_day(None, BASE_NOW) == "-"
 
     def test_formats_value_with_day(self):
         """Formats value with day number in small tag."""
@@ -189,7 +206,7 @@ class TestFmtValMonth:
 
     def test_none_returns_dash(self):
         """None value returns dash."""
-        assert _fmt_val_month(None, datetime.now()) == "-"
+        assert _fmt_val_month(None, BASE_NOW) == "-"
 
     def test_formats_value_with_month(self):
         """Formats value with month abbreviation in small tag."""
@@ -249,30 +266,30 @@ class TestGetStatus:
         assert status_class == "offline"
         assert status_text == "No data"
 
-    def test_recent_timestamp_online(self):
+    def test_recent_timestamp_online(self, fixed_now):
         """Recent timestamp (< 30 min) returns online."""
-        recent_ts = int(datetime.now().timestamp()) - 60  # 1 minute ago
+        recent_ts = int(fixed_now.timestamp()) - 60  # 1 minute ago
         status_class, status_text = get_status(recent_ts)
         assert status_class == "online"
         assert status_text == "Online"
 
-    def test_stale_timestamp(self):
+    def test_stale_timestamp(self, fixed_now):
         """Stale timestamp (30 min - 2 hours) returns stale."""
-        stale_ts = int(datetime.now().timestamp()) - (STATUS_ONLINE_THRESHOLD + 60)
+        stale_ts = int(fixed_now.timestamp()) - (STATUS_ONLINE_THRESHOLD + 60)
         status_class, status_text = get_status(stale_ts)
         assert status_class == "stale"
         assert status_text == "Stale"
 
-    def test_old_timestamp_offline(self):
+    def test_old_timestamp_offline(self, fixed_now):
         """Old timestamp (> 2 hours) returns offline."""
-        old_ts = int(datetime.now().timestamp()) - (STATUS_STALE_THRESHOLD + 60)
+        old_ts = int(fixed_now.timestamp()) - (STATUS_STALE_THRESHOLD + 60)
         status_class, status_text = get_status(old_ts)
         assert status_class == "offline"
         assert status_text == "Offline"
 
-    def test_exactly_at_threshold(self):
+    def test_exactly_at_threshold(self, fixed_now):
         """Timestamps exactly at thresholds."""
-        now = int(datetime.now().timestamp())
+        now = int(fixed_now.timestamp())
 
         # Just under online threshold - still online
         ts_just_online = now - STATUS_ONLINE_THRESHOLD + 1

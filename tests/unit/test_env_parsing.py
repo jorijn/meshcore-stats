@@ -196,18 +196,20 @@ class TestGetPath:
         result = get_path("NONEXISTENT_VAR_12345", "/some/path")
         assert result == Path("/some/path")
 
-    def test_expands_user(self, monkeypatch):
+    def test_expands_user(self, monkeypatch, tmp_path):
         """Expands ~ to user home directory."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
         monkeypatch.setenv("TEST_PATH", "~/subdir")
         result = get_path("TEST_PATH", "/default")
-        assert "~" not in str(result)
-        assert result.is_absolute()
+        assert result == (tmp_path / "subdir").resolve()
 
-    def test_resolves_to_absolute(self, monkeypatch):
-        """Relative paths are resolved to absolute."""
+    def test_resolves_to_absolute(self, monkeypatch, tmp_path):
+        """Relative paths are resolved to absolute from CWD."""
+        monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("TEST_PATH", "relative/path")
         result = get_path("TEST_PATH", "/default")
-        assert result.is_absolute()
+        assert result == (tmp_path / "relative/path").resolve()
 
 
 class TestConfig:

@@ -23,12 +23,11 @@ class TestColumn:
 
     def test_format_with_value(self):
         """Formats value with specified width and alignment."""
-        col = Column(width=10, align="right")
+        col = Column(width=6, align="right")
 
-        result = col.format(42.5)
+        result = col.format(42)
 
-        assert len(result) == 10
-        assert "42" in result
+        assert result == "    42"
 
     def test_format_with_none(self):
         """Formats None as dash."""
@@ -36,7 +35,7 @@ class TestColumn:
 
         result = col.format(None)
 
-        assert "-" in result
+        assert result == "-".rjust(10)
 
     def test_left_alignment(self):
         """Left alignment pads on right."""
@@ -44,7 +43,7 @@ class TestColumn:
 
         result = col.format("Hi")
 
-        assert result.startswith("Hi")
+        assert result == "Hi".ljust(10)
 
     def test_right_alignment(self):
         """Right alignment pads on left."""
@@ -52,7 +51,7 @@ class TestColumn:
 
         result = col.format("Hi")
 
-        assert result.endswith("Hi")
+        assert result == "Hi".rjust(10)
 
     def test_center_alignment(self):
         """Center alignment pads on both sides."""
@@ -60,8 +59,7 @@ class TestColumn:
 
         result = col.format("Hi")
 
-        assert len(result) == 10
-        assert "Hi" in result
+        assert result == "Hi".center(10)
 
     def test_decimals_formatting(self):
         """Formats floats with specified decimals."""
@@ -69,7 +67,7 @@ class TestColumn:
 
         result = col.format(3.14159)
 
-        assert "3.14" in result
+        assert result == "3.14".rjust(10)
 
     def test_comma_separator(self):
         """Uses comma separator for large integers."""
@@ -77,7 +75,7 @@ class TestColumn:
 
         result = col.format(1000000)
 
-        assert "1,000,000" in result
+        assert result == "1,000,000".rjust(15)
 
 
 class TestFormatRow:
@@ -92,9 +90,7 @@ class TestFormatRow:
 
         row = _format_row(columns, [1, 2])
 
-        assert "1" in row
-        assert "2" in row
-        assert len(row) == 10
+        assert row == "    1    2"
 
     def test_handles_fewer_values(self):
         """Handles fewer values than columns."""
@@ -110,6 +106,7 @@ class TestFormatRow:
         assert row is not None
         assert "X" in row
         assert "Y" in row
+        assert len(row) == 10
 
 
 class TestFormatSeparator:
@@ -124,7 +121,7 @@ class TestFormatSeparator:
 
         separator = _format_separator(columns)
 
-        assert "-" in separator
+        assert separator == "-" * 18
 
     def test_matches_total_width(self):
         """Separator width matches total column width."""
@@ -136,6 +133,7 @@ class TestFormatSeparator:
         separator = _format_separator(columns)
 
         assert len(separator) == 20
+        assert set(separator) == {"-"}
 
     def test_custom_separator_char(self):
         """Uses custom separator character."""
@@ -143,8 +141,7 @@ class TestFormatSeparator:
 
         separator = _format_separator(columns, char="=")
 
-        assert "=" in separator
-        assert "-" not in separator
+        assert separator == "=" * 10
 
 
 class TestFormatMonthlyTxt:
@@ -198,8 +195,7 @@ class TestFormatMonthlyTxt:
         """Includes report header with month/year."""
         result = format_monthly_txt(sample_monthly_aggregate, "Test Repeater", sample_location)
 
-        assert "2024" in result
-        assert "January" in result
+        assert "MONTHLY MESHCORE REPORT for January 2024" in result
 
     def test_includes_node_name(self, sample_monthly_aggregate, sample_location):
         """Includes node name."""
@@ -211,8 +207,18 @@ class TestFormatMonthlyTxt:
         """Has ASCII table structure with separators."""
         result = format_monthly_txt(sample_monthly_aggregate, "Test Repeater", sample_location)
 
-        # Should have separator lines
-        assert "-" in result or "=" in result
+        assert "BATTERY (V)" in result
+        assert result.count("-" * 95) == 2
+
+    def test_daily_rows_rendered(self, sample_monthly_aggregate, sample_location):
+        """Renders one row per day with battery values."""
+        result = format_monthly_txt(sample_monthly_aggregate, "Test Repeater", sample_location)
+        lines = result.splitlines()
+        daily_lines = [line for line in lines if line[:3].strip().isdigit()]
+
+        assert [line[:3].strip() for line in daily_lines] == ["1", "2"]
+        assert any("3.80" in line for line in daily_lines)
+        assert any("3.75" in line for line in daily_lines)
 
     def test_handles_empty_daily(self, sample_location):
         """Handles aggregate with no daily data."""
@@ -227,12 +233,17 @@ class TestFormatMonthlyTxt:
         result = format_monthly_txt(agg, "Test Repeater", sample_location)
 
         assert isinstance(result, str)
+        lines = result.splitlines()
+        daily_lines = [line for line in lines if line[:3].strip().isdigit()]
+        assert daily_lines == []
 
     def test_includes_location_info(self, sample_monthly_aggregate, sample_location):
         """Includes location information."""
         result = format_monthly_txt(sample_monthly_aggregate, "Test Repeater", sample_location)
 
-        assert "Test Location" in result or "52" in result
+        assert "NAME: Test Location" in result
+        assert "COORDS:" in result
+        assert "ELEV: 10 meters" in result
 
 
 class TestFormatYearlyTxt:
@@ -285,15 +296,18 @@ class TestFormatYearlyTxt:
         """Includes year in header."""
         result = format_yearly_txt(sample_yearly_aggregate, "Test Repeater", sample_location)
 
-        assert "2024" in result
+        assert "YEARLY MESHCORE REPORT for 2024" in result
+        assert "NODE: Test Repeater" in result
+        assert "NAME: Test Location" in result
 
     def test_has_monthly_breakdown(self, sample_yearly_aggregate, sample_location):
         """Shows monthly breakdown."""
         result = format_yearly_txt(sample_yearly_aggregate, "Test Repeater", sample_location)
 
-        # Should mention months (as numbers: 01, 02)
-        months_numeric = ["01", "02"]
-        assert any(m in result for m in months_numeric)
+        lines = result.splitlines()
+        monthly_lines = [line for line in lines if line.strip().startswith("2024")]
+        months = [line[4:8].strip() for line in monthly_lines]
+        assert months == ["01", "02"]
 
     def test_handles_empty_monthly(self, sample_location):
         """Handles aggregate with no monthly data."""
@@ -390,7 +404,9 @@ class TestFormatYearlyCompanionTxt:
         """Includes year in header."""
         result = format_yearly_txt(sample_companion_yearly_aggregate, "Test Companion", sample_location)
 
-        assert "2024" in result
+        assert "YEARLY MESHCORE REPORT for 2024" in result
+        assert "NODE: Test Companion" in result
+        assert "NAME: Test Location" in result
 
     def test_includes_node_name(self, sample_companion_yearly_aggregate, sample_location):
         """Includes node name."""
@@ -402,9 +418,10 @@ class TestFormatYearlyCompanionTxt:
         """Shows monthly breakdown."""
         result = format_yearly_txt(sample_companion_yearly_aggregate, "Test Companion", sample_location)
 
-        # Should mention months (as numbers: 01, 02)
-        months_numeric = ["01", "02"]
-        assert any(m in result for m in months_numeric)
+        lines = result.splitlines()
+        monthly_lines = [line for line in lines if line.strip().startswith("2024")]
+        months = [line[4:8].strip() for line in monthly_lines]
+        assert months == ["01", "02"]
 
     def test_has_battery_data(self, sample_companion_yearly_aggregate, sample_location):
         """Contains battery voltage data."""
@@ -511,14 +528,16 @@ class TestFormatMonthlyCompanionTxt:
         """Includes month and year in header."""
         result = format_monthly_txt(sample_companion_monthly_aggregate, "Test Companion", sample_location)
 
-        assert "2024" in result
+        assert "MONTHLY MESHCORE REPORT for January 2024" in result
+        assert "NODE: Test Companion" in result
 
     def test_has_daily_breakdown(self, sample_companion_monthly_aggregate, sample_location):
         """Shows daily breakdown."""
         result = format_monthly_txt(sample_companion_monthly_aggregate, "Test Companion", sample_location)
 
-        # Should contain day numbers
-        assert "01" in result or "1" in result
+        lines = result.splitlines()
+        daily_lines = [line for line in lines if line[:3].strip().isdigit()]
+        assert [line[:3].strip() for line in daily_lines] == ["1", "2"]
 
     def test_has_packet_counts(self, sample_companion_monthly_aggregate, sample_location):
         """Contains packet count data."""
@@ -623,4 +642,6 @@ class TestCompanionFormatting:
         result = format_monthly_txt(companion_monthly_aggregate, "Test Companion", sample_location)
 
         assert isinstance(result, str)
-        assert "2024" in result
+        assert "MONTHLY MESHCORE REPORT for January 2024" in result
+        assert "NODE: Test Companion" in result
+        assert "NAME: Test Location" in result

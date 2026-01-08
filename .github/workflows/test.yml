@@ -35,6 +35,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --extra dev
 
+      - name: Set up matplotlib cache
+        run: |
+          echo "MPLCONFIGDIR=$RUNNER_TEMP/matplotlib" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/matplotlib"
+
       - name: Run tests with coverage
         run: |
           uv run pytest \

@@ -1,9 +1,10 @@
 """Fixtures for retry and circuit breaker tests."""
 
 import json
-import time
 
 import pytest
+
+BASE_TS = 1704067200
 
 
 @pytest.fixture
@@ -18,7 +19,7 @@ def closed_circuit(circuit_state_file):
     state = {
         "consecutive_failures": 0,
         "cooldown_until": 0,
-        "last_success": time.time(),
+        "last_success": BASE_TS,
     }
     circuit_state_file.write_text(json.dumps(state))
     return circuit_state_file
@@ -29,8 +30,8 @@ def open_circuit(circuit_state_file):
     """Circuit breaker state file with open circuit (in cooldown)."""
     state = {
         "consecutive_failures": 10,
-        "cooldown_until": time.time() + 3600,  # 1 hour from now
-        "last_success": time.time() - 7200,  # 2 hours ago
+        "cooldown_until": BASE_TS + 3600,  # 1 hour from BASE_TS
+        "last_success": BASE_TS - 7200,  # 2 hours before BASE_TS
     }
     circuit_state_file.write_text(json.dumps(state))
     return circuit_state_file
@@ -41,8 +42,8 @@ def expired_cooldown_circuit(circuit_state_file):
     """Circuit breaker state file with expired cooldown."""
     state = {
         "consecutive_failures": 10,
-        "cooldown_until": time.time() - 100,  # Expired 100s ago
-        "last_success": time.time() - 7200,
+        "cooldown_until": BASE_TS - 100,  # Expired 100s before BASE_TS
+        "last_success": BASE_TS - 7200,
     }
     circuit_state_file.write_text(json.dumps(state))
     return circuit_state_file

@@ -35,7 +35,7 @@ class TestGetIntEdgeCases:
         assert get_int("TEST_INT", 0) == 42
 
     def test_whitespace_around_number(self, monkeypatch):
-        """Whitespace around number causes fallback to default."""
+        """Whitespace around number is tolerated by int()."""
         monkeypatch.setenv("TEST_INT", " 42 ")
         # Python's int() handles whitespace
         assert get_int("TEST_INT", 0) == 42
@@ -50,7 +50,7 @@ class TestGetBoolEdgeCases:
         assert get_bool("TEST_BOOL") is True
 
     def test_with_spaces(self, monkeypatch):
-        """Spaces are ignored after lowering."""
+        """Whitespace causes a non-match since get_bool does not strip."""
         monkeypatch.setenv("TEST_BOOL", "  yes  ")
         # .lower() doesn't strip, so " yes " != "yes"
         # This will return False

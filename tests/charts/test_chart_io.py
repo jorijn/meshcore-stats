@@ -116,10 +116,9 @@ class TestLoadChartStats:
 
     def test_returns_empty_on_invalid_json(self, configured_env):
         """Returns empty dict on invalid JSON."""
-        cfg = __import__("meshmon.env", fromlist=["get_config"]).get_config()
-        stats_path = cfg.out_dir / "assets" / "repeater" / "chart_stats.json"
+        stats_path = configured_env["out_dir"] / "assets" / "repeater" / "chart_stats.json"
         stats_path.parent.mkdir(parents=True, exist_ok=True)
-        stats_path.write_text("not valid json {{{")
+        stats_path.write_text("not valid json {{{", encoding="utf-8")
 
         loaded = load_chart_stats("repeater")
 
