@@ -476,7 +476,8 @@ def get_metric_count(
             "SELECT COUNT(*) FROM metrics WHERE role = ?",
             (role,)
         )
-        return cursor.fetchone()[0]
+        row = cursor.fetchone()
+        return int(row[0]) if row else 0
 
 
 def get_distinct_timestamps(
@@ -501,7 +502,8 @@ def get_distinct_timestamps(
             "SELECT COUNT(DISTINCT ts) FROM metrics WHERE role = ?",
             (role,)
         )
-        return cursor.fetchone()[0]
+        row = cursor.fetchone()
+        return int(row[0]) if row else 0
 
 
 def get_available_metrics(

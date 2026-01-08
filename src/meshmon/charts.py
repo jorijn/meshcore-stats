@@ -37,27 +37,35 @@ BIN_30_MINUTES = 1800  # 30 minutes in seconds
 BIN_2_HOURS = 7200  # 2 hours in seconds
 BIN_1_DAY = 86400  # 1 day in seconds
 
-# Period configuration: lookback duration and aggregation bin size
+
+@dataclass(frozen=True)
+class PeriodConfig:
+    """Configuration for a chart time period."""
+
+    lookback: timedelta
+    bin_seconds: int | None = None  # None = no binning (raw data)
+
+
 # Period configuration for chart rendering
 # Target: ~100-400 data points per chart for clean visualization
 # Chart plot area is ~640px, so aim for 1.5-6px per point
-PERIOD_CONFIG = {
-    "day": {
-        "lookback": timedelta(days=1),
-        "bin_seconds": None,  # No binning - raw data (~96 points at 15-min intervals)
-    },
-    "week": {
-        "lookback": timedelta(days=7),
-        "bin_seconds": BIN_30_MINUTES,  # 30-min bins (~336 points, ~2px per point)
-    },
-    "month": {
-        "lookback": timedelta(days=31),
-        "bin_seconds": BIN_2_HOURS,  # 2-hour bins (~372 points, ~1.7px per point)
-    },
-    "year": {
-        "lookback": timedelta(days=365),
-        "bin_seconds": BIN_1_DAY,  # 1-day bins (~365 points, ~1.8px per point)
-    },
+PERIOD_CONFIG: dict[str, PeriodConfig] = {
+    "day": PeriodConfig(
+        lookback=timedelta(days=1),
+        bin_seconds=None,  # No binning - raw data (~96 points at 15-min intervals)
+    ),
+    "week": PeriodConfig(
+        lookback=timedelta(days=7),
+        bin_seconds=BIN_30_MINUTES,  # 30-min bins (~336 points, ~2px per point)
+    ),
+    "month": PeriodConfig(
+        lookback=timedelta(days=31),
+        bin_seconds=BIN_2_HOURS,  # 2-hour bins (~372 points, ~1.7px per point)
+    ),
+    "year": PeriodConfig(
+        lookback=timedelta(days=365),
+        bin_seconds=BIN_1_DAY,  # 1-day bins (~365 points, ~1.8px per point)
+    ),
 }
 
 
@@ -241,11 +249,9 @@ def load_timeseries_from_db(
         raw_points = [(ts, val * scale) for ts, val in raw_points]
 
     # Apply time binning if configured
-    period_cfg = PERIOD_CONFIG.get(period, {})
-    bin_seconds = period_cfg.get("bin_seconds")
-
-    if bin_seconds and len(raw_points) > 1:
-        raw_points = _aggregate_bins(raw_points, bin_seconds)
+    period_cfg = PERIOD_CONFIG.get(period)
+    if period_cfg and period_cfg.bin_seconds and len(raw_points) > 1:
+        raw_points = _aggregate_bins(raw_points, period_cfg.bin_seconds)
 
     # Convert to DataPoints
     points = [DataPoint(timestamp=ts, value=val) for ts, val in raw_points]
@@ -380,10 +386,14 @@ def render_chart_svg(
             timestamps = ts.timestamps
             values = ts.values
 
+            # Convert datetime to matplotlib date numbers for proper typing
+            # and correct axis formatter behavior
+            x_dates = mdates.date2num(timestamps)
+
             # Plot area fill
             area_color = _hex_to_rgba(theme.area)
             area = ax.fill_between(
-                timestamps,
+                x_dates,
                 values,
                 alpha=area_color[3],
                 color=f"#{theme.line}",
@@ -392,7 +402,7 @@ def render_chart_svg(
 
             # Plot line
             (line,) = ax.plot(
-                timestamps,
+                x_dates,
                 values,
                 color=f"#{theme.line}",
                 linewidth=2,
@@ -414,7 +424,17 @@ def render_chart_svg(
 
             # Set X-axis limits first (before configuring ticks)
             if x_start is not None and x_end is not None:
-                ax.set_xlim(x_start, x_end)
+                ax.set_xlim(mdates.date2num(x_start), mdates.date2num(x_end))
+            else:
+                # Compute sensible x-axis limits from data
+                # For single point or sparse data, add padding based on period
+                x_min_dt = min(timestamps)
+                x_max_dt = max(timestamps)
+                if x_min_dt == x_max_dt:
+                    # Single point: use period lookback for range
+                    period_cfg = PERIOD_CONFIG.get(ts.period, PERIOD_CONFIG["day"])
+                    x_min_dt = x_max_dt - period_cfg.lookback
+                ax.set_xlim(mdates.date2num(x_min_dt), mdates.date2num(x_max_dt))
 
             # Format X-axis based on period (after setting limits)
             _configure_x_axis(ax, ts.period)
@@ -587,7 +607,7 @@ def render_all_charts(
     for period in periods:
         period_cfg = PERIOD_CONFIG[period]
         x_end = now
-        x_start = now - period_cfg["lookback"]
+        x_start = now - period_cfg.lookback
 
         start_ts = int(x_start.timestamp())
         end_ts = int(x_end.timestamp())
@@ -599,7 +619,7 @@ def render_all_charts(
                 role=role,
                 metric=metric,
                 end_time=now,
-                lookback=period_cfg["lookback"],
+                lookback=period_cfg.lookback,
                 period=period,
                 all_metrics=all_metrics,
             )
@@ -675,7 +695,8 @@ def load_chart_stats(role: str) -> dict[str, dict[str, dict[str, Any]]]:
 
     try:
         with open(stats_path) as f:
-            return json.load(f)
+            data: dict[str, dict[str, dict[str, Any]]] = json.load(f)
+            return data
     except Exception as e:
         log.debug(f"Failed to load chart stats: {e}")
         return {}

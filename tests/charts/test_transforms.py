@@ -138,19 +138,19 @@ class TestTimeBinning:
 
     def test_no_binning_for_day(self, initialized_db, configured_env):
         """Day period uses raw data (no binning)."""
-        assert PERIOD_CONFIG["day"]["bin_seconds"] is None
+        assert PERIOD_CONFIG["day"].bin_seconds is None
 
     def test_30_min_bins_for_week(self, initialized_db, configured_env):
         """Week period uses 30-minute bins."""
-        assert PERIOD_CONFIG["week"]["bin_seconds"] == 1800
+        assert PERIOD_CONFIG["week"].bin_seconds == 1800
 
     def test_2_hour_bins_for_month(self, initialized_db, configured_env):
         """Month period uses 2-hour bins."""
-        assert PERIOD_CONFIG["month"]["bin_seconds"] == 7200
+        assert PERIOD_CONFIG["month"].bin_seconds == 7200
 
     def test_1_day_bins_for_year(self, initialized_db, configured_env):
         """Year period uses 1-day bins."""
-        assert PERIOD_CONFIG["year"]["bin_seconds"] == 86400
+        assert PERIOD_CONFIG["year"].bin_seconds == 86400
 
     def test_binning_reduces_point_count(self, initialized_db, configured_env):
         """Binning aggregates multiple points per bin."""

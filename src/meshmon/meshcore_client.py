@@ -40,17 +40,17 @@ def auto_detect_serial_port() -> str | None:
     for port in ports:
         if "ttyACM" in port.device:
             log.info(f"Auto-detected serial port: {port.device} ({port.description})")
-            return port.device
+            return str(port.device)
 
     for port in ports:
         if "ttyUSB" in port.device:
             log.info(f"Auto-detected serial port: {port.device} ({port.description})")
-            return port.device
+            return str(port.device)
 
     # Fall back to first available
     port = ports[0]
     log.info(f"Using first available port: {port.device} ({port.description})")
-    return port.device
+    return str(port.device)
 
 
 async def connect_from_env() -> Any | None:

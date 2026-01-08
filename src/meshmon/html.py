@@ -6,12 +6,9 @@ import calendar
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from jinja2 import Environment, PackageLoader, select_autoescape
-
-if TYPE_CHECKING:
-    from .reports import MonthlyAggregate, YearlyAggregate
 
 from . import log
 from .charts import load_chart_stats
@@ -26,6 +23,18 @@ from .formatters import (
     format_value,
 )
 from .metrics import get_chart_metrics, get_metric_label
+
+if TYPE_CHECKING:
+    from .reports import MonthlyAggregate, YearlyAggregate
+
+
+class MetricDisplay(TypedDict, total=False):
+    """A metric display item for the UI."""
+
+    label: str
+    value: str
+    unit: str | None
+    raw_value: int
 
 # Status indicator thresholds (seconds)
 STATUS_ONLINE_THRESHOLD = 1800  # 30 minutes
@@ -300,7 +309,7 @@ def build_companion_metrics(row: dict | None) -> dict:
         })
 
     # Secondary metrics (empty for companion)
-    secondary_metrics = []
+    secondary_metrics: list[MetricDisplay] = []
 
     # Traffic metrics for companion
     traffic_metrics = []
@@ -527,7 +536,8 @@ def build_chart_groups(
                     {"label": "Max", "value": _format_stat_value(max_val, metric)},
                 ]
 
-            chart_data = {
+            # Build chart data for template - mixed types require Any
+            chart_data: dict[str, Any] = {
                 "label": get_metric_label(metric),
                 "metric": metric,
                 "current": current_formatted,
@@ -793,7 +803,7 @@ def _fmt_val_plain(value: float | None, fmt: str = ".2f") -> str:
 
 def build_monthly_table_data(
     agg: MonthlyAggregate, role: str
-) -> tuple[list[dict], list[dict], list[dict]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Build table column groups, headers and rows for a monthly report.
 
     Args:
@@ -804,6 +814,11 @@ def build_monthly_table_data(
         (col_groups, headers, rows) where each is a list of dicts
     """
     from .reports import MetricStats
+
+    # Define types upfront for mypy
+    col_groups: list[dict[str, Any]]
+    headers: list[dict[str, Any]]
+    rows: list[dict[str, Any]]
 
     if role == "repeater":
         # Column groups matching redesign/reports/monthly.html
@@ -985,7 +1000,7 @@ def _fmt_val_month(value: float | None, time_obj, fmt: str = ".2f") -> str:
 
 def build_yearly_table_data(
     agg: YearlyAggregate, role: str
-) -> tuple[list[dict], list[dict], list[dict]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Build table column groups, headers and rows for a yearly report.
 
     Args:
@@ -996,6 +1011,11 @@ def build_yearly_table_data(
         (col_groups, headers, rows) where each is a list of dicts
     """
     from .reports import MetricStats
+
+    # Define types upfront for mypy
+    col_groups: list[dict[str, Any]]
+    headers: list[dict[str, Any]]
+    rows: list[dict[str, Any]]
 
     if role == "repeater":
         # Column groups matching redesign/reports/yearly.html

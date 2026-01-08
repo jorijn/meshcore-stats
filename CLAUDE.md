@@ -66,7 +66,7 @@ def test_voltage_to_percentage_at_empty():
 
 ### Pre-Commit Requirements
 
-**MANDATORY: Before committing ANY changes, run lint and tests.**
+**MANDATORY: Before committing ANY changes, run lint, type check, and tests.**
 
 ```bash
 # Always run these commands before committing:
@@ -75,17 +75,21 @@ source .venv/bin/activate
 # 1. Run linter (must pass with no errors)
 ruff check src/ tests/ scripts/
 
-# 2. Run test suite (must pass)
+# 2. Run type checker (must pass with no errors)
+python -m mypy src/meshmon --ignore-missing-imports
+
+# 3. Run test suite (must pass)
 python -m pytest tests/ -q
 
-# 3. Only then commit
+# 4. Only then commit
 git add . && git commit -m "..."
 ```
 
-If lint or tests fail:
+If lint, type check, or tests fail:
 1. Fix all lint errors before committing
-2. Fix all failing tests before committing
-3. Never commit with `--no-verify` or skip checks
+2. Fix all type errors before committing - use proper fixes, not `# type: ignore`
+3. Fix all failing tests before committing
+4. Never commit with `--no-verify` or skip checks
 
 ### Running Tests
 

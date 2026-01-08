@@ -129,9 +129,65 @@ def get_path(key: str, default: str) -> Path:
 class Config:
     """Configuration loaded from environment variables."""
 
-    def __init__(self):
+    # Connection settings
+    mesh_transport: str
+    mesh_serial_port: str | None
+    mesh_serial_baud: int
+    mesh_tcp_host: str | None
+    mesh_tcp_port: int
+    mesh_ble_addr: str | None
+    mesh_ble_pin: str | None
+    mesh_debug: bool
+
+    # Remote repeater identity
+    repeater_name: str | None
+    repeater_key_prefix: str | None
+    repeater_password: str | None
+
+    # Intervals and timeouts
+    companion_step: int
+    repeater_step: int
+    remote_timeout_s: int
+    remote_retry_attempts: int
+    remote_retry_backoff_s: int
+    remote_cb_fails: int
+    remote_cb_cooldown_s: int
+
+    # Telemetry
+    telemetry_enabled: bool
+    telemetry_timeout_s: int
+    telemetry_retry_attempts: int
+    telemetry_retry_backoff_s: int
+
+    # Paths
+    state_dir: Path
+    out_dir: Path
+
+    # Report location metadata
+    report_location_name: str | None
+    report_location_short: str | None
+    report_lat: float
+    report_lon: float
+    report_elev: float
+    report_elev_unit: str | None
+
+    # Node display names
+    repeater_display_name: str | None
+    companion_display_name: str | None
+    repeater_pubkey_prefix: str | None
+    companion_pubkey_prefix: str | None
+    repeater_hardware: str | None
+    companion_hardware: str | None
+
+    # Radio configuration
+    radio_frequency: str | None
+    radio_bandwidth: str | None
+    radio_spread_factor: str | None
+    radio_coding_rate: str | None
+
+    def __init__(self) -> None:
         # Connection settings
-        self.mesh_transport = get_str("MESH_TRANSPORT", "serial")
+        self.mesh_transport = get_str("MESH_TRANSPORT", "serial") or "serial"
         self.mesh_serial_port = get_str("MESH_SERIAL_PORT")  # None = auto-detect
         self.mesh_serial_baud = get_int("MESH_SERIAL_BAUD", 115200)
         self.mesh_tcp_host = get_str("MESH_TCP_HOST", "localhost")

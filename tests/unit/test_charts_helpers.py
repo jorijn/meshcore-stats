@@ -448,22 +448,22 @@ class TestPeriodConfig:
 
     def test_day_has_no_binning(self):
         """Day period has no time binning."""
-        assert PERIOD_CONFIG["day"]["bin_seconds"] is None
+        assert PERIOD_CONFIG["day"].bin_seconds is None
 
     def test_week_has_30_min_bins(self):
         """Week period has 30-minute bins."""
-        assert PERIOD_CONFIG["week"]["bin_seconds"] == 1800
+        assert PERIOD_CONFIG["week"].bin_seconds == 1800
 
     def test_month_has_2_hour_bins(self):
         """Month period has 2-hour bins."""
-        assert PERIOD_CONFIG["month"]["bin_seconds"] == 7200
+        assert PERIOD_CONFIG["month"].bin_seconds == 7200
 
     def test_year_has_1_day_bins(self):
         """Year period has 1-day bins."""
-        assert PERIOD_CONFIG["year"]["bin_seconds"] == 86400
+        assert PERIOD_CONFIG["year"].bin_seconds == 86400
 
     def test_all_periods_have_lookback(self):
         """All periods have lookback duration defined."""
         for _period, cfg in PERIOD_CONFIG.items():
-            assert "lookback" in cfg
-            assert isinstance(cfg["lookback"], timedelta)
+            assert cfg.lookback is not None
+            assert isinstance(cfg.lookback, timedelta)
