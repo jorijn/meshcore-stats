@@ -15,8 +15,8 @@ _INTEGRATION_ENV = {
     "MESH_SERIAL_PORT": "/dev/ttyACM0",
 }
 RENDERED_CHART_METRICS = {
-    "companion": ["battery_mv"],
-    "repeater": ["bat"],
+    "companion": ["battery_mv", "recv", "contacts"],
+    "repeater": ["bat", "nb_recv", "last_rssi"],
 }
 
 
