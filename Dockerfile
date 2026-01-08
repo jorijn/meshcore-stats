@@ -34,12 +34,13 @@ RUN set -ex; \
 
 # Create virtual environment
 RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+ENV PATH="/opt/venv/bin:$PATH" \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
 # Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml uv.lock ./
+RUN pip install --no-cache-dir --upgrade pip uv && \
+    uv sync --frozen --no-dev
 
 # =============================================================================
 # Stage 2: Runtime
