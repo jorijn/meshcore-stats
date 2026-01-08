@@ -254,6 +254,7 @@ Example: `fix(charts): prevent crash when no data points available`
 2. release-please creates/updates a "Release PR" with:
    - Updated `CHANGELOG.md`
    - Updated version in `src/meshmon/__init__.py`
+   - Updated `uv.lock` (project version entry)
 3. When the Release PR is merged:
    - A GitHub Release is created
    - A git tag (e.g., `v0.2.0`) is created
