@@ -40,7 +40,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
 # Install Python dependencies
 COPY pyproject.toml uv.lock ./
 RUN pip install --no-cache-dir --upgrade pip uv && \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --no-install-project
 
 # =============================================================================
 # Stage 2: Runtime
