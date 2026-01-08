@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
 "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg data-metric="bat" data-period="day" data-theme="light" data-x-start="1705316400" data-x-end="1705316400" data-y-min="3.0" data-y-max="4.2" data-points="[{&quot;ts&quot;: 1705316400, &quot;v&quot;: 3.85}]" xmlns:xlink="http://www.w3.org/1999/xlink" width="580.5625pt" height="205.437344pt" viewBox="0 0 580.5625 205.437344" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<svg data-metric="bat" data-period="day" data-theme="light" data-x-start="1705320000" data-x-end="1705320000" data-y-min="3.0" data-y-max="4.2" data-points="[{&quot;ts&quot;: 1705320000, &quot;v&quot;: 3.85}]" xmlns:xlink="http://www.w3.org/1999/xlink" width="580.5625pt" height="205.437344pt" viewBox="0 0 580.5625 205.437344" xmlns="http://www.w3.org/2000/svg" version="1.1">
 <metadata>
 <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
 <cc:Work>
@@ -563,7 +563,7 @@ z
 " clip-path="url(#clip_0)" style="fill: #b45309; fill-opacity: 0.14902; stroke: #b45309; stroke-opacity: 0.14902"/>
 </g>
 <g id="chart-line">
-<path data-points="[{&quot;ts&quot;: 1705316400, &quot;v&quot;: 3.85}]" d="M 558.953125 60.745885
+<path data-points="[{&quot;ts&quot;: 1705320000, &quot;v&quot;: 3.85}]" d="M 558.953125 60.745885
 " clip-path="url(#clip_0)" style="fill: none; stroke: #b45309; stroke-width: 2; stroke-linecap: square"/>
 </g>
 <g id="patch_3">
