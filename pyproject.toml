@@ -46,10 +46,11 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["src/meshmon"]
+source = ["src/meshmon", "scripts"]
 branch = true
 omit = [
     "src/meshmon/__init__.py",
+    "scripts/generate_snapshots.py",  # Dev utility for test fixtures
 ]
 
 [tool.coverage.report]

@@ -35,6 +35,7 @@ jobs:
         run: |
           pytest \
             --cov=src/meshmon \
+            --cov=scripts \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
