@@ -502,7 +502,7 @@ class TestMainEntryPoint:
 
         with (
             patch.object(module, "init_db") as mock_init,
-            patch.object(module, "collect_companion", return_value=0),
+            patch.object(module, "collect_companion", new=MagicMock(return_value=0)),
             patch.object(module, "asyncio") as mock_asyncio,
             patch.object(module, "sys"),
         ):
@@ -518,7 +518,7 @@ class TestMainEntryPoint:
 
         with (
             patch.object(module, "init_db"),
-            patch.object(module, "collect_companion", return_value=1),
+            patch.object(module, "collect_companion", new=MagicMock(return_value=1)),
             patch.object(module, "asyncio") as mock_asyncio,
             patch.object(module, "sys") as mock_sys,
         ):
@@ -534,7 +534,7 @@ class TestMainEntryPoint:
 
         with (
             patch.object(module, "init_db"),
-            patch.object(module, "collect_companion", return_value=0),
+            patch.object(module, "collect_companion", new=MagicMock(return_value=0)),
             patch.object(module, "asyncio") as mock_asyncio,
             patch.object(module, "sys"),
         ):
