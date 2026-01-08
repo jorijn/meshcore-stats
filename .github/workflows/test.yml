@@ -1,0 +1,114 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, feat/*]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --locked --extra dev
+
+      - name: Run tests with coverage
+        run: |
+          uv run pytest \
+            --cov=src/meshmon \
+            --cov=scripts \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            --cov-fail-under=95 \
+            --junitxml=test-results.xml \
+            -n auto \
+            --tb=short \
+            -q
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo "### Coverage (Python ${{ matrix.python-version }})"
+            if [ -f .coverage ]; then
+              uv run coverage report -m
+            else
+              echo "No coverage data found."
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage HTML report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && matrix.python-version == '3.12'
+        with:
+          name: coverage-report-html-${{ matrix.python-version }}
+          path: htmlcov/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload coverage XML report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && matrix.python-version == '3.12'
+        with:
+          name: coverage-report-xml-${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: test-results.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Install linters
+        run: uv sync --locked --extra dev --no-install-project
+
+      - name: Run ruff
+        run: uv run ruff check src/ tests/ scripts/
+
+      - name: Run mypy
+        run: uv run mypy src/meshmon --ignore-missing-imports --no-error-summary

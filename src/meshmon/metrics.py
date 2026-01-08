@@ -12,7 +12,6 @@ See docs/firmware-responses.md for the complete field reference.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -30,7 +29,7 @@ class MetricConfig:
     unit: str
     type: str = "gauge"
     scale: float = 1.0
-    transform: Optional[str] = None
+    transform: str | None = None
 
 
 # =============================================================================
@@ -223,7 +222,7 @@ def get_chart_metrics(role: str) -> list[str]:
         raise ValueError(f"Unknown role: {role}")
 
 
-def get_metric_config(metric: str) -> Optional[MetricConfig]:
+def get_metric_config(metric: str) -> MetricConfig | None:
     """Get configuration for a metric.
 
     Args:

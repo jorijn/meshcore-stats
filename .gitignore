@@ -12,6 +12,12 @@ env/
 dist/
 build/
 
+# Testing/Coverage
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
 # Environment
 .envrc
 .env

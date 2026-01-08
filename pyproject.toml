@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meshcore-stats"
+version = "0.2.9"
+description = "MeshCore LoRa mesh network monitoring and statistics"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "meshcore>=2.2.3",
+    "meshcore-cli>=1.0.0",
+    "pyserial>=3.5",
+    "jinja2>=3.1.0",
+    "matplotlib>=3.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "pytest-xdist>=3.5.0",
+    "coverage[toml]>=7.4.0",
+    "freezegun>=1.2.0",
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = ["-v", "--strict-markers", "-ra", "--tb=short"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks integration tests",
+    "snapshot: marks snapshot comparison tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:matplotlib.*",
+]
+
+[tool.coverage.run]
+source = ["src/meshmon", "scripts"]
+branch = true
+omit = [
+    "src/meshmon/__init__.py",
+    "scripts/generate_snapshots.py",  # Dev utility for test fixtures
+]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if not MESHCORE_AVAILABLE:",
+    "except ImportError:",
+    "if __name__ == .__main__.:",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true

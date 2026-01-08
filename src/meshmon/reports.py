@@ -14,12 +14,11 @@ Metric names use firmware field names directly:
 """
 
 import calendar
-import json
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
-from typing import Any, Optional
+from datetime import date, datetime
+from typing import Any
 
-from .db import get_connection, get_metrics_for_period, VALID_ROLES
+from .db import VALID_ROLES, get_connection, get_metrics_for_period
 from .metrics import (
     is_counter_metric,
 )
@@ -88,12 +87,12 @@ class MetricStats:
     For counter metrics: total (sum of positive deltas), reboot_count.
     """
 
-    mean: Optional[float] = None
-    min_value: Optional[float] = None
-    min_time: Optional[datetime] = None
-    max_value: Optional[float] = None
-    max_time: Optional[datetime] = None
-    total: Optional[int] = None  # For counters: sum of positive deltas
+    mean: float | None = None
+    min_value: float | None = None
+    min_time: datetime | None = None
+    max_value: float | None = None
+    max_time: datetime | None = None
+    total: int | None = None  # For counters: sum of positive deltas
     count: int = 0
     reboot_count: int = 0  # Number of counter resets detected
 
@@ -177,7 +176,7 @@ def get_rows_for_date(role: str, d: date) -> list[dict[str, Any]]:
 
 def compute_counter_total(
     values: list[tuple[datetime, int]],
-) -> tuple[Optional[int], int]:
+) -> tuple[int | None, int]:
     """Compute total for a counter metric, handling reboots.
 
     Sums positive deltas between consecutive readings. Negative deltas
@@ -311,8 +310,8 @@ def _aggregate_daily_gauge_to_summary(
     """
     total_sum = 0.0
     total_count = 0
-    overall_min: Optional[tuple[float, datetime]] = None
-    overall_max: Optional[tuple[float, datetime]] = None
+    overall_min: tuple[float, datetime] | None = None
+    overall_max: tuple[float, datetime] | None = None
 
     for daily in daily_list:
         if ds_name not in daily.metrics or not daily.metrics[ds_name].has_data:
@@ -326,14 +325,20 @@ def _aggregate_daily_gauge_to_summary(
             total_count += stats.count
 
         # Track overall min
-        if stats.min_value is not None and stats.min_time is not None:
-            if overall_min is None or stats.min_value < overall_min[0]:
-                overall_min = (stats.min_value, stats.min_time)
+        if (
+            stats.min_value is not None
+            and stats.min_time is not None
+            and (overall_min is None or stats.min_value < overall_min[0])
+        ):
+            overall_min = (stats.min_value, stats.min_time)
 
         # Track overall max
-        if stats.max_value is not None and stats.max_time is not None:
-            if overall_max is None or stats.max_value > overall_max[0]:
-                overall_max = (stats.max_value, stats.max_time)
+        if (
+            stats.max_value is not None
+            and stats.max_time is not None
+            and (overall_max is None or stats.max_value > overall_max[0])
+        ):
+            overall_max = (stats.max_value, stats.max_time)
 
     if total_count == 0:
         return MetricStats()
@@ -422,8 +427,8 @@ def _aggregate_monthly_gauge_to_summary(
     """Aggregate monthly gauge stats into a yearly summary."""
     total_sum = 0.0
     total_count = 0
-    overall_min: Optional[tuple[float, datetime]] = None
-    overall_max: Optional[tuple[float, datetime]] = None
+    overall_min: tuple[float, datetime] | None = None
+    overall_max: tuple[float, datetime] | None = None
 
     for monthly in monthly_list:
         if ds_name not in monthly.summary or not monthly.summary[ds_name].has_data:
@@ -435,13 +440,19 @@ def _aggregate_monthly_gauge_to_summary(
             total_sum += stats.mean * stats.count
             total_count += stats.count
 
-        if stats.min_value is not None and stats.min_time is not None:
-            if overall_min is None or stats.min_value < overall_min[0]:
-                overall_min = (stats.min_value, stats.min_time)
+        if (
+            stats.min_value is not None
+            and stats.min_time is not None
+            and (overall_min is None or stats.min_value < overall_min[0])
+        ):
+            overall_min = (stats.min_value, stats.min_time)
 
-        if stats.max_value is not None and stats.max_time is not None:
-            if overall_max is None or stats.max_value > overall_max[0]:
-                overall_max = (stats.max_value, stats.max_time)
+        if (
+            stats.max_value is not None
+            and stats.max_time is not None
+            and (overall_max is None or stats.max_value > overall_max[0])
+        ):
+            overall_max = (stats.max_value, stats.max_time)
 
     if total_count == 0:
         return MetricStats()
@@ -624,28 +635,28 @@ class LocationInfo:
         )
 
 
-def _fmt_val(val: Optional[float], width: int = 6, decimals: int = 1) -> str:
+def _fmt_val(val: float | None, width: int = 6, decimals: int = 1) -> str:
     """Format a value with fixed width, or dashes if None."""
     if val is None:
         return "-".center(width)
     return f"{val:>{width}.{decimals}f}"
 
 
-def _fmt_int(val: Optional[int], width: int = 6) -> str:
+def _fmt_int(val: int | None, width: int = 6) -> str:
     """Format an integer with fixed width and comma separators, or dashes if None."""
     if val is None:
         return "-".center(width)
     return f"{val:>{width},}"
 
 
-def _fmt_time(dt: Optional[datetime], fmt: str = "%H:%M") -> str:
+def _fmt_time(dt: datetime | None, fmt: str = "%H:%M") -> str:
     """Format a datetime, or dashes if None."""
     if dt is None:
         return "--:--"
     return dt.strftime(fmt)
 
 
-def _fmt_day(dt: Optional[datetime]) -> str:
+def _fmt_day(dt: datetime | None) -> str:
     """Format datetime as day number, or dashes if None."""
     if dt is None:
         return "--"
@@ -669,10 +680,7 @@ class Column:
         if value is None:
             text = "-"
         elif isinstance(value, int):
-            if self.comma_sep:
-                text = f"{value:,}"
-            else:
-                text = str(value)
+            text = f"{value:,}" if self.comma_sep else str(value)
         elif isinstance(value, float):
             text = f"{value:.{self.decimals}f}"
         else:
@@ -688,7 +696,7 @@ class Column:
 
 def _format_row(columns: list[Column], values: list[Any]) -> str:
     """Format a row of values using column specs."""
-    return "".join(col.format(val) for col, val in zip(columns, values))
+    return "".join(col.format(val) for col, val in zip(columns, values, strict=False))
 
 
 def _format_separator(columns: list[Column], char: str = "-") -> str:
@@ -706,10 +714,7 @@ def _get_bat_v(m: dict[str, MetricStats], role: str) -> MetricStats:
     Returns:
         MetricStats with values in volts
     """
-    if role == "companion":
-        bat = m.get("battery_mv", MetricStats())
-    else:
-        bat = m.get("bat", MetricStats())
+    bat = m.get("battery_mv", MetricStats()) if role == "companion" else m.get("bat", MetricStats())
 
     if not bat.has_data:
         return bat

@@ -10,23 +10,23 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for server-side rendering
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 
+matplotlib.use('Agg')  # Non-interactive backend for server-side rendering
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+
+from . import log
 from .db import get_metrics_for_period
 from .env import get_config
 from .metrics import (
     get_chart_metrics,
-    is_counter_metric,
     get_graph_scale,
+    is_counter_metric,
     transform_value,
 )
-from . import log
-
 
 # Type alias for theme names
 ThemeName = Literal["light", "dark"]
@@ -37,27 +37,35 @@ BIN_30_MINUTES = 1800  # 30 minutes in seconds
 BIN_2_HOURS = 7200  # 2 hours in seconds
 BIN_1_DAY = 86400  # 1 day in seconds
 
-# Period configuration: lookback duration and aggregation bin size
+
+@dataclass(frozen=True)
+class PeriodConfig:
+    """Configuration for a chart time period."""
+
+    lookback: timedelta
+    bin_seconds: int | None = None  # None = no binning (raw data)
+
+
 # Period configuration for chart rendering
 # Target: ~100-400 data points per chart for clean visualization
 # Chart plot area is ~640px, so aim for 1.5-6px per point
-PERIOD_CONFIG = {
-    "day": {
-        "lookback": timedelta(days=1),
-        "bin_seconds": None,  # No binning - raw data (~96 points at 15-min intervals)
-    },
-    "week": {
-        "lookback": timedelta(days=7),
-        "bin_seconds": BIN_30_MINUTES,  # 30-min bins (~336 points, ~2px per point)
-    },
-    "month": {
-        "lookback": timedelta(days=31),
-        "bin_seconds": BIN_2_HOURS,  # 2-hour bins (~372 points, ~1.7px per point)
-    },
-    "year": {
-        "lookback": timedelta(days=365),
-        "bin_seconds": BIN_1_DAY,  # 1-day bins (~365 points, ~1.8px per point)
-    },
+PERIOD_CONFIG: dict[str, PeriodConfig] = {
+    "day": PeriodConfig(
+        lookback=timedelta(days=1),
+        bin_seconds=None,  # No binning - raw data (~96 points at 15-min intervals)
+    ),
+    "week": PeriodConfig(
+        lookback=timedelta(days=7),
+        bin_seconds=BIN_30_MINUTES,  # 30-min bins (~336 points, ~2px per point)
+    ),
+    "month": PeriodConfig(
+        lookback=timedelta(days=31),
+        bin_seconds=BIN_2_HOURS,  # 2-hour bins (~372 points, ~1.7px per point)
+    ),
+    "year": PeriodConfig(
+        lookback=timedelta(days=365),
+        bin_seconds=BIN_1_DAY,  # 1-day bins (~365 points, ~1.8px per point)
+    ),
 }
 
 
@@ -134,12 +142,12 @@ class TimeSeries:
 class ChartStatistics:
     """Statistics for a time series (min/avg/max/current)."""
 
-    min_value: Optional[float] = None
-    avg_value: Optional[float] = None
-    max_value: Optional[float] = None
-    current_value: Optional[float] = None
+    min_value: float | None = None
+    avg_value: float | None = None
+    max_value: float | None = None
+    current_value: float | None = None
 
-    def to_dict(self) -> dict[str, Optional[float]]:
+    def to_dict(self) -> dict[str, float | None]:
         """Convert to dict matching existing chart_stats.json format."""
         return {
             "min": self.min_value,
@@ -167,7 +175,7 @@ def load_timeseries_from_db(
     end_time: datetime,
     lookback: timedelta,
     period: str,
-    all_metrics: Optional[dict[str, list[tuple[int, float]]]] = None,
+    all_metrics: dict[str, list[tuple[int, float]]] | None = None,
 ) -> TimeSeries:
     """Load time series data from SQLite database.
 
@@ -241,11 +249,9 @@ def load_timeseries_from_db(
         raw_points = [(ts, val * scale) for ts, val in raw_points]
 
     # Apply time binning if configured
-    period_cfg = PERIOD_CONFIG.get(period, {})
-    bin_seconds = period_cfg.get("bin_seconds")
-
-    if bin_seconds and len(raw_points) > 1:
-        raw_points = _aggregate_bins(raw_points, bin_seconds)
+    period_cfg = PERIOD_CONFIG.get(period)
+    if period_cfg and period_cfg.bin_seconds and len(raw_points) > 1:
+        raw_points = _aggregate_bins(raw_points, period_cfg.bin_seconds)
 
     # Convert to DataPoints
     points = [DataPoint(timestamp=ts, value=val) for ts, val in raw_points]
@@ -318,10 +324,10 @@ def render_chart_svg(
     theme: ChartTheme,
     width: int = 800,
     height: int = 280,
-    y_min: Optional[float] = None,
-    y_max: Optional[float] = None,
-    x_start: Optional[datetime] = None,
-    x_end: Optional[datetime] = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
+    x_start: datetime | None = None,
+    x_end: datetime | None = None,
 ) -> str:
     """Render time series as SVG using matplotlib.
 
@@ -380,10 +386,14 @@ def render_chart_svg(
             timestamps = ts.timestamps
             values = ts.values
 
+            # Convert datetime to matplotlib date numbers for proper typing
+            # and correct axis formatter behavior
+            x_dates = mdates.date2num(timestamps)
+
             # Plot area fill
             area_color = _hex_to_rgba(theme.area)
             area = ax.fill_between(
-                timestamps,
+                x_dates,
                 values,
                 alpha=area_color[3],
                 color=f"#{theme.line}",
@@ -392,7 +402,7 @@ def render_chart_svg(
 
             # Plot line
             (line,) = ax.plot(
-                timestamps,
+                x_dates,
                 values,
                 color=f"#{theme.line}",
                 linewidth=2,
@@ -414,7 +424,17 @@ def render_chart_svg(
 
             # Set X-axis limits first (before configuring ticks)
             if x_start is not None and x_end is not None:
-                ax.set_xlim(x_start, x_end)
+                ax.set_xlim(mdates.date2num(x_start), mdates.date2num(x_end))
+            else:
+                # Compute sensible x-axis limits from data
+                # For single point or sparse data, add padding based on period
+                x_min_dt = min(timestamps)
+                x_max_dt = max(timestamps)
+                if x_min_dt == x_max_dt:
+                    # Single point: use period lookback for range
+                    period_cfg = PERIOD_CONFIG.get(ts.period, PERIOD_CONFIG["day"])
+                    x_min_dt = x_max_dt - period_cfg.lookback
+                ax.set_xlim(mdates.date2num(x_min_dt), mdates.date2num(x_max_dt))
 
             # Format X-axis based on period (after setting limits)
             _configure_x_axis(ax, ts.period)
@@ -464,10 +484,10 @@ def _inject_data_attributes(
     svg: str,
     ts: TimeSeries,
     theme_name: str,
-    x_start: Optional[datetime] = None,
-    x_end: Optional[datetime] = None,
-    y_min: Optional[float] = None,
-    y_max: Optional[float] = None,
+    x_start: datetime | None = None,
+    x_end: datetime | None = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
 ) -> str:
     """Inject data-* attributes into SVG for tooltip support.
 
@@ -543,7 +563,7 @@ def _inject_data_attributes(
 
 def render_all_charts(
     role: str,
-    metrics: Optional[list[str]] = None,
+    metrics: list[str] | None = None,
 ) -> tuple[list[Path], dict[str, dict[str, dict[str, Any]]]]:
     """Render all charts for a role in both light and dark themes.
 
@@ -587,7 +607,7 @@ def render_all_charts(
     for period in periods:
         period_cfg = PERIOD_CONFIG[period]
         x_end = now
-        x_start = now - period_cfg["lookback"]
+        x_start = now - period_cfg.lookback
 
         start_ts = int(x_start.timestamp())
         end_ts = int(x_end.timestamp())
@@ -599,7 +619,7 @@ def render_all_charts(
                 role=role,
                 metric=metric,
                 end_time=now,
-                lookback=period_cfg["lookback"],
+                lookback=period_cfg.lookback,
                 period=period,
                 all_metrics=all_metrics,
             )
@@ -675,7 +695,8 @@ def load_chart_stats(role: str) -> dict[str, dict[str, dict[str, Any]]]:
 
     try:
         with open(stats_path) as f:
-            return json.load(f)
+            data: dict[str, dict[str, dict[str, Any]]] = json.load(f)
+            return data
     except Exception as e:
         log.debug(f"Failed to load chart stats: {e}")
         return {}

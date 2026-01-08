@@ -1,27 +1,40 @@
 """HTML rendering helpers using Jinja2 templates."""
 
+from __future__ import annotations
+
 import calendar
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from jinja2 import Environment, PackageLoader, select_autoescape
 
+from . import log
+from .charts import load_chart_stats
 from .env import get_config
 from .formatters import (
-    format_time,
-    format_value,
-    format_number,
-    format_duration,
-    format_uptime,
     format_compact_number,
+    format_duration,
     format_duration_compact,
+    format_number,
+    format_time,
+    format_uptime,
+    format_value,
 )
-from .charts import load_chart_stats
 from .metrics import get_chart_metrics, get_metric_label
-from . import log
 
+if TYPE_CHECKING:
+    from .reports import MonthlyAggregate, YearlyAggregate
+
+
+class MetricDisplay(TypedDict, total=False):
+    """A metric display item for the UI."""
+
+    label: str
+    value: str
+    unit: str | None
+    raw_value: int
 
 # Status indicator thresholds (seconds)
 STATUS_ONLINE_THRESHOLD = 1800  # 30 minutes
@@ -76,7 +89,7 @@ COMPANION_CHART_GROUPS = [
 ]
 
 # Singleton Jinja2 environment
-_jinja_env: Optional[Environment] = None
+_jinja_env: Environment | None = None
 
 
 def get_jinja_env() -> Environment:
@@ -110,7 +123,7 @@ def get_jinja_env() -> Environment:
     return env
 
 
-def get_status(ts: Optional[int]) -> tuple[str, str]:
+def get_status(ts: int | None) -> tuple[str, str]:
     """Determine status based on timestamp age.
 
     Returns:
@@ -128,7 +141,7 @@ def get_status(ts: Optional[int]) -> tuple[str, str]:
         return ("offline", "Offline")
 
 
-def build_repeater_metrics(row: Optional[dict]) -> dict:
+def build_repeater_metrics(row: dict | None) -> dict:
     """Build metrics data from repeater database row.
 
     Args:
@@ -242,7 +255,7 @@ def build_repeater_metrics(row: Optional[dict]) -> dict:
     }
 
 
-def build_companion_metrics(row: Optional[dict]) -> dict:
+def build_companion_metrics(row: dict | None) -> dict:
     """Build metrics data from companion database row.
 
     Args:
@@ -296,7 +309,7 @@ def build_companion_metrics(row: Optional[dict]) -> dict:
         })
 
     # Secondary metrics (empty for companion)
-    secondary_metrics = []
+    secondary_metrics: list[MetricDisplay] = []
 
     # Traffic metrics for companion
     traffic_metrics = []
@@ -402,7 +415,7 @@ def build_radio_config() -> list[dict]:
     ]
 
 
-def _format_stat_value(value: Optional[float], metric: str) -> str:
+def _format_stat_value(value: float | None, metric: str) -> str:
     """Format a statistic value for display in chart footer.
 
     Args:
@@ -444,7 +457,7 @@ def _format_stat_value(value: Optional[float], metric: str) -> str:
         return f"{value:.2f}"
 
 
-def _load_svg_content(path: Path) -> Optional[str]:
+def _load_svg_content(path: Path) -> str | None:
     """Load SVG file content for inline embedding.
 
     Args:
@@ -466,7 +479,7 @@ def _load_svg_content(path: Path) -> Optional[str]:
 def build_chart_groups(
     role: str,
     period: str,
-    chart_stats: Optional[dict] = None,
+    chart_stats: dict | None = None,
 ) -> list[dict]:
     """Build chart groups for template.
 
@@ -523,7 +536,8 @@ def build_chart_groups(
                     {"label": "Max", "value": _format_stat_value(max_val, metric)},
                 ]
 
-            chart_data = {
+            # Build chart data for template - mixed types require Any
+            chart_data: dict[str, Any] = {
                 "label": get_metric_label(metric),
                 "metric": metric,
                 "current": current_formatted,
@@ -555,7 +569,7 @@ def build_chart_groups(
 def build_page_context(
     role: str,
     period: str,
-    row: Optional[dict],
+    row: dict | None,
     at_root: bool,
 ) -> dict[str, Any]:
     """Build template context dictionary for node pages.
@@ -569,16 +583,10 @@ def build_page_context(
     cfg = get_config()
 
     # Get node name from config
-    if role == "repeater":
-        node_name = cfg.repeater_display_name
-    else:
-        node_name = cfg.companion_display_name
+    node_name = cfg.repeater_display_name if role == "repeater" else cfg.companion_display_name
 
     # Pubkey prefix from config
-    if role == "repeater":
-        pubkey_pre = cfg.repeater_pubkey_prefix
-    else:
-        pubkey_pre = cfg.companion_pubkey_prefix
+    pubkey_pre = cfg.repeater_pubkey_prefix if role == "repeater" else cfg.companion_pubkey_prefix
 
     # Status based on timestamp
     ts = row.get("ts") if row else None
@@ -675,7 +683,7 @@ def build_page_context(
 def render_node_page(
     role: str,
     period: str,
-    row: Optional[dict],
+    row: dict | None,
     at_root: bool = False,
 ) -> str:
     """Render a node page (companion or repeater).
@@ -689,7 +697,7 @@ def render_node_page(
     env = get_jinja_env()
     context = build_page_context(role, period, row, at_root)
     template = env.get_template("node.html")
-    return template.render(**context)
+    return str(template.render(**context))
 
 
 def copy_static_assets():
@@ -712,8 +720,8 @@ def copy_static_assets():
 
 
 def write_site(
-    companion_row: Optional[dict],
-    repeater_row: Optional[dict],
+    companion_row: dict | None,
+    repeater_row: dict | None,
 ) -> list[Path]:
     """
     Write all static site pages.
@@ -794,8 +802,8 @@ def _fmt_val_plain(value: float | None, fmt: str = ".2f") -> str:
 
 
 def build_monthly_table_data(
-    agg: "MonthlyAggregate", role: str
-) -> tuple[list[dict], list[dict], list[dict]]:
+    agg: MonthlyAggregate, role: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Build table column groups, headers and rows for a monthly report.
 
     Args:
@@ -806,6 +814,11 @@ def build_monthly_table_data(
         (col_groups, headers, rows) where each is a list of dicts
     """
     from .reports import MetricStats
+
+    # Define types upfront for mypy
+    col_groups: list[dict[str, Any]]
+    headers: list[dict[str, Any]]
+    rows: list[dict[str, Any]]
 
     if role == "repeater":
         # Column groups matching redesign/reports/monthly.html
@@ -986,8 +999,8 @@ def _fmt_val_month(value: float | None, time_obj, fmt: str = ".2f") -> str:
 
 
 def build_yearly_table_data(
-    agg: "YearlyAggregate", role: str
-) -> tuple[list[dict], list[dict], list[dict]]:
+    agg: YearlyAggregate, role: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Build table column groups, headers and rows for a yearly report.
 
     Args:
@@ -998,6 +1011,11 @@ def build_yearly_table_data(
         (col_groups, headers, rows) where each is a list of dicts
     """
     from .reports import MetricStats
+
+    # Define types upfront for mypy
+    col_groups: list[dict[str, Any]]
+    headers: list[dict[str, Any]]
+    rows: list[dict[str, Any]]
 
     if role == "repeater":
         # Column groups matching redesign/reports/yearly.html
@@ -1166,8 +1184,8 @@ def render_report_page(
     agg: Any,
     node_name: str,
     report_type: str,
-    prev_report: Optional[dict] = None,
-    next_report: Optional[dict] = None,
+    prev_report: dict | None = None,
+    next_report: dict | None = None,
 ) -> str:
     """Render a report page (monthly or yearly).
 
@@ -1239,7 +1257,7 @@ def render_report_page(
     }
 
     template = env.get_template("report.html")
-    return template.render(**context)
+    return str(template.render(**context))
 
 
 def render_reports_index(report_sections: list[dict]) -> str:
@@ -1276,4 +1294,4 @@ def render_reports_index(report_sections: list[dict]) -> str:
     }
 
     template = env.get_template("report_index.html")
-    return template.render(**context)
+    return str(template.render(**context))

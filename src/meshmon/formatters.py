@@ -1,14 +1,14 @@
 """Shared formatting functions for display values."""
 
 from datetime import datetime
-from typing import Any, Optional, Union
-
-Number = Union[int, float]
+from typing import Any
 
 from .battery import voltage_to_percentage
 
+Number = int | float
 
-def format_time(ts: Optional[int]) -> str:
+
+def format_time(ts: int | None) -> str:
     """Format Unix timestamp to human readable string."""
     if ts is None:
         return "N/A"
@@ -28,14 +28,14 @@ def format_value(value: Any) -> str:
     return str(value)
 
 
-def format_number(value: Optional[int]) -> str:
+def format_number(value: int | None) -> str:
     """Format an integer with thousands separators."""
     if value is None:
         return "N/A"
     return f"{value:,}"
 
 
-def format_duration(seconds: Optional[int]) -> str:
+def format_duration(seconds: int | None) -> str:
     """Format duration in seconds to human readable string (days, hours, minutes, seconds)."""
     if seconds is None:
         return "N/A"
@@ -57,7 +57,7 @@ def format_duration(seconds: Optional[int]) -> str:
     return " ".join(parts)
 
 
-def format_uptime(seconds: Optional[int]) -> str:
+def format_uptime(seconds: int | None) -> str:
     """Format uptime seconds to human readable string (days, hours, minutes)."""
     if seconds is None:
         return "N/A"
@@ -76,7 +76,7 @@ def format_uptime(seconds: Optional[int]) -> str:
     return " ".join(parts)
 
 
-def format_voltage_with_pct(mv: Optional[float]) -> str:
+def format_voltage_with_pct(mv: float | None) -> str:
     """Format millivolts as voltage with battery percentage."""
     if mv is None:
         return "N/A"
@@ -85,7 +85,7 @@ def format_voltage_with_pct(mv: Optional[float]) -> str:
     return f"{v:.2f} V ({pct:.0f}%)"
 
 
-def format_compact_number(value: Optional[Number], precision: int = 1) -> str:
+def format_compact_number(value: Number | None, precision: int = 1) -> str:
     """Format a number using compact notation (k, M suffixes).
 
     Rules:
@@ -119,7 +119,7 @@ def format_compact_number(value: Optional[Number], precision: int = 1) -> str:
         return str(int(value))
 
 
-def format_duration_compact(seconds: Optional[int]) -> str:
+def format_duration_compact(seconds: int | None) -> str:
     """Format duration showing only the two most significant units.
 
     Uses truncation (floor), not rounding.

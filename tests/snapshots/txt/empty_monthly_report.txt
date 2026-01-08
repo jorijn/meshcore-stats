@@ -1,0 +1,12 @@
+                   MONTHLY MESHCORE REPORT for January 2024
+
+NODE: Test Repeater
+NAME: Test Observatory
+COORDS: 52°22'03"N  004°54'14"E    ELEV: 2 meters
+
+                   BATTERY (V)                    SIGNAL                PACKETS        AIR
+      MEAN              MIN              MAX      RSSI   SNR    NOISE    RX      TX    SECS
+DAY   VOLT   %     VOLT  TIME     VOLT  TIME      dBm    dB      dBm
+-----------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------
+       -     -     -    --       -    --       -     -      -       -       -       -  
