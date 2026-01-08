@@ -370,6 +370,8 @@ Jobs configured in `docker/ofelia.ini`:
 
 All GitHub Actions are pinned by full SHA for security. Dependabot can be configured to update these automatically.
 
+The test and lint workflow (`.github/workflows/test.yml`) installs dependencies with uv (`uv sync --locked --extra dev`) and runs commands via `uv run`, using `uv.lock` as the source of truth.
+
 ### Version Placeholder
 
 The version in `docker-compose.yml` uses release-please's placeholder syntax:
