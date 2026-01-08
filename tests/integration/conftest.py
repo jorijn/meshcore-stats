@@ -1,14 +1,58 @@
 """Integration test fixtures."""
 
+import os
 import time
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+_INTEGRATION_ENV = {
+    "REPORT_LOCATION_NAME": "Test Location",
+    "REPORT_LOCATION_SHORT": "Test",
+    "REPEATER_DISPLAY_NAME": "Test Repeater",
+    "COMPANION_DISPLAY_NAME": "Test Companion",
+    "MESH_TRANSPORT": "serial",
+    "MESH_SERIAL_PORT": "/dev/ttyACM0",
+}
 
-@pytest.fixture
-def populated_db_with_history(initialized_db, sample_companion_metrics, sample_repeater_metrics):
-    """Database populated with 30 days of historical data for integration tests."""
+
+def _sample_companion_metrics() -> dict[str, float]:
+    return {
+        "battery_mv": 3850.0,
+        "uptime_secs": 86400.0,
+        "contacts": 5.0,
+        "recv": 1234.0,
+        "sent": 567.0,
+        "errors": 0.0,
+    }
+
+
+def _sample_repeater_metrics() -> dict[str, float]:
+    return {
+        "bat": 3920.0,
+        "uptime": 172800.0,
+        "last_rssi": -85.0,
+        "last_snr": 7.5,
+        "noise_floor": -115.0,
+        "tx_queue_len": 0.0,
+        "nb_recv": 5678.0,
+        "nb_sent": 2345.0,
+        "airtime": 3600.0,
+        "rx_airtime": 7200.0,
+        "flood_dups": 12.0,
+        "direct_dups": 5.0,
+        "sent_flood": 100.0,
+        "recv_flood": 200.0,
+        "sent_direct": 50.0,
+        "recv_direct": 75.0,
+    }
+
+
+def _populate_db_with_history(
+    db_path,
+    sample_companion_metrics: dict[str, float],
+    sample_repeater_metrics: dict[str, float],
+) -> None:
     from meshmon.db import insert_metrics
 
     now = int(time.time())
@@ -24,7 +68,7 @@ def populated_db_with_history(initialized_db, sample_companion_metrics, sample_r
             metrics["recv"] = 100 + day * 10 + hour
             metrics["sent"] = 50 + day * 5 + hour
             metrics["uptime_secs"] = (30 - day) * day_seconds + hour * 3600
-            insert_metrics(ts, "companion", metrics, initialized_db)
+            insert_metrics(ts, "companion", metrics, db_path=db_path)
 
     # Insert 30 days of repeater data (every 15 minutes)
     for day in range(30):
@@ -38,9 +82,120 @@ def populated_db_with_history(initialized_db, sample_companion_metrics, sample_r
             metrics["uptime"] = (30 - day) * day_seconds + interval * 900
             metrics["last_rssi"] = -90 + (interval % 20)
             metrics["last_snr"] = 5 + (interval % 10) * 0.5
-            insert_metrics(ts, "repeater", metrics, initialized_db)
+            insert_metrics(ts, "repeater", metrics, db_path=db_path)
 
-    return initialized_db
+
+@pytest.fixture
+def reports_env(reports_db_cache, tmp_out_dir, monkeypatch):
+    """Integration env wired to the shared reports DB and per-test output."""
+    monkeypatch.setenv("STATE_DIR", str(reports_db_cache["state_dir"]))
+    monkeypatch.setenv("OUT_DIR", str(tmp_out_dir))
+    for key, value in _INTEGRATION_ENV.items():
+        monkeypatch.setenv(key, value)
+
+    import meshmon.env
+    meshmon.env._config = None
+
+    return {
+        "state_dir": reports_db_cache["state_dir"],
+        "out_dir": tmp_out_dir,
+    }
+
+
+@pytest.fixture
+def populated_db_with_history(reports_db_cache, reports_env):
+    """Shared database populated with 30 days of history for integration tests."""
+    return reports_db_cache["db_path"]
+
+
+@pytest.fixture(scope="module")
+def reports_db_cache(tmp_path_factory):
+    """Create and populate a shared reports DB once per module."""
+    from meshmon.db import init_db
+
+    root_dir = tmp_path_factory.mktemp("reports-db")
+    state_dir = root_dir / "state"
+    state_dir.mkdir()
+
+    db_path = state_dir / "metrics.db"
+    init_db(db_path=db_path)
+    _populate_db_with_history(
+        db_path,
+        _sample_companion_metrics(),
+        _sample_repeater_metrics(),
+    )
+
+    return {
+        "state_dir": state_dir,
+        "db_path": db_path,
+    }
+
+
+@pytest.fixture(scope="module")
+def rendered_charts_cache(tmp_path_factory):
+    """Cache rendered charts once per module to speed up integration tests."""
+    from meshmon.charts import render_all_charts, save_chart_stats
+    from meshmon.db import init_db
+
+    root_dir = tmp_path_factory.mktemp("rendered-charts")
+    state_dir = root_dir / "state"
+    out_dir = root_dir / "out"
+    state_dir.mkdir()
+    out_dir.mkdir()
+
+    env_keys = ["STATE_DIR", "OUT_DIR", *_INTEGRATION_ENV.keys()]
+    previous_env = {key: os.environ.get(key) for key in env_keys}
+
+    os.environ["STATE_DIR"] = str(state_dir)
+    os.environ["OUT_DIR"] = str(out_dir)
+    for key, value in _INTEGRATION_ENV.items():
+        os.environ[key] = value
+
+    import meshmon.env
+    meshmon.env._config = None
+
+    db_path = state_dir / "metrics.db"
+    init_db(db_path=db_path)
+    _populate_db_with_history(
+        db_path,
+        _sample_companion_metrics(),
+        _sample_repeater_metrics(),
+    )
+
+    for role in ["companion", "repeater"]:
+        charts, stats = render_all_charts(role)
+        save_chart_stats(role, stats)
+
+    yield {
+        "state_dir": state_dir,
+        "out_dir": out_dir,
+        "db_path": db_path,
+    }
+
+    for key, value in previous_env.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+    meshmon.env._config = None
+
+
+@pytest.fixture
+def rendered_charts(rendered_charts_cache, monkeypatch):
+    """Expose cached charts with env wired for per-test access."""
+    state_dir = rendered_charts_cache["state_dir"]
+    out_dir = rendered_charts_cache["out_dir"]
+
+    monkeypatch.setenv("STATE_DIR", str(state_dir))
+    monkeypatch.setenv("OUT_DIR", str(out_dir))
+    for key, value in _INTEGRATION_ENV.items():
+        monkeypatch.setenv(key, value)
+
+    import meshmon.env
+    meshmon.env._config = None
+
+    return rendered_charts_cache
 
 
 @pytest.fixture
@@ -89,18 +244,9 @@ def mock_meshcore_successful_collection(sample_companion_metrics):
 
 @pytest.fixture
 def full_integration_env(configured_env, monkeypatch):
-    """Full integration environment with all directories set up.
-
-    Builds on top of configured_env from root conftest.py to ensure
-    consistent directory paths when used with other fixtures like
-    initialized_db and populated_db_with_history.
-    """
-    monkeypatch.setenv("REPORT_LOCATION_NAME", "Test Location")
-    monkeypatch.setenv("REPORT_LOCATION_SHORT", "Test")
-    monkeypatch.setenv("REPEATER_DISPLAY_NAME", "Test Repeater")
-    monkeypatch.setenv("COMPANION_DISPLAY_NAME", "Test Companion")
-    monkeypatch.setenv("MESH_TRANSPORT", "serial")
-    monkeypatch.setenv("MESH_SERIAL_PORT", "/dev/ttyACM0")
+    """Full integration environment with per-test directories."""
+    for key, value in _INTEGRATION_ENV.items():
+        monkeypatch.setenv(key, value)
 
     import meshmon.env
     meshmon.env._config = None

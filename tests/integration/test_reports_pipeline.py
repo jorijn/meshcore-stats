@@ -11,7 +11,7 @@ import pytest
 class TestReportGenerationPipeline:
     """Test report generation end-to-end."""
 
-    def test_generates_monthly_reports(self, populated_db_with_history, full_integration_env):
+    def test_generates_monthly_reports(self, populated_db_with_history, reports_env):
         """Should generate monthly reports for available data."""
         from meshmon.html import render_report_page
         from meshmon.reports import aggregate_monthly, format_monthly_txt, get_available_periods
@@ -50,7 +50,7 @@ class TestReportGenerationPipeline:
         assert html_report is not None
         assert "<html" in html_report.lower()
 
-    def test_generates_yearly_reports(self, populated_db_with_history, full_integration_env):
+    def test_generates_yearly_reports(self, populated_db_with_history, reports_env):
         """Should generate yearly reports for available data."""
         from meshmon.html import render_report_page
         from meshmon.reports import aggregate_yearly, format_yearly_txt, get_available_periods
@@ -88,7 +88,7 @@ class TestReportGenerationPipeline:
         assert html_report is not None
         assert "<html" in html_report.lower()
 
-    def test_generates_json_reports(self, populated_db_with_history, full_integration_env):
+    def test_generates_json_reports(self, populated_db_with_history, reports_env):
         """Should generate valid JSON reports."""
         from meshmon.reports import (
             aggregate_monthly,
@@ -123,7 +123,7 @@ class TestReportGenerationPipeline:
         assert "year" in yearly_json
         assert "monthly" in yearly_json
 
-    def test_report_files_created(self, populated_db_with_history, full_integration_env):
+    def test_report_files_created(self, populated_db_with_history, reports_env):
         """Should create report files in correct directory structure."""
         from meshmon.html import render_report_page
         from meshmon.reports import (
@@ -134,7 +134,7 @@ class TestReportGenerationPipeline:
             monthly_to_json,
         )
 
-        out_dir = full_integration_env["out_dir"]
+        out_dir = reports_env["out_dir"]
 
         periods = get_available_periods("repeater")
         year, month = periods[-1]
@@ -171,14 +171,14 @@ class TestReportGenerationPipeline:
 class TestReportsIndex:
     """Test reports index page generation."""
 
-    def test_generates_reports_index(self, populated_db_with_history, full_integration_env):
+    def test_generates_reports_index(self, populated_db_with_history, reports_env):
         """Should generate reports index with all available periods."""
         import calendar
 
         from meshmon.html import render_reports_index
         from meshmon.reports import get_available_periods
 
-        out_dir = full_integration_env["out_dir"]
+        out_dir = reports_env["out_dir"]
 
         # Build sections data (mimicking render_reports.py)
         sections = []
@@ -292,7 +292,7 @@ class TestReportConsistency:
     """Test consistency across different report formats."""
 
     def test_txt_json_html_contain_same_data(
-        self, populated_db_with_history, full_integration_env
+        self, populated_db_with_history, reports_env
     ):
         """TXT, JSON, and HTML reports should contain consistent data."""
         from meshmon.html import render_report_page

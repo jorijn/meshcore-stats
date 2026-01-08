@@ -9,42 +9,21 @@ import pytest
 class TestChartRenderingPipeline:
     """Test chart rendering end-to-end."""
 
-    def test_renders_all_chart_periods(self, populated_db_with_history, full_integration_env):
+    def test_renders_all_chart_periods(self, rendered_charts):
         """Should render charts for all periods (day/week/month/year)."""
-        from meshmon.charts import render_all_charts, save_chart_stats
-        from meshmon.db import get_metric_count
+        out_dir = rendered_charts["out_dir"]
 
-        # Verify data exists
-        companion_count = get_metric_count("companion")
-        repeater_count = get_metric_count("repeater")
+        for role in ["companion", "repeater"]:
+            assets_dir = out_dir / "assets" / role
+            assert assets_dir.exists()
 
-        assert companion_count > 0
-        assert repeater_count > 0
+            for period in ["day", "week", "month", "year"]:
+                period_svgs = list(assets_dir.glob(f"*_{period}_*.svg"))
+                assert period_svgs, f"No {period} charts found for {role}"
 
-        # Render companion charts
-        charts, stats = render_all_charts("companion")
-        save_chart_stats("companion", stats)
-
-        # Should have charts for multiple metrics and periods
-        assert len(charts) > 0
-        assert len(stats) > 0
-
-        # Render repeater charts
-        charts, stats = render_all_charts("repeater")
-        save_chart_stats("repeater", stats)
-
-        assert len(charts) > 0
-        assert len(stats) > 0
-
-    def test_chart_files_created(self, populated_db_with_history, full_integration_env):
+    def test_chart_files_created(self, rendered_charts):
         """Should create SVG chart files in output directory."""
-        from meshmon.charts import render_all_charts, save_chart_stats
-
-        out_dir = full_integration_env["out_dir"]
-
-        # Render charts
-        charts, stats = render_all_charts("repeater")
-        save_chart_stats("repeater", stats)
+        out_dir = rendered_charts["out_dir"]
 
         # Check SVG files exist
         assets_dir = out_dir / "assets" / "repeater"
@@ -58,13 +37,9 @@ class TestChartRenderingPipeline:
         stats_file = assets_dir / "chart_stats.json"
         assert stats_file.exists()
 
-    def test_chart_statistics_calculated(self, populated_db_with_history, full_integration_env):
+    def test_chart_statistics_calculated(self, rendered_charts):
         """Should calculate correct statistics for charts."""
-        from meshmon.charts import load_chart_stats, render_all_charts, save_chart_stats
-
-        # Render charts
-        charts, stats = render_all_charts("repeater")
-        save_chart_stats("repeater", stats)
+        from meshmon.charts import load_chart_stats
 
         # Load and verify stats
         loaded_stats = load_chart_stats("repeater")
@@ -87,18 +62,12 @@ class TestChartRenderingPipeline:
 class TestHtmlRenderingPipeline:
     """Test HTML site rendering end-to-end."""
 
-    def test_renders_site_pages(self, populated_db_with_history, full_integration_env):
+    def test_renders_site_pages(self, rendered_charts):
         """Should render all HTML site pages."""
-        from meshmon.charts import render_all_charts, save_chart_stats
         from meshmon.db import get_latest_metrics
         from meshmon.html import write_site
 
-        out_dir = full_integration_env["out_dir"]
-
-        # First render charts (needed for site)
-        for role in ["repeater", "companion"]:
-            charts, stats = render_all_charts(role)
-            save_chart_stats(role, stats)
+        out_dir = rendered_charts["out_dir"]
 
         # Get latest metrics for write_site
         companion_row = get_latest_metrics("companion")
@@ -129,18 +98,12 @@ class TestHtmlRenderingPipeline:
         assert (out_dir / "styles.css").exists()
         assert (out_dir / "chart-tooltip.js").exists()
 
-    def test_html_contains_chart_data(self, populated_db_with_history, full_integration_env):
+    def test_html_contains_chart_data(self, rendered_charts):
         """HTML should contain embedded chart SVGs."""
-        from meshmon.charts import render_all_charts, save_chart_stats
         from meshmon.db import get_latest_metrics
         from meshmon.html import write_site
 
-        out_dir = full_integration_env["out_dir"]
-
-        # Render charts first
-        for role in ["repeater", "companion"]:
-            charts, stats = render_all_charts(role)
-            save_chart_stats(role, stats)
+        out_dir = rendered_charts["out_dir"]
 
         # Get latest metrics for write_site
         companion_row = get_latest_metrics("companion")
@@ -158,19 +121,13 @@ class TestHtmlRenderingPipeline:
         assert "data-metric" in day_html or "data-points" in day_html
 
     def test_html_has_correct_status_indicator(
-        self, populated_db_with_history, full_integration_env
+        self, rendered_charts
     ):
         """HTML should have correct status indicator based on data freshness."""
-        from meshmon.charts import render_all_charts, save_chart_stats
         from meshmon.db import get_latest_metrics
         from meshmon.html import write_site
 
-        out_dir = full_integration_env["out_dir"]
-
-        # Render charts and site
-        for role in ["repeater", "companion"]:
-            charts, stats = render_all_charts(role)
-            save_chart_stats(role, stats)
+        out_dir = rendered_charts["out_dir"]
 
         # Get latest metrics for write_site
         companion_row = get_latest_metrics("companion")
@@ -190,27 +147,23 @@ class TestFullRenderingChain:
     """Test complete rendering chain: data -> charts -> HTML."""
 
     def test_full_chain_from_database_to_html(
-        self, populated_db_with_history, full_integration_env
+        self, rendered_charts
     ):
         """Complete chain: database metrics -> charts -> HTML site."""
-        from meshmon.charts import render_all_charts, save_chart_stats
         from meshmon.db import get_latest_metrics, get_metric_count
         from meshmon.html import copy_static_assets, write_site
 
-        out_dir = full_integration_env["out_dir"]
+        out_dir = rendered_charts["out_dir"]
 
         # 1. Verify database has data
         assert get_metric_count("repeater") > 0
         assert get_metric_count("companion") > 0
 
-        # 2. Render charts for both roles
-        total_charts = 0
+        # 2. Verify rendered charts exist for both roles
         for role in ["repeater", "companion"]:
-            charts, stats = render_all_charts(role)
-            save_chart_stats(role, stats)
-            total_charts += len(charts)
-
-        assert total_charts > 0
+            assets_dir = out_dir / "assets" / role
+            svg_files = list(assets_dir.glob("*.svg"))
+            assert svg_files, f"No charts found for {role}"
 
         # 3. Copy static assets
         copy_static_assets()
