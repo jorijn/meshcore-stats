@@ -1,4 +1,4 @@
-# CLAUDE.md - MeshCore Stats Project Guide
+# AGENTS.md - MeshCore Stats Project Guide
 
 > **Maintenance Note**: This file should always reflect the current state of the project. When making changes to the codebase (adding features, changing architecture, modifying configuration), update this document accordingly. Keep it accurate and comprehensive for future reference.
 

@@ -35,7 +35,7 @@ docs/
 !README.md
 
 # Development files
-.claude/
+.codex/
 *.log
 
 # macOS
