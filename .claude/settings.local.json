@@ -14,7 +14,8 @@
       "Bash(gh run list:*)",
       "Bash(gh release view:*)",
       "Bash(gh release list:*)",
-      "Bash(gh workflow list:*)"
+      "Bash(gh workflow list:*)",
+      "Bash(python -m mypy:*)"
     ]
   }
 }
