@@ -70,7 +70,7 @@ class TestRunCommandSuccess:
             mock_meshcore_client, cmd(), "test"
         )
 
-        assert "voltage" in payload
+        assert payload == {"voltage": 3.85}
 
     @pytest.mark.asyncio
     async def test_converts_namedtuple_payload(self, mock_meshcore_client, monkeypatch):
@@ -91,8 +91,7 @@ class TestRunCommandSuccess:
             mock_meshcore_client, cmd(), "test"
         )
 
-        assert payload["voltage"] == 3.85
-        assert payload["uptime"] == 86400
+        assert payload == {"voltage": 3.85, "uptime": 86400}
 
 
 class TestRunCommandFailure:
@@ -118,7 +117,9 @@ class TestRunCommandFailure:
         cmd_coro.close()
 
         assert success is False
-        assert "not available" in error
+        assert event_type is None
+        assert payload is None
+        assert error == "meshcore not available"
 
     @pytest.mark.asyncio
     async def test_returns_failure_on_none_event(self, mock_meshcore_client, monkeypatch):
@@ -133,7 +134,7 @@ class TestRunCommandFailure:
         )
 
         assert success is False
-        assert "No response" in error
+        assert error == "No response received"
 
     @pytest.mark.asyncio
     async def test_returns_failure_on_error_event(self, mock_meshcore_client, monkeypatch):
@@ -157,7 +158,9 @@ class TestRunCommandFailure:
         )
 
         assert success is False
-        assert error is not None
+        assert event_type == "ERROR"
+        assert payload is None
+        assert error == "Command failed"
 
     @pytest.mark.asyncio
     async def test_returns_failure_on_timeout(self, mock_meshcore_client, monkeypatch):
@@ -172,7 +175,7 @@ class TestRunCommandFailure:
         )
 
         assert success is False
-        assert "Timeout" in error
+        assert error == "Timeout"
 
     @pytest.mark.asyncio
     async def test_returns_failure_on_exception(self, mock_meshcore_client, monkeypatch):
@@ -187,7 +190,7 @@ class TestRunCommandFailure:
         )
 
         assert success is False
-        assert "Connection lost" in error
+        assert error == "Connection lost"
 
 
 class TestRunCommandEventTypeParsing:
@@ -203,11 +206,14 @@ class TestRunCommandEventTypeParsing:
         async def cmd():
             return event
 
-        _, event_type, _, _ = await run_command(
+        success, event_type, payload, error = await run_command(
             mock_meshcore_client, cmd(), "test"
         )
 
+        assert success is True
         assert event_type == "CUSTOM_EVENT"
+        assert payload == {}
+        assert error is None
 
     @pytest.mark.asyncio
     async def test_falls_back_to_str_type(self, mock_meshcore_client, monkeypatch):
@@ -221,8 +227,11 @@ class TestRunCommandEventTypeParsing:
         async def cmd():
             return event
 
-        _, event_type, _, _ = await run_command(
+        success, event_type, payload, error = await run_command(
             mock_meshcore_client, cmd(), "test"
         )
 
+        assert success is True
         assert event_type == "STRING_TYPE"
+        assert payload == {}
+        assert error is None

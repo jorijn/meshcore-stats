@@ -11,13 +11,15 @@ from meshmon.charts import (
 )
 from meshmon.db import insert_metrics
 
+BASE_TIME = datetime(2024, 1, 1, 0, 0, 0)
+
 
 class TestDataPoint:
     """Tests for DataPoint dataclass."""
 
     def test_stores_timestamp_and_value(self):
         """Stores timestamp and value."""
-        ts = datetime.now()
+        ts = BASE_TIME
         dp = DataPoint(timestamp=ts, value=3.85)
 
         assert dp.timestamp == ts
@@ -25,13 +27,13 @@ class TestDataPoint:
 
     def test_value_types(self):
         """Accepts float and int values."""
-        ts = datetime.now()
+        ts = BASE_TIME
 
         dp_float = DataPoint(timestamp=ts, value=3.85)
         assert dp_float.value == 3.85
 
-        dp_int = DataPoint(timestamp=ts, value=100.0)
-        assert dp_int.value == 100.0
+        dp_int = DataPoint(timestamp=ts, value=100)
+        assert dp_int.value == 100
 
 
 class TestTimeSeries:
@@ -123,7 +125,7 @@ class TestLoadTimeseriesFromDb:
         ts = load_timeseries_from_db(
             role="repeater",
             metric="bat",
-            end_time=datetime.now(),
+            end_time=BASE_TIME,
             lookback=timedelta(hours=1),
             period="week",
         )
@@ -157,7 +159,7 @@ class TestLoadTimeseriesFromDb:
         ts = load_timeseries_from_db(
             role="repeater",
             metric="nonexistent_metric",
-            end_time=datetime.now(),
+            end_time=BASE_TIME,
             lookback=timedelta(hours=1),
             period="day",
         )

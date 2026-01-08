@@ -1,9 +1,23 @@
 """Tests for meshcore.conf file parsing."""
 
-from unittest.mock import patch
+import os
 
 from meshmon.env import _parse_config_value
 
+
+def _load_config_from_content(tmp_path, monkeypatch, content: str | None) -> None:
+    import meshmon.env as env
+
+    config_path = tmp_path / "meshcore.conf"
+    if content is not None:
+        config_path.write_text(content)
+
+    fake_env_path = tmp_path / "src" / "meshmon" / "env.py"
+    fake_env_path.parent.mkdir(parents=True, exist_ok=True)
+    fake_env_path.write_text("")
+
+    monkeypatch.setattr(env, "__file__", str(fake_env_path))
+    env._load_config_file()
 
 class TestParseConfigValueDetailed:
     """Detailed tests for _parse_config_value."""
@@ -112,15 +126,11 @@ class TestParseConfigValueDetailed:
 class TestLoadConfigFileBehavior:
     """Tests for _load_config_file behavior."""
 
-    def test_nonexistent_file_no_error(self, tmp_path, monkeypatch):
+    def test_nonexistent_file_no_error(self, tmp_path, monkeypatch, isolate_config_loading):
         """Missing config file doesn't raise error."""
-        # Point to non-existent path
-        fake_module_path = tmp_path / "src" / "meshmon" / "env.py"
-        fake_module_path.parent.mkdir(parents=True)
-        fake_module_path.write_text("")
+        _load_config_from_content(tmp_path, monkeypatch, content=None)
 
-        # No exception should be raised
-        # The function checks for existence first
+        assert "MESH_TRANSPORT" not in os.environ
 
     def test_skips_empty_lines(self, tmp_path, monkeypatch, isolate_config_loading):
         """Empty lines are skipped."""
@@ -130,41 +140,38 @@ MESH_TRANSPORT=tcp
 MESH_DEBUG=1
 
 """
-        config_path = tmp_path / "meshcore.conf"
-        config_path.write_text(config_content)
+        _load_config_from_content(tmp_path, monkeypatch, config_content)
 
-        # Mock the config path location
-        with patch("meshmon.env.Path") as mock_path:
-            mock_path.return_value.resolve.return_value.parent.parent.parent.__truediv__.return_value = config_path
-            mock_path.return_value.resolve.return_value.parent.parent.parent / "meshcore.conf"
-            # _load_config_file() would need to be called manually or tested via Config
+        assert os.environ["MESH_TRANSPORT"] == "tcp"
+        assert os.environ["MESH_DEBUG"] == "1"
 
-    def test_skips_comment_lines(self, tmp_path):
+    def test_skips_comment_lines(self, tmp_path, monkeypatch, isolate_config_loading):
         """Lines starting with # are skipped."""
         config_content = """# This is a comment
 MESH_TRANSPORT=tcp
 # Another comment
 """
-        config_path = tmp_path / "meshcore.conf"
-        config_path.write_text(config_content)
-        # The parsing logic skips lines starting with #
+        _load_config_from_content(tmp_path, monkeypatch, config_content)
 
-    def test_handles_export_prefix(self, tmp_path):
+        assert os.environ["MESH_TRANSPORT"] == "tcp"
+
+    def test_handles_export_prefix(self, tmp_path, monkeypatch, isolate_config_loading):
         """Lines with 'export ' prefix are handled."""
         config_content = "export MESH_TRANSPORT=tcp\n"
-        config_path = tmp_path / "meshcore.conf"
-        config_path.write_text(config_content)
-        # The parsing logic removes 'export ' prefix
+        _load_config_from_content(tmp_path, monkeypatch, config_content)
 
-    def test_skips_lines_without_equals(self, tmp_path):
+        assert os.environ["MESH_TRANSPORT"] == "tcp"
+
+    def test_skips_lines_without_equals(self, tmp_path, monkeypatch, isolate_config_loading):
         """Lines without = are skipped."""
         config_content = """MESH_TRANSPORT=tcp
 this line has no equals
 MESH_DEBUG=1
 """
-        config_path = tmp_path / "meshcore.conf"
-        config_path.write_text(config_content)
-        # Invalid lines are skipped
+        _load_config_from_content(tmp_path, monkeypatch, config_content)
+
+        assert os.environ["MESH_TRANSPORT"] == "tcp"
+        assert os.environ["MESH_DEBUG"] == "1"
 
     def test_env_vars_take_precedence(self, tmp_path, monkeypatch, isolate_config_loading):
         """Environment variables override config file values."""
@@ -173,11 +180,9 @@ MESH_DEBUG=1
 
         # Config file has different value
         config_content = "MESH_TRANSPORT=serial\n"
-        config_path = tmp_path / "meshcore.conf"
-        config_path.write_text(config_content)
+        _load_config_from_content(tmp_path, monkeypatch, config_content)
 
         # After loading, env var should still be "ble"
-        import os
         assert os.environ.get("MESH_TRANSPORT") == "ble"
 
 

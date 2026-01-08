@@ -10,6 +10,8 @@ from meshmon.charts import (
 )
 from meshmon.db import insert_metrics
 
+BASE_TIME = datetime(2024, 1, 1, 0, 0, 0)
+
 
 class TestCounterToRateConversion:
     """Tests for counter metric rate conversion."""
@@ -35,8 +37,9 @@ class TestCounterToRateConversion:
         assert len(ts.points) == 4
 
         # All rates should be positive (counter increasing)
+        expected_rate = (100.0 / 900.0) * 60.0
         for p in ts.points:
-            assert p.value >= 0
+            assert p.value == pytest.approx(expected_rate)
 
     def test_handles_counter_reset(self, initialized_db, configured_env):
         """Counter resets (negative delta) are skipped."""
@@ -58,6 +61,11 @@ class TestCounterToRateConversion:
 
         # Reset point should be skipped, so fewer points
         assert len(ts.points) == 2  # Only valid deltas
+        expected_rate = (100.0 / 900.0) * 60.0
+        assert ts.points[0].timestamp == datetime.fromtimestamp(base_ts + 900)
+        assert ts.points[1].timestamp == datetime.fromtimestamp(base_ts + 2700)
+        assert ts.points[0].value == pytest.approx(expected_rate)
+        assert ts.points[1].value == pytest.approx(expected_rate)
 
     def test_applies_scale_factor(self, initialized_db, configured_env):
         """Counter rate is scaled (typically x60 for per-minute)."""
@@ -136,19 +144,19 @@ class TestGaugeValueTransform:
 class TestTimeBinning:
     """Tests for time series aggregation/binning."""
 
-    def test_no_binning_for_day(self, initialized_db, configured_env):
+    def test_no_binning_for_day(self):
         """Day period uses raw data (no binning)."""
         assert PERIOD_CONFIG["day"].bin_seconds is None
 
-    def test_30_min_bins_for_week(self, initialized_db, configured_env):
+    def test_30_min_bins_for_week(self):
         """Week period uses 30-minute bins."""
         assert PERIOD_CONFIG["week"].bin_seconds == 1800
 
-    def test_2_hour_bins_for_month(self, initialized_db, configured_env):
+    def test_2_hour_bins_for_month(self):
         """Month period uses 2-hour bins."""
         assert PERIOD_CONFIG["month"].bin_seconds == 7200
 
-    def test_1_day_bins_for_year(self, initialized_db, configured_env):
+    def test_1_day_bins_for_year(self):
         """Year period uses 1-day bins."""
         assert PERIOD_CONFIG["year"].bin_seconds == 86400
 
@@ -181,7 +189,7 @@ class TestEmptyData:
         ts = load_timeseries_from_db(
             role="repeater",
             metric="nonexistent",
-            end_time=datetime.now(),
+            end_time=BASE_TIME,
             lookback=timedelta(days=1),
             period="day",
         )
@@ -199,7 +207,7 @@ class TestEmptyData:
         ts = load_timeseries_from_db(
             role="repeater",
             metric="bat",
-            end_time=datetime.now(),
+            end_time=BASE_TIME,
             lookback=timedelta(hours=1),
             period="day",
         )

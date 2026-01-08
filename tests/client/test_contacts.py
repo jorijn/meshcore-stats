@@ -1,5 +1,6 @@
 """Tests for contact lookup functions."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 
@@ -28,6 +29,7 @@ class TestGetContactByName:
         result = get_contact_by_name(mock_meshcore_client, "NonExistent")
 
         assert result is None
+        mock_meshcore_client.get_contact_by_name.assert_called_once_with("NonExistent")
 
     def test_returns_none_when_method_not_available(self):
         """Returns None when get_contact_by_name method not available."""
@@ -48,6 +50,7 @@ class TestGetContactByName:
         result = get_contact_by_name(mock_meshcore_client, "TestNode")
 
         assert result is None
+        mock_meshcore_client.get_contact_by_name.assert_called_once_with("TestNode")
 
 
 class TestGetContactByKeyPrefix:
@@ -75,6 +78,7 @@ class TestGetContactByKeyPrefix:
         result = get_contact_by_key_prefix(mock_meshcore_client, "xyz789")
 
         assert result is None
+        mock_meshcore_client.get_contact_by_key_prefix.assert_called_once_with("xyz789")
 
     def test_returns_none_when_method_not_available(self):
         """Returns None when get_contact_by_key_prefix method not available."""
@@ -95,6 +99,7 @@ class TestGetContactByKeyPrefix:
         result = get_contact_by_key_prefix(mock_meshcore_client, "abc123")
 
         assert result is None
+        mock_meshcore_client.get_contact_by_key_prefix.assert_called_once_with("abc123")
 
 
 class TestExtractContactInfo:
@@ -126,13 +131,14 @@ class TestExtractContactInfo:
         """Extracts info from object-based contact."""
         from meshmon.meshcore_client import extract_contact_info
 
-        contact = MagicMock()
-        contact.adv_name = "TestNode"
-        contact.name = "test"
-        contact.pubkey_prefix = "abc123"
-        contact.public_key = "abc123def456"
-        contact.type = 1
-        contact.flags = 0
+        contact = SimpleNamespace(
+            adv_name="TestNode",
+            name="test",
+            pubkey_prefix="abc123",
+            public_key="abc123def456",
+            type=1,
+            flags=0,
+        )
 
         result = extract_contact_info(contact)
 
@@ -158,14 +164,10 @@ class TestExtractContactInfo:
         """Converts bytes values from object attributes to hex."""
         from meshmon.meshcore_client import extract_contact_info
 
-        contact = MagicMock()
-        contact.adv_name = "TestNode"
-        contact.public_key = bytes.fromhex("deadbeef")
-        # Make sure other attributes return AttributeError when accessed
-        del contact.name
-        del contact.pubkey_prefix
-        del contact.type
-        del contact.flags
+        contact = SimpleNamespace(
+            adv_name="TestNode",
+            public_key=bytes.fromhex("deadbeef"),
+        )
 
         result = extract_contact_info(contact)
 
@@ -231,13 +233,7 @@ class TestListContactsSummary:
         """Handles mix of dict and object contacts."""
         from meshmon.meshcore_client import list_contacts_summary
 
-        obj_contact = MagicMock()
-        obj_contact.adv_name = "ObjectNode"
-        del obj_contact.name
-        del obj_contact.pubkey_prefix
-        del obj_contact.public_key
-        del obj_contact.type
-        del obj_contact.flags
+        obj_contact = SimpleNamespace(adv_name="ObjectNode")
 
         contacts = [
             {"adv_name": "DictNode"},

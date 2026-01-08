@@ -26,16 +26,24 @@ class TestVacuumDb:
         # Should not raise
         vacuum_db(initialized_db)
 
-    def test_runs_analyze(self, initialized_db, capfd):
+    def test_runs_analyze(self, initialized_db):
         """ANALYZE should be run after VACUUM."""
+        conn = sqlite3.connect(initialized_db)
+        conn.execute(
+            "INSERT INTO metrics (ts, role, metric, value) VALUES (1, 'companion', 'test', 1.0)"
+        )
+        conn.commit()
+        conn.close()
+
         # Vacuum includes ANALYZE
         vacuum_db(initialized_db)
 
         # Check that database stats were updated
         conn = sqlite3.connect(initialized_db)
-        conn.execute("SELECT * FROM sqlite_stat1")
-        # After ANALYZE, sqlite_stat1 should have entries if tables have data
+        cursor = conn.execute("SELECT COUNT(*) FROM sqlite_stat1")
+        count = cursor.fetchone()[0]
         conn.close()
+        assert count > 0
 
     def test_uses_default_path_when_none(self, configured_env, monkeypatch):
         """Uses get_db_path() when no path provided."""

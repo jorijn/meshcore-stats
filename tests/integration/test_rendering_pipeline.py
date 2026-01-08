@@ -56,6 +56,7 @@ class TestChartRenderingPipeline:
                         assert "min" in period_stats
                         assert "max" in period_stats
                         assert "avg" in period_stats
+                        assert "current" in period_stats
 
 
 @pytest.mark.integration
@@ -85,6 +86,8 @@ class TestHtmlRenderingPipeline:
         # Check companion pages exist
         assert (out_dir / "companion" / "day.html").exists()
         assert (out_dir / "companion" / "week.html").exists()
+        assert (out_dir / "companion" / "month.html").exists()
+        assert (out_dir / "companion" / "year.html").exists()
 
     def test_copies_static_assets(self, full_integration_env):
         """Should copy static assets (CSS, JS)."""
@@ -118,7 +121,8 @@ class TestHtmlRenderingPipeline:
         # Should contain SVG elements
         assert "<svg" in day_html
         # Should contain chart data attributes
-        assert "data-metric" in day_html or "data-points" in day_html
+        assert "data-metric" in day_html
+        assert "data-points" in day_html
 
     def test_html_has_correct_status_indicator(
         self, rendered_charts
@@ -138,8 +142,8 @@ class TestHtmlRenderingPipeline:
         # Check status indicator exists
         day_html = (out_dir / "day.html").read_text()
 
-        # Should have status indicator class
-        assert "status-" in day_html or "online" in day_html or "offline" in day_html
+        assert "status-badge" in day_html
+        assert any(label in day_html for label in ["Online", "Stale", "Offline"])
 
 
 @pytest.mark.integration
@@ -187,7 +191,11 @@ class TestFullRenderingChain:
         assert "<!DOCTYPE html>" in html_content or "<!doctype html>" in html_content.lower()
         assert "</html>" in html_content
 
-    def test_empty_database_renders_gracefully(self, full_integration_env):
+    def test_empty_database_renders_gracefully(
+        self,
+        full_integration_env,
+        rendered_chart_metrics,
+    ):
         """Should handle empty database gracefully."""
         from meshmon.charts import render_all_charts, save_chart_stats
         from meshmon.db import get_latest_metrics, get_metric_count, init_db
@@ -204,7 +212,9 @@ class TestFullRenderingChain:
 
         # Rendering with no data should not crash
         for role in ["repeater", "companion"]:
-            charts, stats = render_all_charts(role)
+            charts, stats = render_all_charts(
+                role, metrics=rendered_chart_metrics[role]
+            )
             save_chart_stats(role, stats)
             # Should have no charts (or empty charts)
             # The important thing is it doesn't crash

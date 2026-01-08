@@ -51,7 +51,10 @@ class TestRenderChartsImport:
             module.main()
 
             # Should check both companion and repeater
-            assert mock_count.call_count == 2
+            assert [call.args[0] for call in mock_count.call_args_list] == [
+                "companion",
+                "repeater",
+            ]
 
     def test_main_renders_when_data_exists(self, configured_env):
         """main() should render charts when data exists."""
@@ -61,13 +64,20 @@ class TestRenderChartsImport:
             patch.object(module, "init_db"),
             patch.object(module, "get_metric_count", return_value=100),
             patch.object(module, "render_all_charts") as mock_render,
-            patch.object(module, "save_chart_stats"),
+            patch.object(module, "save_chart_stats") as mock_save,
         ):
             mock_render.return_value = (["chart1.svg"], {"bat": {}})
             module.main()
 
             # Should render for both roles
-            assert mock_render.call_count == 2
+            assert [call.args[0] for call in mock_render.call_args_list] == [
+                "companion",
+                "repeater",
+            ]
+            assert [call.args[0] for call in mock_save.call_args_list] == [
+                "companion",
+                "repeater",
+            ]
 
 
 class TestRenderSiteImport:
@@ -106,7 +116,10 @@ class TestRenderSiteImport:
             module.main()
 
             # Should get metrics for both companion and repeater
-            assert mock_get.call_count == 2
+            assert [call.args[0] for call in mock_get.call_args_list] == [
+                "companion",
+                "repeater",
+            ]
 
     def test_main_calls_write_site(self, configured_env):
         """main() should call write_site with metrics."""
@@ -196,7 +209,10 @@ class TestRenderReportsImport:
             module.main()
 
             # Should check periods for both roles
-            assert mock_periods.call_count == 2
+            assert [call.args[0] for call in mock_periods.call_args_list] == [
+                "repeater",
+                "companion",
+            ]
 
 
 class TestRenderReportsHelpers:

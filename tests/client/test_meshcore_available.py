@@ -1,6 +1,6 @@
 """Tests for MESHCORE_AVAILABLE flag handling."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -28,6 +28,7 @@ class TestMeshcoreAvailableTrue:
 
         assert success is True
         assert event_type == "SELF_INFO"
+        assert payload == {"bat": 3850}
         assert error is None
 
     @pytest.mark.asyncio
@@ -55,7 +56,7 @@ class TestMeshcoreAvailableTrue:
         result = await connect_from_env()
 
         assert result == mock_mc
-        mock_meshcore.create_serial.assert_called_once()
+        mock_meshcore.create_serial.assert_called_once_with("/dev/ttyACM0", 115200, debug=False)
 
 
 class TestMeshcoreAvailableFalse:
@@ -109,28 +110,54 @@ class TestMeshcoreAvailableFalse:
 class TestMeshcoreImportFallback:
     """Tests for import fallback behavior."""
 
-    def test_meshcore_none_when_import_fails(self):
+    def test_meshcore_none_when_import_fails(self, monkeypatch):
         """MeshCore is None when import fails."""
-        # This tests the behavior defined in the module
-        # When meshcore library is not installed, MESHCORE_AVAILABLE should be False
-        # and MeshCore/EventType should be None
+        import builtins
+        import importlib
 
-        # We can verify the fallback behavior by checking module-level attributes
-        # after patching the import
-        with patch.dict("sys.modules", {"meshcore": None}):
-            # Importing with meshcore unavailable
-            # Note: This test verifies the pattern used in the module
-            # The actual import fallback is tested implicitly by the other tests
-            pass
+        import meshmon.meshcore_client as module
 
-    def test_event_type_check_handles_none(self, monkeypatch):
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "meshcore":
+                raise ImportError("No module named 'meshcore'")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+
+        module = importlib.reload(module)
+
+        assert module.MESHCORE_AVAILABLE is False
+        assert module.MeshCore is None
+        assert module.EventType is None
+
+        monkeypatch.setattr(builtins, "__import__", real_import)
+        importlib.reload(module)
+
+    @pytest.mark.asyncio
+    async def test_event_type_check_handles_none(self, monkeypatch):
         """EventType checks handle None gracefully."""
         monkeypatch.setattr("meshmon.meshcore_client.MESHCORE_AVAILABLE", True)
         monkeypatch.setattr("meshmon.meshcore_client.EventType", None)
 
+        from meshmon.meshcore_client import run_command
 
-        # When EventType is None, the error check should be skipped
-        # This is tested by the run_command success tests which mock EventType
+        from .conftest import make_mock_event
+
+        event = make_mock_event("SELF_INFO", {"bat": 3850})
+
+        async def cmd():
+            return event
+
+        success, event_type, payload, error = await run_command(
+            MagicMock(), cmd(), "test"
+        )
+
+        assert success is True
+        assert event_type == "SELF_INFO"
+        assert payload == {"bat": 3850}
+        assert error is None
 
 
 class TestContactFunctionsWithUnavailableMeshcore:

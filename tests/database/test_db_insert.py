@@ -1,7 +1,5 @@
 """Tests for database insert functions."""
 
-import time
-
 import pytest
 
 from meshmon.db import (
@@ -10,13 +8,15 @@ from meshmon.db import (
     insert_metrics,
 )
 
+BASE_TS = 1704067200
+
 
 class TestInsertMetric:
     """Tests for insert_metric function."""
 
     def test_inserts_single_metric(self, initialized_db):
         """Inserts a single metric successfully."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         result = insert_metric(ts, "companion", "battery_mv", 3850.0, initialized_db)
 
@@ -33,7 +33,7 @@ class TestInsertMetric:
 
     def test_returns_false_on_duplicate(self, initialized_db):
         """Returns False for duplicate (ts, role, metric) tuple."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         # First insert succeeds
         assert insert_metric(ts, "companion", "test", 1.0, initialized_db) is True
@@ -43,28 +43,28 @@ class TestInsertMetric:
 
     def test_different_roles_not_duplicate(self, initialized_db):
         """Same ts/metric with different roles are not duplicates."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         assert insert_metric(ts, "companion", "test", 1.0, initialized_db) is True
         assert insert_metric(ts, "repeater", "test", 2.0, initialized_db) is True
 
     def test_different_metrics_not_duplicate(self, initialized_db):
         """Same ts/role with different metrics are not duplicates."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         assert insert_metric(ts, "companion", "test1", 1.0, initialized_db) is True
         assert insert_metric(ts, "companion", "test2", 2.0, initialized_db) is True
 
     def test_invalid_role_raises(self, initialized_db):
         """Invalid role raises ValueError."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         with pytest.raises(ValueError, match="Invalid role"):
             insert_metric(ts, "invalid", "test", 1.0, initialized_db)
 
     def test_sql_injection_blocked(self, initialized_db):
         """SQL injection attempt raises ValueError."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         with pytest.raises(ValueError, match="Invalid role"):
             insert_metric(ts, "'; DROP TABLE metrics; --", "test", 1.0, initialized_db)
@@ -75,7 +75,7 @@ class TestInsertMetrics:
 
     def test_inserts_multiple_metrics(self, initialized_db):
         """Inserts multiple metrics from dict."""
-        ts = int(time.time())
+        ts = BASE_TS
         metrics = {
             "battery_mv": 3850.0,
             "contacts": 5,
@@ -95,7 +95,7 @@ class TestInsertMetrics:
 
     def test_returns_insert_count(self, initialized_db):
         """Returns correct count of inserted metrics."""
-        ts = int(time.time())
+        ts = BASE_TS
         metrics = {"a": 1.0, "b": 2.0, "c": 3.0}
 
         count = insert_metrics(ts, "companion", metrics, initialized_db)
@@ -104,7 +104,7 @@ class TestInsertMetrics:
 
     def test_skips_non_numeric_values(self, initialized_db):
         """Non-numeric values are silently skipped."""
-        ts = int(time.time())
+        ts = BASE_TS
         metrics = {
             "battery_mv": 3850.0,      # Numeric - inserted
             "name": "test",             # String - skipped
@@ -119,7 +119,7 @@ class TestInsertMetrics:
 
     def test_handles_int_and_float(self, initialized_db):
         """Both int and float values are inserted."""
-        ts = int(time.time())
+        ts = BASE_TS
         metrics = {
             "int_value": 42,
             "float_value": 3.14,
@@ -131,7 +131,7 @@ class TestInsertMetrics:
 
     def test_converts_int_to_float(self, initialized_db):
         """Integer values are stored as float."""
-        ts = int(time.time())
+        ts = BASE_TS
         metrics = {"contacts": 5}
 
         insert_metrics(ts, "companion", metrics, initialized_db)
@@ -146,7 +146,7 @@ class TestInsertMetrics:
 
     def test_empty_dict_returns_zero(self, initialized_db):
         """Empty dict returns 0."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         count = insert_metrics(ts, "companion", {}, initialized_db)
 
@@ -154,7 +154,7 @@ class TestInsertMetrics:
 
     def test_skips_duplicates_silently(self, initialized_db):
         """Duplicate metrics are skipped without error."""
-        ts = int(time.time())
+        ts = BASE_TS
         metrics = {"test": 1.0}
 
         # First insert
@@ -167,7 +167,7 @@ class TestInsertMetrics:
 
     def test_partial_duplicates(self, initialized_db):
         """Partial duplicates: some inserted, some skipped."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         # First insert
         insert_metrics(ts, "companion", {"existing": 1.0}, initialized_db)
@@ -183,25 +183,25 @@ class TestInsertMetrics:
 
     def test_invalid_role_raises(self, initialized_db):
         """Invalid role raises ValueError."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         with pytest.raises(ValueError, match="Invalid role"):
             insert_metrics(ts, "invalid", {"test": 1.0}, initialized_db)
 
     def test_companion_metrics(self, initialized_db, sample_companion_metrics):
         """Inserts companion metrics dict."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         count = insert_metrics(ts, "companion", sample_companion_metrics, initialized_db)
 
         # Should insert all numeric fields
-        assert count >= 4  # At least battery_mv, uptime_secs, contacts, recv, sent
+        assert count == len(sample_companion_metrics)
 
     def test_repeater_metrics(self, initialized_db, sample_repeater_metrics):
         """Inserts repeater metrics dict."""
-        ts = int(time.time())
+        ts = BASE_TS
 
         count = insert_metrics(ts, "repeater", sample_repeater_metrics, initialized_db)
 
         # Should insert all numeric fields
-        assert count >= 10  # Many metrics
+        assert count == len(sample_repeater_metrics)

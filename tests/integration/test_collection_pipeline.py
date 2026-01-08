@@ -5,6 +5,10 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.scripts.conftest import load_script_module
+
+BASE_TS = 1704067200
+
 
 @pytest.mark.integration
 class TestCompanionCollectionPipeline:
@@ -36,12 +40,10 @@ class TestCompanionCollectionPipeline:
 
             # Import and run collection (inline to avoid import issues)
             # Note: We import the function directly rather than the script
-            import time
-
             from meshmon.db import insert_metrics
 
             # Simulate collection logic
-            ts = int(time.time())
+            ts = BASE_TS
             metrics = {}
 
             async with mock_connect_with_lock() as mc:
@@ -115,22 +117,31 @@ class TestCollectionWithCircuitBreaker:
         self, full_integration_env, monkeypatch
     ):
         """Collection should be skipped when circuit breaker is open."""
-        import time
-
         from meshmon.retry import CircuitBreaker
 
         # Create an open circuit breaker
         state_dir = full_integration_env["state_dir"]
         cb = CircuitBreaker(state_dir / "repeater_circuit.json")
-        cb.consecutive_failures = 10
-        cb.cooldown_until = time.time() + 3600  # 1 hour from now
-        cb._save()  # Use private method
+        cb.record_failure(max_failures=1, cooldown_s=3600)
 
         # Verify circuit is open
         assert cb.is_open() is True
 
-        # Collection should check circuit breaker and skip
-        # This tests the pattern used in collect_repeater.py
+        module = load_script_module("collect_repeater.py")
+        connect_called = False
+
+        @asynccontextmanager
+        async def mock_connect_with_lock(*args, **kwargs):
+            nonlocal connect_called
+            connect_called = True
+            yield None
+
+        monkeypatch.setattr(module, "connect_with_lock", mock_connect_with_lock)
+
+        result = await module.collect_repeater()
+
+        assert result == 0
+        assert connect_called is False
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_records_failure(self, full_integration_env, monkeypatch):
@@ -157,8 +168,6 @@ class TestCollectionWithCircuitBreaker:
     @pytest.mark.asyncio
     async def test_circuit_breaker_state_persists(self, full_integration_env):
         """Circuit breaker state should persist to disk."""
-        import time
-
         from meshmon.retry import CircuitBreaker
 
         state_dir = full_integration_env["state_dir"]
@@ -166,12 +175,10 @@ class TestCollectionWithCircuitBreaker:
 
         # Create and configure circuit breaker
         cb1 = CircuitBreaker(state_file)
-        cb1.consecutive_failures = 5
-        cb1.cooldown_until = time.time() + 1800
-        cb1._save()  # Use private method
+        cb1.record_failure(max_failures=1, cooldown_s=1800)
 
         # Load in new instance
         cb2 = CircuitBreaker(state_file)
 
-        assert cb2.consecutive_failures == 5
+        assert cb2.consecutive_failures == 1
         assert cb2.cooldown_until == cb1.cooldown_until

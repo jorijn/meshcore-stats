@@ -14,6 +14,10 @@ _INTEGRATION_ENV = {
     "MESH_TRANSPORT": "serial",
     "MESH_SERIAL_PORT": "/dev/ttyACM0",
 }
+RENDERED_CHART_METRICS = {
+    "companion": ["battery_mv"],
+    "repeater": ["bat"],
+}
 
 
 def _sample_companion_metrics() -> dict[str, float]:
@@ -52,34 +56,39 @@ def _populate_db_with_history(
     db_path,
     sample_companion_metrics: dict[str, float],
     sample_repeater_metrics: dict[str, float],
+    days: int = 30,
+    companion_step_seconds: int = 3600,
+    repeater_step_seconds: int = 900,
 ) -> None:
     from meshmon.db import insert_metrics
 
     now = int(time.time())
     day_seconds = 86400
+    companion_steps = day_seconds // companion_step_seconds
+    repeater_steps = day_seconds // repeater_step_seconds
 
-    # Insert 30 days of companion data (every hour)
-    for day in range(30):
-        for hour in range(24):
-            ts = now - (day * day_seconds) - (hour * 3600)
+    # Insert companion data (default: 30 days, hourly)
+    for day in range(days):
+        for step in range(companion_steps):
+            ts = now - (day * day_seconds) - (step * companion_step_seconds)
             metrics = sample_companion_metrics.copy()
             # Vary values to create realistic patterns
-            metrics["battery_mv"] = 3700 + (hour * 5) + (day % 7) * 10
-            metrics["recv"] = 100 + day * 10 + hour
-            metrics["sent"] = 50 + day * 5 + hour
-            metrics["uptime_secs"] = (30 - day) * day_seconds + hour * 3600
+            metrics["battery_mv"] = 3700 + (step * 5) + (day % 7) * 10
+            metrics["recv"] = 100 + day * 10 + step
+            metrics["sent"] = 50 + day * 5 + step
+            metrics["uptime_secs"] = (days - day) * day_seconds + step * companion_step_seconds
             insert_metrics(ts, "companion", metrics, db_path=db_path)
 
-    # Insert 30 days of repeater data (every 15 minutes)
-    for day in range(30):
-        for interval in range(96):  # 24 * 4 = 96 intervals per day
-            ts = now - (day * day_seconds) - (interval * 900)
+    # Insert repeater data (default: 30 days, every 15 minutes)
+    for day in range(days):
+        for interval in range(repeater_steps):
+            ts = now - (day * day_seconds) - (interval * repeater_step_seconds)
             metrics = sample_repeater_metrics.copy()
             # Vary values to create realistic patterns
             metrics["bat"] = 3800 + (interval % 24) * 5 + (day % 7) * 10
             metrics["nb_recv"] = 1000 + day * 100 + interval
             metrics["nb_sent"] = 500 + day * 50 + interval
-            metrics["uptime"] = (30 - day) * day_seconds + interval * 900
+            metrics["uptime"] = (days - day) * day_seconds + interval * repeater_step_seconds
             metrics["last_rssi"] = -90 + (interval % 20)
             metrics["last_snr"] = 5 + (interval % 10) * 0.5
             insert_metrics(ts, "repeater", metrics, db_path=db_path)
@@ -102,9 +111,15 @@ def reports_env(reports_db_cache, tmp_out_dir, monkeypatch):
     }
 
 
+@pytest.fixture(scope="session")
+def rendered_chart_metrics():
+    """Minimal chart set to keep integration rendering tests fast."""
+    return RENDERED_CHART_METRICS
+
+
 @pytest.fixture
 def populated_db_with_history(reports_db_cache, reports_env):
-    """Shared database populated with 30 days of history for integration tests."""
+    """Shared database populated with a fixed history window for integration tests."""
     return reports_db_cache["db_path"]
 
 
@@ -123,6 +138,9 @@ def reports_db_cache(tmp_path_factory):
         db_path,
         _sample_companion_metrics(),
         _sample_repeater_metrics(),
+        days=14,
+        companion_step_seconds=7200,
+        repeater_step_seconds=7200,
     )
 
     return {
@@ -160,10 +178,13 @@ def rendered_charts_cache(tmp_path_factory):
         db_path,
         _sample_companion_metrics(),
         _sample_repeater_metrics(),
+        days=7,
+        companion_step_seconds=3600,
+        repeater_step_seconds=3600,
     )
 
     for role in ["companion", "repeater"]:
-        charts, stats = render_all_charts(role)
+        charts, stats = render_all_charts(role, metrics=RENDERED_CHART_METRICS[role])
         save_chart_stats(role, stats)
 
     yield {

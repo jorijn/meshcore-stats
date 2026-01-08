@@ -2,8 +2,9 @@
 
 import json
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock
 
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import pytest
 
 from meshmon.charts import (
@@ -18,6 +19,9 @@ from meshmon.charts import (
     _inject_data_attributes,
     calculate_statistics,
 )
+
+BASE_TIME = datetime(2024, 1, 1, 12, 0, 0)
+BASE_DAY_START = datetime(2024, 1, 1, 0, 0, 0)
 
 
 class TestHexToRgba:
@@ -154,44 +158,101 @@ class TestConfigureXAxis:
 
     def test_day_period_format(self):
         """Day period uses HH:MM format with 4-hour intervals."""
-        fig, ax = self._create_mock_ax()
-        _configure_x_axis(ax, "day")
-        ax.xaxis.set_major_formatter.assert_called_once()
-        ax.xaxis.set_major_locator.assert_called_once()
+        fig, ax = plt.subplots()
+        try:
+            _configure_x_axis(ax, "day")
+            formatter = ax.xaxis.get_major_formatter()
+            locator = ax.xaxis.get_major_locator()
+            assert isinstance(formatter, mdates.DateFormatter)
+            assert formatter.fmt == "%H:%M"
+            assert isinstance(locator, mdates.HourLocator)
+            ticks = locator.tick_values(
+                BASE_DAY_START, BASE_DAY_START + timedelta(days=1)
+            )
+            tick_times = [
+                mdates.num2date(tick).replace(tzinfo=None) for tick in ticks
+            ]
+            assert tick_times[1] - tick_times[0] == timedelta(hours=4)
+        finally:
+            plt.close(fig)
 
     def test_week_period_format(self):
         """Week period uses weekday format with daily intervals."""
-        fig, ax = self._create_mock_ax()
-        _configure_x_axis(ax, "week")
-        ax.xaxis.set_major_formatter.assert_called_once()
-        ax.xaxis.set_major_locator.assert_called_once()
+        fig, ax = plt.subplots()
+        try:
+            _configure_x_axis(ax, "week")
+            formatter = ax.xaxis.get_major_formatter()
+            locator = ax.xaxis.get_major_locator()
+            assert isinstance(formatter, mdates.DateFormatter)
+            assert formatter.fmt == "%a"
+            assert isinstance(locator, mdates.DayLocator)
+            ticks = locator.tick_values(
+                BASE_DAY_START, BASE_DAY_START + timedelta(days=7)
+            )
+            tick_times = [
+                mdates.num2date(tick).replace(tzinfo=None) for tick in ticks
+            ]
+            assert tick_times[1] - tick_times[0] == timedelta(days=1)
+        finally:
+            plt.close(fig)
 
     def test_month_period_format(self):
         """Month period uses day-of-month format with 5-day intervals."""
-        fig, ax = self._create_mock_ax()
-        _configure_x_axis(ax, "month")
-        ax.xaxis.set_major_formatter.assert_called_once()
-        ax.xaxis.set_major_locator.assert_called_once()
+        fig, ax = plt.subplots()
+        try:
+            _configure_x_axis(ax, "month")
+            formatter = ax.xaxis.get_major_formatter()
+            locator = ax.xaxis.get_major_locator()
+            assert isinstance(formatter, mdates.DateFormatter)
+            assert formatter.fmt == "%d"
+            assert isinstance(locator, mdates.DayLocator)
+            ticks = locator.tick_values(
+                BASE_DAY_START, BASE_DAY_START + timedelta(days=31)
+            )
+            tick_times = [
+                mdates.num2date(tick).replace(tzinfo=None) for tick in ticks
+            ]
+            assert tick_times[1] - tick_times[0] == timedelta(days=5)
+        finally:
+            plt.close(fig)
 
     def test_year_period_format(self):
         """Year period uses month abbreviation format."""
-        fig, ax = self._create_mock_ax()
-        _configure_x_axis(ax, "year")
-        ax.xaxis.set_major_formatter.assert_called_once()
-        ax.xaxis.set_major_locator.assert_called_once()
+        fig, ax = plt.subplots()
+        try:
+            _configure_x_axis(ax, "year")
+            formatter = ax.xaxis.get_major_formatter()
+            locator = ax.xaxis.get_major_locator()
+            assert isinstance(formatter, mdates.DateFormatter)
+            assert formatter.fmt == "%b"
+            assert isinstance(locator, mdates.MonthLocator)
+            ticks = locator.tick_values(
+                BASE_DAY_START, BASE_DAY_START + timedelta(days=365)
+            )
+            tick_times = [
+                mdates.num2date(tick).replace(tzinfo=None) for tick in ticks
+            ]
+            assert len(tick_times) > 1
+            assert all(tick.day == 1 for tick in tick_times)
+            for current, nxt in zip(tick_times, tick_times[1:], strict=False):
+                expected_month = 1 if current.month == 12 else current.month + 1
+                expected_year = current.year + (1 if current.month == 12 else 0)
+                assert (nxt.year, nxt.month) == (expected_year, expected_month)
+        finally:
+            plt.close(fig)
 
     def test_unknown_period_defaults_to_year(self):
         """Unknown period defaults to year format."""
-        fig, ax = self._create_mock_ax()
-        _configure_x_axis(ax, "unknown")
-        ax.xaxis.set_major_formatter.assert_called_once()
-
-    def _create_mock_ax(self):
-        """Create a mock axes object."""
-        ax = MagicMock()
-        ax.xaxis = MagicMock()
-        ax.xaxis.get_majorticklabels.return_value = []
-        return None, ax
+        fig, ax = plt.subplots()
+        try:
+            _configure_x_axis(ax, "unknown")
+            formatter = ax.xaxis.get_major_formatter()
+            locator = ax.xaxis.get_major_locator()
+            assert isinstance(formatter, mdates.DateFormatter)
+            assert formatter.fmt == "%b"
+            assert isinstance(locator, mdates.MonthLocator)
+        finally:
+            plt.close(fig)
 
 
 class TestInjectDataAttributes:
@@ -267,7 +328,7 @@ class TestInjectDataAttributes:
 
     def _create_sample_timeseries(self) -> TimeSeries:
         """Create sample time series for testing."""
-        now = datetime.now()
+        now = BASE_TIME
         return TimeSeries(
             metric="bat",
             role="repeater",
@@ -316,7 +377,7 @@ class TestCalculateStatistics:
             metric="bat",
             role="repeater",
             period="day",
-            points=[DataPoint(timestamp=datetime.now(), value=3.8)],
+            points=[DataPoint(timestamp=BASE_TIME, value=3.8)],
         )
         stats = calculate_statistics(ts)
         assert stats.min_value == 3.8
@@ -326,15 +387,14 @@ class TestCalculateStatistics:
 
     def test_multiple_points(self):
         """Multiple points calculate correct statistics."""
-        now = datetime.now()
         ts = TimeSeries(
             metric="bat",
             role="repeater",
             period="day",
             points=[
-                DataPoint(timestamp=now - timedelta(hours=2), value=3.0),
-                DataPoint(timestamp=now - timedelta(hours=1), value=4.0),
-                DataPoint(timestamp=now, value=5.0),
+                DataPoint(timestamp=BASE_TIME - timedelta(hours=2), value=3.0),
+                DataPoint(timestamp=BASE_TIME - timedelta(hours=1), value=4.0),
+                DataPoint(timestamp=BASE_TIME, value=5.0),
             ],
         )
         stats = calculate_statistics(ts)
@@ -345,15 +405,14 @@ class TestCalculateStatistics:
 
     def test_current_is_last_point(self):
         """Current value is the most recent (last) point."""
-        now = datetime.now()
         ts = TimeSeries(
             metric="bat",
             role="repeater",
             period="day",
             points=[
-                DataPoint(timestamp=now - timedelta(hours=2), value=100.0),
-                DataPoint(timestamp=now - timedelta(hours=1), value=50.0),
-                DataPoint(timestamp=now, value=75.0),
+                DataPoint(timestamp=BASE_TIME - timedelta(hours=2), value=100.0),
+                DataPoint(timestamp=BASE_TIME - timedelta(hours=1), value=50.0),
+                DataPoint(timestamp=BASE_TIME, value=75.0),
             ],
         )
         stats = calculate_statistics(ts)
@@ -365,14 +424,13 @@ class TestTimeSeries:
 
     def test_timestamps_property(self):
         """timestamps property returns list of timestamps."""
-        now = datetime.now()
         ts = TimeSeries(
             metric="bat",
             role="repeater",
             period="day",
             points=[
-                DataPoint(timestamp=now - timedelta(hours=1), value=3.8),
-                DataPoint(timestamp=now, value=3.9),
+                DataPoint(timestamp=BASE_TIME - timedelta(hours=1), value=3.8),
+                DataPoint(timestamp=BASE_TIME, value=3.9),
             ],
         )
         timestamps = ts.timestamps
@@ -386,8 +444,8 @@ class TestTimeSeries:
             role="repeater",
             period="day",
             points=[
-                DataPoint(timestamp=datetime.now(), value=3.8),
-                DataPoint(timestamp=datetime.now(), value=3.9),
+                DataPoint(timestamp=BASE_TIME, value=3.8),
+                DataPoint(timestamp=BASE_TIME + timedelta(minutes=1), value=3.9),
             ],
         )
         values = ts.values
@@ -404,7 +462,7 @@ class TestTimeSeries:
             metric="bat",
             role="repeater",
             period="day",
-            points=[DataPoint(timestamp=datetime.now(), value=3.8)],
+            points=[DataPoint(timestamp=BASE_TIME, value=3.8)],
         )
         assert ts.is_empty is False
 

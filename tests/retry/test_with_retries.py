@@ -7,6 +7,18 @@ import pytest
 from meshmon.retry import with_retries
 
 
+@pytest.fixture
+def sleep_spy(monkeypatch):
+    """Capture asyncio.sleep calls without waiting."""
+    calls = []
+
+    async def fake_sleep(delay):
+        calls.append(delay)
+
+    monkeypatch.setattr("meshmon.retry.asyncio.sleep", fake_sleep)
+    return calls
+
+
 class TestWithRetriesSuccess:
     """Tests for successful operation scenarios."""
 
@@ -69,7 +81,7 @@ class TestWithRetriesFailure:
             raise ValueError("always fails")
 
         success, result, exception = await with_retries(
-            failing_fn, attempts=3, backoff_s=0.01
+            failing_fn, attempts=3, backoff_s=0
         )
 
         assert success is False
@@ -86,7 +98,7 @@ class TestWithRetriesFailure:
             call_count += 1
             raise RuntimeError("fail")
 
-        await with_retries(failing_fn, attempts=5, backoff_s=0.01)
+        await with_retries(failing_fn, attempts=5, backoff_s=0)
 
         assert call_count == 5
 
@@ -101,7 +113,7 @@ class TestWithRetriesFailure:
             raise ValueError(f"error {attempt}")
 
         success, result, exception = await with_retries(
-            changing_error_fn, attempts=3, backoff_s=0.01
+            changing_error_fn, attempts=3, backoff_s=0
         )
 
         assert str(exception) == "error 3"
@@ -123,7 +135,7 @@ class TestWithRetriesRetryBehavior:
             return "success"
 
         success, result, exception = await with_retries(
-            eventually_succeeds, attempts=5, backoff_s=0.01
+            eventually_succeeds, attempts=5, backoff_s=0
         )
 
         assert success is True
@@ -132,36 +144,24 @@ class TestWithRetriesRetryBehavior:
         assert attempt == 3
 
     @pytest.mark.asyncio
-    async def test_backoff_timing(self):
+    async def test_backoff_timing(self, sleep_spy):
         """Waits backoff_s between retries."""
-        import time
-
         async def failing_fn():
             raise RuntimeError("fail")
 
-        start = time.time()
         await with_retries(failing_fn, attempts=3, backoff_s=0.1)
-        elapsed = time.time() - start
 
-        # Should wait ~0.2s total (2 backoffs between 3 attempts)
-        assert elapsed >= 0.18
-        assert elapsed < 0.5  # Allow some overhead
+        assert sleep_spy == [0.1, 0.1]
 
     @pytest.mark.asyncio
-    async def test_no_backoff_after_last_attempt(self):
+    async def test_no_backoff_after_last_attempt(self, sleep_spy):
         """Does not wait after final failed attempt."""
-        import time
-
         async def failing_fn():
             raise RuntimeError("fail")
 
-        start = time.time()
         await with_retries(failing_fn, attempts=2, backoff_s=0.5)
-        elapsed = time.time() - start
 
-        # Only 1 backoff between 2 attempts (~0.5s)
-        assert elapsed >= 0.45
-        assert elapsed < 0.8  # Should not wait twice
+        assert sleep_spy == [0.5]
 
 
 class TestWithRetriesParameters:
@@ -177,7 +177,7 @@ class TestWithRetriesParameters:
             call_count += 1
             raise RuntimeError("fail")
 
-        await with_retries(failing_fn, backoff_s=0.01)
+        await with_retries(failing_fn, backoff_s=0)
 
         assert call_count == 2
 
@@ -191,7 +191,7 @@ class TestWithRetriesParameters:
             call_count += 1
             raise RuntimeError("fail")
 
-        await with_retries(failing_fn, attempts=1, backoff_s=0.01)
+        await with_retries(failing_fn, attempts=1, backoff_s=0)
 
         assert call_count == 1
 
@@ -210,17 +210,27 @@ class TestWithRetriesParameters:
         assert call_count == 3
 
     @pytest.mark.asyncio
-    async def test_name_parameter_for_logging(self, capfd):
+    async def test_name_parameter_for_logging(self, monkeypatch, sleep_spy):
         """Name parameter is used in logging."""
+        messages = []
+
+        def fake_info(msg):
+            messages.append(msg)
+
+        def fake_debug(msg):
+            messages.append(msg)
+
+        monkeypatch.setattr("meshmon.retry.log.info", fake_info)
+        monkeypatch.setattr("meshmon.retry.log.debug", fake_debug)
+
         async def failing_fn():
             raise RuntimeError("fail")
 
         await with_retries(
-            failing_fn, attempts=2, backoff_s=0.01, name="test_operation"
+            failing_fn, attempts=2, backoff_s=0.1, name="test_operation"
         )
 
-        # The function logs with the operation name
-        # (actual output depends on log configuration)
+        assert any("test_operation" in msg for msg in messages)
 
 
 class TestWithRetriesExceptionTypes:

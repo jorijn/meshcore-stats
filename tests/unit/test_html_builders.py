@@ -36,6 +36,7 @@ class TestBuildTrafficTableRows:
         assert result[0]["rx_raw"] == 1200
         assert result[0]["tx"] == "800"
         assert result[0]["tx_raw"] == 800
+        assert result[0]["unit"] == "packets"
 
     def test_flood_rx_tx(self):
         """Flood RX/TX become Flood row."""
@@ -49,6 +50,9 @@ class TestBuildTrafficTableRows:
         assert result[0]["label"] == "Flood"
         assert result[0]["rx"] == "500"
         assert result[0]["tx"] == "300"
+        assert result[0]["rx_raw"] == 500
+        assert result[0]["tx_raw"] == 300
+        assert result[0]["unit"] == "packets"
 
     def test_direct_rx_tx(self):
         """Direct RX/TX become Direct row."""
@@ -62,6 +66,9 @@ class TestBuildTrafficTableRows:
         assert result[0]["label"] == "Direct"
         assert result[0]["rx"] == "200"
         assert result[0]["tx"] == "100"
+        assert result[0]["rx_raw"] == 200
+        assert result[0]["tx_raw"] == 100
+        assert result[0]["unit"] == "packets"
 
     def test_airtime_rx_tx(self):
         """Airtime TX/RX become Airtime row."""
@@ -75,6 +82,9 @@ class TestBuildTrafficTableRows:
         assert result[0]["label"] == "Airtime"
         assert result[0]["tx"] == "1h 30m"
         assert result[0]["rx"] == "3h 0m"
+        assert result[0]["rx_raw"] == 10800
+        assert result[0]["tx_raw"] == 5400
+        assert result[0]["unit"] == "seconds"
 
     def test_output_order(self):
         """Output follows order: Packets, Flood, Direct, Airtime."""
@@ -98,6 +108,8 @@ class TestBuildTrafficTableRows:
 
         assert result[0]["rx"] == "500"
         assert result[0]["tx"] is None
+        assert result[0]["rx_raw"] == 500
+        assert result[0]["tx_raw"] is None
 
     def test_unrecognized_label_skipped(self):
         """Unrecognized labels are skipped."""
@@ -138,6 +150,10 @@ class TestBuildNodeDetails:
         # Check specific values
         location = next(d for d in result if d["label"] == "Location")
         assert location["value"] == "Test Location"
+        coords = next(d for d in result if d["label"] == "Coordinates")
+        assert coords["value"] == "51.5074°N, 0.1278°W"
+        elevation = next(d for d in result if d["label"] == "Elevation")
+        assert elevation["value"] == "11 m"
 
         hardware = next(d for d in result if d["label"] == "Hardware")
         assert hardware["value"] == "RAK 4631"
@@ -155,6 +171,8 @@ class TestBuildNodeDetails:
         labels = [d["label"] for d in result]
         assert "Hardware" in labels
         assert "Connection" in labels
+        assert next(d for d in result if d["label"] == "Connection")["value"] == "USB Serial"
+        assert next(d for d in result if d["label"] == "Hardware")["value"] == "T-Beam Supreme"
 
         # No location info for companion
         assert "Location" not in labels
@@ -171,8 +189,7 @@ class TestBuildNodeDetails:
         result = build_node_details("repeater")
         coords = next(d for d in result if d["label"] == "Coordinates")
 
-        assert "S" in coords["value"]  # South
-        assert "E" in coords["value"]  # East
+        assert coords["value"] == "33.8688°S, 151.2093°E"
 
 
 class TestBuildRadioConfig:
@@ -198,6 +215,9 @@ class TestBuildRadioConfig:
 
         freq = next(d for d in result if d["label"] == "Frequency")
         assert freq["value"] == "915.0 MHz"
+        assert next(d for d in result if d["label"] == "Bandwidth")["value"] == "125 kHz"
+        assert next(d for d in result if d["label"] == "Spread Factor")["value"] == "SF12"
+        assert next(d for d in result if d["label"] == "Coding Rate")["value"] == "CR5"
 
 
 class TestBuildRepeaterMetrics:
@@ -239,16 +259,56 @@ class TestBuildRepeaterMetrics:
         result = build_repeater_metrics(row)
 
         # Critical metrics
-        assert len(result["critical_metrics"]) >= 4
-        battery = next(m for m in result["critical_metrics"] if m["label"] == "Battery")
-        assert battery["value"] == "3.85"
-        assert battery["unit"] == "V"
+        assert [m["label"] for m in result["critical_metrics"]] == [
+            "Battery",
+            "Charge",
+            "RSSI",
+            "SNR",
+        ]
+        battery = result["critical_metrics"][0]
+        assert battery == {
+            "value": "3.85",
+            "unit": "V",
+            "label": "Battery",
+            "bar_pct": 55,
+        }
+        assert result["critical_metrics"][1] == {
+            "value": "55",
+            "unit": "%",
+            "label": "Charge",
+        }
+        assert result["critical_metrics"][2] == {
+            "value": "-85",
+            "unit": "dBm",
+            "label": "RSSI",
+        }
+        assert result["critical_metrics"][3] == {
+            "value": "7.50",
+            "unit": "dB",
+            "label": "SNR",
+        }
 
         # Secondary metrics
-        assert len(result["secondary_metrics"]) >= 2
+        assert result["secondary_metrics"] == [
+            {"label": "Uptime", "value": "1d 0h"},
+            {"label": "Noise Floor", "value": "-115 dBm"},
+            {"label": "TX Queue", "value": "0"},
+        ]
 
         # Traffic metrics
-        assert len(result["traffic_metrics"]) >= 8
+        assert [
+            (metric["label"], metric["value"], metric["raw_value"], metric["unit"])
+            for metric in result["traffic_metrics"]
+        ] == [
+            ("RX", "1,234", 1234, "packets"),
+            ("TX", "567", 567, "packets"),
+            ("Flood RX", "500", 500, "packets"),
+            ("Flood TX", "200", 200, "packets"),
+            ("Direct RX", "100", 100, "packets"),
+            ("Direct TX", "50", 50, "packets"),
+            ("Airtime TX", "1h 0m", 3600, "seconds"),
+            ("Airtime RX", "2h 0m", 7200, "seconds"),
+        ]
 
     def test_battery_converts_mv_to_v(self):
         """Battery value is converted from mV to V."""
@@ -290,13 +350,26 @@ class TestBuildCompanionMetrics:
         result = build_companion_metrics(row)
 
         # Critical metrics
-        assert len(result["critical_metrics"]) == 4  # Battery, Charge, Contacts, Uptime
+        assert result["critical_metrics"] == [
+            {
+                "value": "3.85",
+                "unit": "V",
+                "label": "Battery",
+                "bar_pct": 55,
+            },
+            {"value": "55", "unit": "%", "label": "Charge"},
+            {"value": "5", "unit": None, "label": "Contacts"},
+            {"value": "1d 0h", "unit": None, "label": "Uptime"},
+        ]
 
         # Secondary metrics (empty for companion)
         assert result["secondary_metrics"] == []
 
         # Traffic metrics
-        assert len(result["traffic_metrics"]) == 2  # RX and TX
+        assert result["traffic_metrics"] == [
+            {"label": "RX", "value": "1,234", "raw_value": 1234, "unit": "packets"},
+            {"label": "TX", "value": "567", "raw_value": 567, "unit": "packets"},
+        ]
 
     def test_battery_converts_mv_to_v(self):
         """Battery value is converted from mV to V."""

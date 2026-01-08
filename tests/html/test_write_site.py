@@ -1,7 +1,5 @@
 """Tests for write_site and related output functions."""
 
-import time
-
 import pytest
 
 from meshmon.db import get_latest_metrics
@@ -9,6 +7,8 @@ from meshmon.html import (
     copy_static_assets,
     write_site,
 )
+
+BASE_TS = 1704067200
 
 
 def _sample_companion_metrics() -> dict[str, float]:
@@ -55,7 +55,7 @@ def html_db_cache(tmp_path_factory):
     db_path = state_dir / "metrics.db"
     init_db(db_path=db_path)
 
-    now = int(time.time())
+    now = BASE_TS
     day_seconds = 86400
 
     sample_companion_metrics = _sample_companion_metrics()
@@ -192,8 +192,7 @@ class TestCopyStaticAssets:
         css_file = out_dir / "styles.css"
         content = css_file.read_text()
 
-        # Should have CSS variables
-        assert "--" in content or "{" in content
+        assert "--bg-primary" in content
 
     def test_requires_output_directory(self, html_env):
         """Requires output directory to exist."""
@@ -219,8 +218,8 @@ class TestCopyStaticAssets:
 
         # Should be overwritten with real content
         content = css_file.read_text()
-        assert "/* fake */" not in content or len(content) > 20
-
+        assert content != "/* fake */"
+ 
 
 class TestHtmlOutput:
     """Tests for HTML output structure."""

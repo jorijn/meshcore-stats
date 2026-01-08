@@ -1,6 +1,6 @@
 """Tests for MeshCore connection functions."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -10,6 +10,13 @@ from meshmon.meshcore_client import (
     connect_from_env,
     connect_with_lock,
 )
+
+
+def _reset_config():
+    import meshmon.env
+
+    meshmon.env._config = None
+    return meshmon.env.get_config()
 
 
 class TestAutoDetectSerialPort:
@@ -63,12 +70,20 @@ class TestAutoDetectSerialPort:
 
         assert result is None
 
-    def test_handles_import_error(self):
+    def test_handles_import_error(self, monkeypatch):
         """Returns None when pyserial not installed."""
-        with patch.dict("sys.modules", {"serial": None, "serial.tools": None, "serial.tools.list_ports": None}):
-            # Force re-import to test import error handling
-            # This test may need adjustment based on actual import structure
-            pass
+        import builtins
+
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name in {"serial", "serial.tools.list_ports"}:
+                raise ImportError("No module named 'serial'")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+
+        assert auto_detect_serial_port() is None
 
 
 class TestConnectFromEnv:
@@ -89,19 +104,22 @@ class TestConnectFromEnv:
         monkeypatch.setattr("meshmon.meshcore_client.MESHCORE_AVAILABLE", True)
         monkeypatch.setenv("MESH_TRANSPORT", "serial")
         monkeypatch.setenv("MESH_SERIAL_PORT", "/dev/ttyACM0")
+        monkeypatch.setenv("MESH_SERIAL_BAUD", "57600")
+        monkeypatch.setenv("MESH_DEBUG", "1")
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
-        mock_create = AsyncMock(return_value=MagicMock())
+        mock_client = MagicMock()
+        mock_create = AsyncMock(return_value=mock_client)
         mock_meshcore = MagicMock()
         mock_meshcore.create_serial = mock_create
 
         monkeypatch.setattr("meshmon.meshcore_client.MeshCore", mock_meshcore)
 
-        await connect_from_env()
+        result = await connect_from_env()
 
-        mock_create.assert_called_once()
+        assert result is mock_client
+        mock_create.assert_called_once_with("/dev/ttyACM0", 57600, debug=True)
 
     @pytest.mark.asyncio
     async def test_tcp_connection(self, configured_env, monkeypatch):
@@ -111,18 +129,19 @@ class TestConnectFromEnv:
         monkeypatch.setenv("MESH_TCP_HOST", "localhost")
         monkeypatch.setenv("MESH_TCP_PORT", "4403")
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
-        mock_create = AsyncMock(return_value=MagicMock())
+        mock_client = MagicMock()
+        mock_create = AsyncMock(return_value=mock_client)
         mock_meshcore = MagicMock()
         mock_meshcore.create_tcp = mock_create
 
         monkeypatch.setattr("meshmon.meshcore_client.MeshCore", mock_meshcore)
 
-        await connect_from_env()
+        result = await connect_from_env()
 
-        mock_create.assert_called_once()
+        assert result is mock_client
+        mock_create.assert_called_once_with("localhost", 4403)
 
     @pytest.mark.asyncio
     async def test_unknown_transport(self, configured_env, monkeypatch):
@@ -130,8 +149,7 @@ class TestConnectFromEnv:
         monkeypatch.setattr("meshmon.meshcore_client.MESHCORE_AVAILABLE", True)
         monkeypatch.setenv("MESH_TRANSPORT", "unknown")
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
         result = await connect_from_env()
 
@@ -144,8 +162,7 @@ class TestConnectFromEnv:
         monkeypatch.setenv("MESH_TRANSPORT", "serial")
         monkeypatch.setenv("MESH_SERIAL_PORT", "/dev/ttyACM0")
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
         mock_create = AsyncMock(side_effect=Exception("Connection failed"))
         mock_meshcore = MagicMock()
@@ -156,6 +173,7 @@ class TestConnectFromEnv:
         result = await connect_from_env()
 
         assert result is None
+        mock_create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_ble_connection(self, configured_env, monkeypatch):
@@ -165,18 +183,19 @@ class TestConnectFromEnv:
         monkeypatch.setenv("MESH_BLE_ADDR", "AA:BB:CC:DD:EE:FF")
         monkeypatch.setenv("MESH_BLE_PIN", "123456")
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
-        mock_create = AsyncMock(return_value=MagicMock())
+        mock_client = MagicMock()
+        mock_create = AsyncMock(return_value=mock_client)
         mock_meshcore = MagicMock()
         mock_meshcore.create_ble = mock_create
 
         monkeypatch.setattr("meshmon.meshcore_client.MeshCore", mock_meshcore)
 
-        await connect_from_env()
+        result = await connect_from_env()
 
-        mock_create.assert_called_once()
+        assert result is mock_client
+        mock_create.assert_called_once_with("AA:BB:CC:DD:EE:FF", pin="123456")
 
     @pytest.mark.asyncio
     async def test_ble_missing_address(self, configured_env, monkeypatch):
@@ -185,8 +204,7 @@ class TestConnectFromEnv:
         monkeypatch.setenv("MESH_TRANSPORT", "ble")
         # Don't set MESH_BLE_ADDR
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
         result = await connect_from_env()
 
@@ -199,23 +217,24 @@ class TestConnectFromEnv:
         monkeypatch.setenv("MESH_TRANSPORT", "serial")
         # Don't set MESH_SERIAL_PORT to trigger auto-detection
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
         # Set up mock port detection
         mock_port = MagicMock()
         mock_port.device = "/dev/ttyACM0"
         mock_serial_port.tools.list_ports.comports.return_value = [mock_port]
 
-        mock_create = AsyncMock(return_value=MagicMock())
+        mock_client = MagicMock()
+        mock_create = AsyncMock(return_value=mock_client)
         mock_meshcore = MagicMock()
         mock_meshcore.create_serial = mock_create
 
         monkeypatch.setattr("meshmon.meshcore_client.MeshCore", mock_meshcore)
 
-        await connect_from_env()
+        result = await connect_from_env()
 
-        mock_create.assert_called_once()
+        assert result is mock_client
+        mock_create.assert_called_once_with("/dev/ttyACM0", 115200, debug=False)
 
     @pytest.mark.asyncio
     async def test_serial_auto_detect_fails(self, configured_env, monkeypatch, mock_serial_port):
@@ -224,8 +243,7 @@ class TestConnectFromEnv:
         monkeypatch.setenv("MESH_TRANSPORT", "serial")
         # Don't set MESH_SERIAL_PORT to trigger auto-detection
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
         # No ports available
         mock_serial_port.tools.list_ports.comports.return_value = []
@@ -245,8 +263,7 @@ class TestConnectWithLock:
         monkeypatch.setenv("MESH_TRANSPORT", "serial")
         monkeypatch.setenv("MESH_SERIAL_PORT", "/dev/ttyACM0")
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
         mock_client = MagicMock()
         mock_client.disconnect = AsyncMock()
@@ -269,8 +286,7 @@ class TestConnectWithLock:
         monkeypatch.setenv("MESH_TRANSPORT", "serial")
         monkeypatch.setenv("MESH_SERIAL_PORT", "/dev/ttyACM0")
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
         mock_create = AsyncMock(side_effect=Exception("Connection failed"))
         mock_meshcore = MagicMock()
@@ -288,9 +304,7 @@ class TestConnectWithLock:
         monkeypatch.setenv("MESH_TRANSPORT", "serial")
         monkeypatch.setenv("MESH_SERIAL_PORT", "/dev/ttyACM0")
 
-        import meshmon.env
-        meshmon.env._config = None
-        cfg = meshmon.env.get_config()
+        cfg = _reset_config()
 
         mock_client = MagicMock()
         mock_client.disconnect = AsyncMock()
@@ -313,9 +327,7 @@ class TestConnectWithLock:
         monkeypatch.setenv("MESH_TCP_HOST", "localhost")
         monkeypatch.setenv("MESH_TCP_PORT", "4403")
 
-        import meshmon.env
-        meshmon.env._config = None
-        cfg = meshmon.env.get_config()
+        cfg = _reset_config()
 
         mock_client = MagicMock()
         mock_client.disconnect = AsyncMock()
@@ -338,8 +350,7 @@ class TestConnectWithLock:
         monkeypatch.setenv("MESH_TRANSPORT", "serial")
         monkeypatch.setenv("MESH_SERIAL_PORT", "/dev/ttyACM0")
 
-        import meshmon.env
-        meshmon.env._config = None
+        _reset_config()
 
         mock_client = MagicMock()
         mock_client.disconnect = AsyncMock(side_effect=Exception("Disconnect error"))
@@ -363,8 +374,7 @@ class TestConnectWithLock:
         monkeypatch.setenv("MESH_TRANSPORT", "serial")
         monkeypatch.setenv("MESH_SERIAL_PORT", "/dev/ttyACM0")
 
-        import meshmon.env
-        meshmon.env._config = None
+        cfg = _reset_config()
 
         mock_create = AsyncMock(side_effect=Exception("Connection failed"))
         mock_meshcore = MagicMock()
@@ -377,7 +387,6 @@ class TestConnectWithLock:
 
         # Lock should be released after exiting context
         # We can verify by acquiring it again without timeout
-        cfg = meshmon.env.get_config()
         lock_path = cfg.state_dir / "serial.lock"
         if lock_path.exists():
             import fcntl
