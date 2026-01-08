@@ -5,7 +5,7 @@ The script is the entry point that users run - if it breaks, everything breaks.
 """
 
 import inspect
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -65,12 +65,14 @@ class TestCollectCompanionExitCodes:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(
                 module, "run_command", side_effect=mock_run_command_factory(responses)
-            ):
-                with patch.object(module, "insert_metrics", return_value=5):
-                    exit_code = await module.collect_companion()
+            ),
+            patch.object(module, "insert_metrics", return_value=5),
+        ):
+            exit_code = await module.collect_companion()
 
         assert exit_code == 0
 
@@ -104,9 +106,11 @@ class TestCollectCompanionExitCodes:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command_fail):
-                exit_code = await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command_fail),
+        ):
+            exit_code = await module.collect_companion()
 
         assert exit_code == 1
 
@@ -127,12 +131,14 @@ class TestCollectCompanionExitCodes:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(
                 module, "run_command", side_effect=mock_run_command_factory(responses, default)
-            ):
-                with patch.object(module, "insert_metrics", side_effect=Exception("DB error")):
-                    exit_code = await module.collect_companion()
+            ),
+            patch.object(module, "insert_metrics", side_effect=Exception("DB error")),
+        ):
+            exit_code = await module.collect_companion()
 
         assert exit_code == 1
 
@@ -178,12 +184,14 @@ class TestCollectCompanionMetrics:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(
                 module, "run_command", side_effect=mock_run_command_factory(responses)
-            ):
-                with patch.object(module, "insert_metrics", side_effect=capture_metrics):
-                    await module.collect_companion()
+            ),
+            patch.object(module, "insert_metrics", side_effect=capture_metrics),
+        ):
+            await module.collect_companion()
 
         # Verify all expected metrics were collected
         assert collected_metrics["battery_mv"] == 3850
@@ -217,10 +225,12 @@ class TestCollectCompanionMetrics:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command):
-                with patch.object(module, "insert_metrics", side_effect=capture_metrics):
-                    await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command),
+            patch.object(module, "insert_metrics", side_effect=capture_metrics),
+        ):
+            await module.collect_companion()
 
         # No telemetry.* keys should be present
         telemetry_keys = [k for k in collected_metrics if k.startswith("telemetry.")]
@@ -261,10 +271,12 @@ class TestCollectCompanionMetrics:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command):
-                with patch.object(module, "insert_metrics", side_effect=capture_metrics):
-                    exit_code = await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command),
+            patch.object(module, "insert_metrics", side_effect=capture_metrics),
+        ):
+            exit_code = await module.collect_companion()
 
         assert exit_code == 0
         # Telemetry keys should be present
@@ -302,10 +314,12 @@ class TestCollectCompanionMetrics:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command):
-                with patch.object(module, "insert_metrics", side_effect=capture_metrics):
-                    exit_code = await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command),
+            patch.object(module, "insert_metrics", side_effect=capture_metrics),
+        ):
+            exit_code = await module.collect_companion()
 
         # Should still succeed - just no telemetry extracted
         assert exit_code == 0
@@ -339,10 +353,12 @@ class TestPartialSuccessScenarios:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command):
-                with patch.object(module, "insert_metrics", side_effect=capture_metrics):
-                    exit_code = await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command),
+            patch.object(module, "insert_metrics", side_effect=capture_metrics),
+        ):
+            exit_code = await module.collect_companion()
 
         # Should succeed because stats_core succeeded and had metrics
         assert exit_code == 0
@@ -373,10 +389,12 @@ class TestPartialSuccessScenarios:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command):
-                with patch.object(module, "insert_metrics", side_effect=capture_metrics):
-                    exit_code = await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command),
+            patch.object(module, "insert_metrics", side_effect=capture_metrics),
+        ):
+            exit_code = await module.collect_companion()
 
         assert exit_code == 0
         assert collected_metrics["contacts"] == 2
@@ -404,9 +422,11 @@ class TestPartialSuccessScenarios:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command):
-                exit_code = await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command),
+        ):
+            exit_code = await module.collect_companion()
 
         # Should fail because no metrics were collected
         assert exit_code == 1
@@ -435,10 +455,12 @@ class TestExceptionHandling:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command_with_exception):
-                with patch.object(module, "log") as mock_log:
-                    exit_code = await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command_with_exception),
+            patch.object(module, "log") as mock_log,
+        ):
+            exit_code = await module.collect_companion()
 
         # Should have logged the error
         error_calls = [c for c in mock_log.error.call_args_list if "Error during collection" in str(c)]
@@ -461,9 +483,11 @@ class TestExceptionHandling:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command_raise):
-                await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command_raise),
+        ):
+            await module.collect_companion()
 
         # Verify context manager was properly exited
         assert ctx_mock.exited is True
@@ -476,44 +500,50 @@ class TestMainEntryPoint:
         """main() should initialize database before collection."""
         module = load_collect_companion()
 
-        with patch.object(module, "init_db") as mock_init:
+        with (
+            patch.object(module, "init_db") as mock_init,
+            patch.object(module, "collect_companion", return_value=0),
+            patch.object(module, "asyncio") as mock_asyncio,
+            patch.object(module, "sys"),
+        ):
             # Patch collect_companion to return a non-coroutine to avoid unawaited coroutine warning
-            with patch.object(module, "collect_companion", return_value=0):
-                with patch.object(module, "asyncio") as mock_asyncio:
-                    mock_asyncio.run.return_value = 0
-                    with patch.object(module, "sys") as mock_sys:
-                        module.main()
+            mock_asyncio.run.return_value = 0
+            module.main()
 
-                        mock_init.assert_called_once()
+            mock_init.assert_called_once()
 
     def test_main_exits_with_collection_result(self, configured_env):
         """main() should exit with the collection exit code."""
         module = load_collect_companion()
 
-        with patch.object(module, "init_db"):
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "collect_companion", return_value=1),
+            patch.object(module, "asyncio") as mock_asyncio,
+            patch.object(module, "sys") as mock_sys,
+        ):
             # Patch collect_companion to return a non-coroutine to avoid unawaited coroutine warning
-            with patch.object(module, "collect_companion", return_value=1):
-                with patch.object(module, "asyncio") as mock_asyncio:
-                    mock_asyncio.run.return_value = 1  # Collection failed
-                    with patch.object(module, "sys") as mock_sys:
-                        module.main()
+            mock_asyncio.run.return_value = 1  # Collection failed
+            module.main()
 
-                        mock_sys.exit.assert_called_once_with(1)
+            mock_sys.exit.assert_called_once_with(1)
 
     def test_main_runs_collect_companion_async(self, configured_env):
         """main() should run collect_companion() with asyncio.run()."""
         module = load_collect_companion()
 
-        with patch.object(module, "init_db"):
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "collect_companion", return_value=0),
+            patch.object(module, "asyncio") as mock_asyncio,
+            patch.object(module, "sys"),
+        ):
             # Patch collect_companion to return a non-coroutine to avoid unawaited coroutine warning
-            with patch.object(module, "collect_companion", return_value=0):
-                with patch.object(module, "asyncio") as mock_asyncio:
-                    mock_asyncio.run.return_value = 0
-                    with patch.object(module, "sys"):
-                        module.main()
+            mock_asyncio.run.return_value = 0
+            module.main()
 
-                        # asyncio.run should be called with the return value
-                        mock_asyncio.run.assert_called_once()
+            # asyncio.run should be called with the return value
+            mock_asyncio.run.assert_called_once()
 
 
 class TestDatabaseIntegration:
@@ -549,11 +579,13 @@ class TestDatabaseIntegration:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(
                 module, "run_command", side_effect=mock_run_command_factory(responses)
-            ):
-                exit_code = await module.collect_companion()
+            ),
+        ):
+            exit_code = await module.collect_companion()
 
         assert exit_code == 0
 
@@ -594,9 +626,11 @@ class TestDatabaseIntegration:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-            with patch.object(module, "run_command", side_effect=mock_run_command):
-                exit_code = await module.collect_companion()
+        with (
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command),
+        ):
+            exit_code = await module.collect_companion()
 
         assert exit_code == 0
 

@@ -8,8 +8,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from tests.scripts.conftest import load_script_module
 
 
@@ -32,38 +30,44 @@ class TestRenderChartsImport:
         """main() should initialize database."""
         module = load_script("render_charts.py")
 
-        with patch.object(module, "init_db") as mock_init:
-            with patch.object(module, "get_metric_count", return_value=0):
-                module.main()
+        with (
+            patch.object(module, "init_db") as mock_init,
+            patch.object(module, "get_metric_count", return_value=0),
+        ):
+            module.main()
 
-                mock_init.assert_called_once()
+            mock_init.assert_called_once()
 
     def test_main_checks_metric_counts(self, configured_env):
         """main() should check for data before rendering."""
         module = load_script("render_charts.py")
 
-        with patch.object(module, "init_db"):
-            with patch.object(module, "get_metric_count") as mock_count:
-                mock_count.return_value = 0
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "get_metric_count") as mock_count,
+        ):
+            mock_count.return_value = 0
 
-                module.main()
+            module.main()
 
-                # Should check both companion and repeater
-                assert mock_count.call_count == 2
+            # Should check both companion and repeater
+            assert mock_count.call_count == 2
 
     def test_main_renders_when_data_exists(self, configured_env):
         """main() should render charts when data exists."""
         module = load_script("render_charts.py")
 
-        with patch.object(module, "init_db"):
-            with patch.object(module, "get_metric_count", return_value=100):
-                with patch.object(module, "render_all_charts") as mock_render:
-                    mock_render.return_value = (["chart1.svg"], {"bat": {}})
-                    with patch.object(module, "save_chart_stats"):
-                        module.main()
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "get_metric_count", return_value=100),
+            patch.object(module, "render_all_charts") as mock_render,
+            patch.object(module, "save_chart_stats"),
+        ):
+            mock_render.return_value = (["chart1.svg"], {"bat": {}})
+            module.main()
 
-                        # Should render for both roles
-                        assert mock_render.call_count == 2
+            # Should render for both roles
+            assert mock_render.call_count == 2
 
 
 class TestRenderSiteImport:
@@ -80,25 +84,29 @@ class TestRenderSiteImport:
         """main() should initialize database."""
         module = load_script("render_site.py")
 
-        with patch.object(module, "init_db") as mock_init:
-            with patch.object(module, "get_latest_metrics", return_value=None):
-                with patch.object(module, "write_site", return_value=[]):
-                    module.main()
+        with (
+            patch.object(module, "init_db") as mock_init,
+            patch.object(module, "get_latest_metrics", return_value=None),
+            patch.object(module, "write_site", return_value=[]),
+        ):
+            module.main()
 
-                    mock_init.assert_called_once()
+            mock_init.assert_called_once()
 
     def test_main_loads_latest_metrics(self, configured_env):
         """main() should load latest metrics for both roles."""
         module = load_script("render_site.py")
 
-        with patch.object(module, "init_db"):
-            with patch.object(module, "get_latest_metrics") as mock_get:
-                mock_get.return_value = {"battery_mv": 3850}
-                with patch.object(module, "write_site", return_value=[]):
-                    module.main()
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "get_latest_metrics") as mock_get,
+            patch.object(module, "write_site", return_value=[]),
+        ):
+            mock_get.return_value = {"battery_mv": 3850}
+            module.main()
 
-                    # Should get metrics for both companion and repeater
-                    assert mock_get.call_count == 2
+            # Should get metrics for both companion and repeater
+            assert mock_get.call_count == 2
 
     def test_main_calls_write_site(self, configured_env):
         """main() should call write_site with metrics."""
@@ -107,15 +115,17 @@ class TestRenderSiteImport:
         companion_metrics = {"battery_mv": 3850, "ts": 12345}
         repeater_metrics = {"bat": 3900, "ts": 12346}
 
-        with patch.object(module, "init_db"):
-            with patch.object(module, "get_latest_metrics") as mock_get:
-                mock_get.side_effect = [companion_metrics, repeater_metrics]
-                with patch.object(module, "write_site") as mock_write:
-                    mock_write.return_value = ["day.html", "week.html"]
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "get_latest_metrics") as mock_get,
+            patch.object(module, "write_site") as mock_write,
+        ):
+            mock_get.side_effect = [companion_metrics, repeater_metrics]
+            mock_write.return_value = ["day.html", "week.html"]
 
-                    module.main()
+            module.main()
 
-                    mock_write.assert_called_once_with(companion_metrics, repeater_metrics)
+            mock_write.assert_called_once_with(companion_metrics, repeater_metrics)
 
     def test_creates_html_files_for_all_periods(self, configured_env, initialized_db, tmp_path):
         """Should create HTML files for day/week/month/year periods."""
@@ -123,11 +133,13 @@ class TestRenderSiteImport:
         out_dir = configured_env["out_dir"]
 
         # Use real write_site but mock the templates to avoid complex setup
-        with patch.object(module, "init_db"):
-            with patch.object(module, "get_latest_metrics") as mock_get:
-                mock_get.return_value = {"battery_mv": 3850, "ts": 12345}
-                # Let write_site run - it will create the files
-                module.main()
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "get_latest_metrics") as mock_get,
+        ):
+            mock_get.return_value = {"battery_mv": 3850, "ts": 12345}
+            # Let write_site run - it will create the files
+            module.main()
 
         # Verify HTML files exist and have content
         for period in ["day", "week", "month", "year"]:
@@ -158,29 +170,33 @@ class TestRenderReportsImport:
         """main() should initialize database."""
         module = load_script("render_reports.py")
 
-        with patch.object(module, "init_db") as mock_init:
-            with patch.object(module, "get_available_periods", return_value=[]):
-                with patch.object(module, "build_reports_index_data", return_value=[]):
-                    with patch.object(module, "render_reports_index", return_value="<html>"):
-                        with patch.object(module, "safe_write", return_value=True):
-                            module.main()
+        with (
+            patch.object(module, "init_db") as mock_init,
+            patch.object(module, "get_available_periods", return_value=[]),
+            patch.object(module, "build_reports_index_data", return_value=[]),
+            patch.object(module, "render_reports_index", return_value="<html>"),
+            patch.object(module, "safe_write", return_value=True),
+        ):
+            module.main()
 
-                            mock_init.assert_called_once()
+            mock_init.assert_called_once()
 
     def test_main_processes_both_roles(self, configured_env):
         """main() should process both repeater and companion."""
         module = load_script("render_reports.py")
 
-        with patch.object(module, "init_db"):
-            with patch.object(module, "get_available_periods") as mock_periods:
-                mock_periods.return_value = []
-                with patch.object(module, "build_reports_index_data", return_value=[]):
-                    with patch.object(module, "render_reports_index", return_value="<html>"):
-                        with patch.object(module, "safe_write", return_value=True):
-                            module.main()
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "get_available_periods") as mock_periods,
+            patch.object(module, "build_reports_index_data", return_value=[]),
+            patch.object(module, "render_reports_index", return_value="<html>"),
+            patch.object(module, "safe_write", return_value=True),
+        ):
+            mock_periods.return_value = []
+            module.main()
 
-                            # Should check periods for both roles
-                            assert mock_periods.call_count == 2
+            # Should check periods for both roles
+            assert mock_periods.call_count == 2
 
 
 class TestRenderReportsHelpers:
@@ -326,12 +342,14 @@ class TestRenderMonthlyReport:
         mock_agg = MagicMock()
         mock_agg.daily = []  # No data
 
-        with patch.object(module, "aggregate_monthly", return_value=mock_agg):
-            with patch.object(module, "safe_write") as mock_write:
-                module.render_monthly_report("repeater", 2024, 12)
+        with (
+            patch.object(module, "aggregate_monthly", return_value=mock_agg),
+            patch.object(module, "safe_write") as mock_write,
+        ):
+            module.render_monthly_report("repeater", 2024, 12)
 
-                # Should not write any files
-                mock_write.assert_not_called()
+            # Should not write any files
+            mock_write.assert_not_called()
 
     def test_writes_all_formats(self, configured_env, tmp_path, monkeypatch):
         """Should write HTML, TXT, and JSON formats."""
@@ -345,11 +363,13 @@ class TestRenderMonthlyReport:
         mock_agg = MagicMock()
         mock_agg.daily = [{"day": 1}]  # Has data
 
-        with patch.object(module, "aggregate_monthly", return_value=mock_agg):
-            with patch.object(module, "render_report_page", return_value="<html>"):
-                with patch.object(module, "format_monthly_txt", return_value="TXT"):
-                    with patch.object(module, "monthly_to_json", return_value={}):
-                        module.render_monthly_report("repeater", 2024, 12)
+        with (
+            patch.object(module, "aggregate_monthly", return_value=mock_agg),
+            patch.object(module, "render_report_page", return_value="<html>"),
+            patch.object(module, "format_monthly_txt", return_value="TXT"),
+            patch.object(module, "monthly_to_json", return_value={}),
+        ):
+            module.render_monthly_report("repeater", 2024, 12)
 
         # Check files were created
         report_dir = tmp_path / "reports" / "repeater" / "2024" / "12"
@@ -371,11 +391,13 @@ class TestRenderMonthlyReport:
 
         json_data = {"period": "2024-12", "metrics": {"bat": {"avg": 3850}}}
 
-        with patch.object(module, "aggregate_monthly", return_value=mock_agg):
-            with patch.object(module, "render_report_page", return_value="<html>"):
-                with patch.object(module, "format_monthly_txt", return_value="TXT"):
-                    with patch.object(module, "monthly_to_json", return_value=json_data):
-                        module.render_monthly_report("repeater", 2024, 12)
+        with (
+            patch.object(module, "aggregate_monthly", return_value=mock_agg),
+            patch.object(module, "render_report_page", return_value="<html>"),
+            patch.object(module, "format_monthly_txt", return_value="TXT"),
+            patch.object(module, "monthly_to_json", return_value=json_data),
+        ):
+            module.render_monthly_report("repeater", 2024, 12)
 
         json_file = tmp_path / "reports" / "repeater" / "2024" / "12" / "report.json"
         content = json_file.read_text()
@@ -393,12 +415,14 @@ class TestRenderYearlyReport:
         mock_agg = MagicMock()
         mock_agg.monthly = []  # No data
 
-        with patch.object(module, "aggregate_yearly", return_value=mock_agg):
-            with patch.object(module, "safe_write") as mock_write:
-                module.render_yearly_report("repeater", 2024)
+        with (
+            patch.object(module, "aggregate_yearly", return_value=mock_agg),
+            patch.object(module, "safe_write") as mock_write,
+        ):
+            module.render_yearly_report("repeater", 2024)
 
-                # Should not write any files
-                mock_write.assert_not_called()
+            # Should not write any files
+            mock_write.assert_not_called()
 
     def test_writes_all_formats(self, configured_env, tmp_path, monkeypatch):
         """Should write HTML, TXT, and JSON formats."""
@@ -412,11 +436,13 @@ class TestRenderYearlyReport:
         mock_agg = MagicMock()
         mock_agg.monthly = [{"month": 1}]  # Has data
 
-        with patch.object(module, "aggregate_yearly", return_value=mock_agg):
-            with patch.object(module, "render_report_page", return_value="<html>"):
-                with patch.object(module, "format_yearly_txt", return_value="TXT"):
-                    with patch.object(module, "yearly_to_json", return_value={}):
-                        module.render_yearly_report("repeater", 2024)
+        with (
+            patch.object(module, "aggregate_yearly", return_value=mock_agg),
+            patch.object(module, "render_report_page", return_value="<html>"),
+            patch.object(module, "format_yearly_txt", return_value="TXT"),
+            patch.object(module, "yearly_to_json", return_value={}),
+        ):
+            module.render_yearly_report("repeater", 2024)
 
         # Check files were created
         report_dir = tmp_path / "reports" / "repeater" / "2024"
@@ -438,11 +464,13 @@ class TestRenderYearlyReport:
 
         html_content = "<!DOCTYPE html><html><head><title>Report</title></head><body>Content</body></html>"
 
-        with patch.object(module, "aggregate_yearly", return_value=mock_agg):
-            with patch.object(module, "render_report_page", return_value=html_content):
-                with patch.object(module, "format_yearly_txt", return_value="TXT"):
-                    with patch.object(module, "yearly_to_json", return_value={}):
-                        module.render_yearly_report("repeater", 2024)
+        with (
+            patch.object(module, "aggregate_yearly", return_value=mock_agg),
+            patch.object(module, "render_report_page", return_value=html_content),
+            patch.object(module, "format_yearly_txt", return_value="TXT"),
+            patch.object(module, "yearly_to_json", return_value={}),
+        ):
+            module.render_yearly_report("repeater", 2024)
 
         html_file = tmp_path / "reports" / "repeater" / "2024" / "index.html"
         content = html_file.read_text()
@@ -475,14 +503,16 @@ class TestReportNavigation:
             next_report_data = next_report
             return "<html>"
 
-        with patch.object(module, "aggregate_monthly", return_value=mock_agg):
-            with patch.object(module, "render_report_page", side_effect=capture_render):
-                with patch.object(module, "format_monthly_txt", return_value="TXT"):
-                    with patch.object(module, "monthly_to_json", return_value={}):
-                        # Call with prev and next periods
-                        module.render_monthly_report(
-                            "repeater", 2024, 6, prev_period=(2024, 5), next_period=(2024, 7)
-                        )
+        with (
+            patch.object(module, "aggregate_monthly", return_value=mock_agg),
+            patch.object(module, "render_report_page", side_effect=capture_render),
+            patch.object(module, "format_monthly_txt", return_value="TXT"),
+            patch.object(module, "monthly_to_json", return_value={}),
+        ):
+            # Call with prev and next periods
+            module.render_monthly_report(
+                "repeater", 2024, 6, prev_period=(2024, 5), next_period=(2024, 7)
+            )
 
         assert prev_report_data is not None
         assert prev_report_data["url"] == "/reports/repeater/2024/05/"
@@ -512,12 +542,14 @@ class TestReportNavigation:
             next_report_data = next_report
             return "<html>"
 
-        with patch.object(module, "aggregate_yearly", return_value=mock_agg):
-            with patch.object(module, "render_report_page", side_effect=capture_render):
-                with patch.object(module, "format_yearly_txt", return_value="TXT"):
-                    with patch.object(module, "yearly_to_json", return_value={}):
-                        # Call with prev and next years
-                        module.render_yearly_report("repeater", 2024, prev_year=2023, next_year=2025)
+        with (
+            patch.object(module, "aggregate_yearly", return_value=mock_agg),
+            patch.object(module, "render_report_page", side_effect=capture_render),
+            patch.object(module, "format_yearly_txt", return_value="TXT"),
+            patch.object(module, "yearly_to_json", return_value={}),
+        ):
+            # Call with prev and next years
+            module.render_yearly_report("repeater", 2024, prev_year=2023, next_year=2025)
 
         assert prev_report_data is not None
         assert prev_report_data["url"] == "/reports/repeater/2023/"
@@ -550,19 +582,19 @@ class TestMainWithData:
         mock_yearly_agg = MagicMock()
         mock_yearly_agg.monthly = [{"month": 11}]
 
-        with patch.object(module, "init_db"):
-            with patch.object(module, "get_available_periods", side_effect=mock_periods):
-                with patch.object(module, "aggregate_monthly", return_value=mock_monthly_agg):
-                    with patch.object(module, "aggregate_yearly", return_value=mock_yearly_agg):
-                        with patch.object(module, "render_report_page", return_value="<html>"):
-                            with patch.object(module, "format_monthly_txt", return_value="TXT"):
-                                with patch.object(module, "format_yearly_txt", return_value="TXT"):
-                                    with patch.object(module, "monthly_to_json", return_value={}):
-                                        with patch.object(module, "yearly_to_json", return_value={}):
-                                            with patch.object(
-                                                module, "render_reports_index", return_value="<html>"
-                                            ):
-                                                module.main()
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "get_available_periods", side_effect=mock_periods),
+            patch.object(module, "aggregate_monthly", return_value=mock_monthly_agg),
+            patch.object(module, "aggregate_yearly", return_value=mock_yearly_agg),
+            patch.object(module, "render_report_page", return_value="<html>"),
+            patch.object(module, "format_monthly_txt", return_value="TXT"),
+            patch.object(module, "format_yearly_txt", return_value="TXT"),
+            patch.object(module, "monthly_to_json", return_value={}),
+            patch.object(module, "yearly_to_json", return_value={}),
+            patch.object(module, "render_reports_index", return_value="<html>"),
+        ):
+            module.main()
 
         # Verify reports were created
         repeater_dir = tmp_path / "reports" / "repeater"
@@ -585,11 +617,13 @@ class TestMainWithData:
 <body><h1>Reports</h1></body>
 </html>"""
 
-        with patch.object(module, "init_db"):
-            with patch.object(module, "get_available_periods", return_value=[]):
-                with patch.object(module, "build_reports_index_data", return_value=[]):
-                    with patch.object(module, "render_reports_index", return_value=index_html):
-                        module.main()
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "get_available_periods", return_value=[]),
+            patch.object(module, "build_reports_index_data", return_value=[]),
+            patch.object(module, "render_reports_index", return_value=index_html),
+        ):
+            module.main()
 
         index_file = tmp_path / "reports" / "index.html"
         assert index_file.exists()

@@ -2,7 +2,7 @@
 
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -237,7 +237,7 @@ def snapshot_base_time():
     Uses 2024-01-15 12:00:00 UTC as a stable reference point.
     Explicitly set to UTC to ensure consistent behavior across all machines.
     """
-    return datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    return datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
 
 
 @pytest.fixture

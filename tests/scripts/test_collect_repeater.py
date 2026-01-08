@@ -61,16 +61,18 @@ class TestFindRepeaterContact:
         mc.commands = MagicMock()
         mc.contacts = {"abc123": {"adv_name": "MyRepeater", "public_key": "abc123"}}
 
-        with patch.object(module, "run_command") as mock_run:
+        with (
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "get_contact_by_name") as mock_get,
+        ):
             mock_run.return_value = (True, "CONTACTS", mc.contacts, None)
-            with patch.object(module, "get_contact_by_name") as mock_get:
-                mock_get.return_value = mc.contacts["abc123"]
+            mock_get.return_value = mc.contacts["abc123"]
 
-                contact = await module.find_repeater_contact(mc)
+            contact = await module.find_repeater_contact(mc)
 
-                assert contact is not None
-                assert contact["adv_name"] == "MyRepeater"
-                mock_get.assert_called_once_with(mc, "MyRepeater")
+            assert contact is not None
+            assert contact["adv_name"] == "MyRepeater"
+            mock_get.assert_called_once_with(mc, "MyRepeater")
 
     @pytest.mark.asyncio
     async def test_finds_contact_by_key_prefix(self, configured_env, monkeypatch):
@@ -86,16 +88,18 @@ class TestFindRepeaterContact:
         mc.commands = MagicMock()
         mc.contacts = {"abc123def456": {"adv_name": "SomeNode", "public_key": "abc123def456"}}
 
-        with patch.object(module, "run_command") as mock_run:
+        with (
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "get_contact_by_name", return_value=None),
+            patch.object(module, "get_contact_by_key_prefix") as mock_get,
+        ):
             mock_run.return_value = (True, "CONTACTS", mc.contacts, None)
-            with patch.object(module, "get_contact_by_name", return_value=None):
-                with patch.object(module, "get_contact_by_key_prefix") as mock_get:
-                    mock_get.return_value = mc.contacts["abc123def456"]
+            mock_get.return_value = mc.contacts["abc123def456"]
 
-                    contact = await module.find_repeater_contact(mc)
+            contact = await module.find_repeater_contact(mc)
 
-                    assert contact is not None
-                    mock_get.assert_called_once()
+            assert contact is not None
+            mock_get.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_fallback_to_manual_name_search(self, configured_env, monkeypatch):
@@ -111,14 +115,16 @@ class TestFindRepeaterContact:
         mc.commands = MagicMock()
         contacts_dict = {"xyz789": {"adv_name": "ManualFind", "public_key": "xyz789"}}
 
-        with patch.object(module, "run_command") as mock_run:
+        with (
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "get_contact_by_name", return_value=None),
+        ):
             mock_run.return_value = (True, "CONTACTS", contacts_dict, None)
             # get_contact_by_name returns None, forcing manual search
-            with patch.object(module, "get_contact_by_name", return_value=None):
-                contact = await module.find_repeater_contact(mc)
+            contact = await module.find_repeater_contact(mc)
 
-                assert contact is not None
-                assert contact["adv_name"] == "ManualFind"
+            assert contact is not None
+            assert contact["adv_name"] == "ManualFind"
 
     @pytest.mark.asyncio
     async def test_case_insensitive_name_match(self, configured_env, monkeypatch):
@@ -134,12 +140,14 @@ class TestFindRepeaterContact:
         mc.commands = MagicMock()
         contacts_dict = {"key1": {"adv_name": "MyRepeater", "public_key": "key1"}}  # Mixed case
 
-        with patch.object(module, "run_command") as mock_run:
+        with (
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "get_contact_by_name", return_value=None),
+        ):
             mock_run.return_value = (True, "CONTACTS", contacts_dict, None)
-            with patch.object(module, "get_contact_by_name", return_value=None):
-                contact = await module.find_repeater_contact(mc)
+            contact = await module.find_repeater_contact(mc)
 
-                assert contact is not None
+            assert contact is not None
 
     @pytest.mark.asyncio
     async def test_returns_none_when_not_found(self, configured_env, monkeypatch):
@@ -154,12 +162,14 @@ class TestFindRepeaterContact:
         mc = MagicMock()
         mc.commands = MagicMock()
 
-        with patch.object(module, "run_command") as mock_run:
+        with (
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "get_contact_by_name", return_value=None),
+        ):
             mock_run.return_value = (True, "CONTACTS", {}, None)
-            with patch.object(module, "get_contact_by_name", return_value=None):
-                contact = await module.find_repeater_contact(mc)
+            contact = await module.find_repeater_contact(mc)
 
-                assert contact is None
+            assert contact is None
 
     @pytest.mark.asyncio
     async def test_returns_none_when_get_contacts_fails(self, configured_env, monkeypatch):
@@ -222,21 +232,21 @@ class TestCircuitBreakerIntegration:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "query_repeater_with_retry") as mock_query,
+            patch.object(module, "insert_metrics", return_value=2),
+        ):
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_query.return_value = (True, {"bat": 3850, "uptime": 86400}, None)
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
+            await module.collect_repeater()
 
-                        with patch.object(module, "query_repeater_with_retry") as mock_query:
-                            mock_query.return_value = (True, {"bat": 3850, "uptime": 86400}, None)
-
-                            with patch.object(module, "insert_metrics", return_value=2):
-                                await module.collect_repeater()
-
-                                mock_cb.record_success.assert_called_once()
+            mock_cb.record_success.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_records_failure_on_status_timeout(
@@ -257,21 +267,21 @@ class TestCircuitBreakerIntegration:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "query_repeater_with_retry") as mock_query,
+        ):
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_query.return_value = (False, None, "Timeout")
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
+            exit_code = await module.collect_repeater()
 
-                        with patch.object(module, "query_repeater_with_retry") as mock_query:
-                            mock_query.return_value = (False, None, "Timeout")
-
-                            exit_code = await module.collect_repeater()
-
-                            mock_cb.record_failure.assert_called_once()
-                            assert exit_code == 1
+            mock_cb.record_failure.assert_called_once()
+            assert exit_code == 1
 
 
 class TestCollectRepeaterExitCodes:
@@ -296,23 +306,23 @@ class TestCollectRepeaterExitCodes:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "query_repeater_with_retry") as mock_query,
+            patch.object(module, "insert_metrics", return_value=3),
+        ):
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_query.return_value = (
+                True,
+                {"bat": 3850, "uptime": 86400, "nb_recv": 100},
+                None,
+            )
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
-
-                        with patch.object(module, "query_repeater_with_retry") as mock_query:
-                            mock_query.return_value = (
-                                True,
-                                {"bat": 3850, "uptime": 86400, "nb_recv": 100},
-                                None,
-                            )
-
-                            with patch.object(module, "insert_metrics", return_value=3):
-                                exit_code = await module.collect_repeater()
+            exit_code = await module.collect_repeater()
 
         assert exit_code == 0
 
@@ -327,9 +337,11 @@ class TestCollectRepeaterExitCodes:
         mock_cb.is_open.return_value = False
         ctx_mock = async_context_manager_factory(None)  # Connection returns None
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                exit_code = await module.collect_repeater()
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+        ):
+            exit_code = await module.collect_repeater()
 
         assert exit_code == 1
 
@@ -352,15 +364,16 @@ class TestCollectRepeaterExitCodes:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+        ):
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = None  # Not found
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = None  # Not found
-
-                        exit_code = await module.collect_repeater()
+            exit_code = await module.collect_repeater()
 
         assert exit_code == 1
 
@@ -420,29 +433,33 @@ class TestMainEntryPoint:
         """main() should initialize database before collection."""
         module = load_collect_repeater()
 
-        with patch.object(module, "init_db") as mock_init:
+        with (
+            patch.object(module, "init_db") as mock_init,
+            patch.object(module, "collect_repeater", return_value=0),
+            patch.object(module, "asyncio") as mock_asyncio,
+            patch.object(module, "sys"),
+        ):
             # Patch collect_repeater to return a non-coroutine to avoid unawaited coroutine warning
-            with patch.object(module, "collect_repeater", return_value=0):
-                with patch.object(module, "asyncio") as mock_asyncio:
-                    mock_asyncio.run.return_value = 0
-                    with patch.object(module, "sys") as mock_sys:
-                        module.main()
+            mock_asyncio.run.return_value = 0
+            module.main()
 
-                        mock_init.assert_called_once()
+            mock_init.assert_called_once()
 
     def test_main_exits_with_collection_result(self, configured_env):
         """main() should exit with the collection exit code."""
         module = load_collect_repeater()
 
-        with patch.object(module, "init_db"):
+        with (
+            patch.object(module, "init_db"),
+            patch.object(module, "collect_repeater", return_value=1),
+            patch.object(module, "asyncio") as mock_asyncio,
+            patch.object(module, "sys") as mock_sys,
+        ):
             # Patch collect_repeater to return a non-coroutine to avoid unawaited coroutine warning
-            with patch.object(module, "collect_repeater", return_value=1):
-                with patch.object(module, "asyncio") as mock_asyncio:
-                    mock_asyncio.run.return_value = 1  # Collection failed
-                    with patch.object(module, "sys") as mock_sys:
-                        module.main()
+            mock_asyncio.run.return_value = 1  # Collection failed
+            module.main()
 
-                        mock_sys.exit.assert_called_once_with(1)
+            mock_sys.exit.assert_called_once_with(1)
 
 
 class TestDatabaseIntegration:
@@ -469,22 +486,22 @@ class TestDatabaseIntegration:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "query_repeater_with_retry") as mock_query,
+        ):
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_query.return_value = (
+                True,
+                {"bat": 3777, "uptime": 99999, "nb_recv": 1234, "nb_sent": 567},
+                None,
+            )
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
-
-                        with patch.object(module, "query_repeater_with_retry") as mock_query:
-                            mock_query.return_value = (
-                                True,
-                                {"bat": 3777, "uptime": 99999, "nb_recv": 1234, "nb_sent": 567},
-                                None,
-                            )
-
-                            exit_code = await module.collect_repeater()
+            exit_code = await module.collect_repeater()
 
         assert exit_code == 0
 
@@ -513,15 +530,17 @@ class TestFindRepeaterContactEdgeCases:
         mc.contacts = {}  # Empty contacts attribute
         payload_dict = {"pk123": {"adv_name": "PayloadRepeater", "public_key": "pk123"}}
 
-        with patch.object(module, "run_command") as mock_run:
+        with (
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "get_contact_by_name", return_value=None),
+        ):
             # Return contacts in payload
             mock_run.return_value = (True, "CONTACTS", payload_dict, None)
             # get_contact_by_name returns None, forcing manual search in payload
-            with patch.object(module, "get_contact_by_name", return_value=None):
-                contact = await module.find_repeater_contact(mc)
+            contact = await module.find_repeater_contact(mc)
 
-                assert contact is not None
-                assert contact["adv_name"] == "PayloadRepeater"
+            assert contact is not None
+            assert contact["adv_name"] == "PayloadRepeater"
 
     @pytest.mark.asyncio
     async def test_finds_contact_by_key_prefix_manual_search(self, configured_env, monkeypatch):
@@ -537,15 +556,17 @@ class TestFindRepeaterContactEdgeCases:
         mc.commands = MagicMock()
         contacts_dict = {"abc123xyz": {"adv_name": "KeyPrefixNode"}}
 
-        with patch.object(module, "run_command") as mock_run:
+        with (
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "get_contact_by_name", return_value=None),
+            patch.object(module, "get_contact_by_key_prefix", return_value=None),
+        ):
             mock_run.return_value = (True, "CONTACTS", contacts_dict, None)
             # Both helper functions return None, forcing manual search
-            with patch.object(module, "get_contact_by_name", return_value=None):
-                with patch.object(module, "get_contact_by_key_prefix", return_value=None):
-                    contact = await module.find_repeater_contact(mc)
+            contact = await module.find_repeater_contact(mc)
 
-                    assert contact is not None
-                    assert contact["adv_name"] == "KeyPrefixNode"
+            assert contact is not None
+            assert contact["adv_name"] == "KeyPrefixNode"
 
     @pytest.mark.asyncio
     async def test_prints_available_contacts_when_not_found(self, configured_env, monkeypatch):
@@ -565,15 +586,17 @@ class TestFindRepeaterContactEdgeCases:
             "key3": {},  # No name fields
         }
 
-        with patch.object(module, "run_command") as mock_run:
+        with (
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "get_contact_by_name", return_value=None),
+            patch.object(module, "log") as mock_log,
+        ):
             mock_run.return_value = (True, "CONTACTS", contacts_dict, None)
-            with patch.object(module, "get_contact_by_name", return_value=None):
-                with patch.object(module, "log") as mock_log:
-                    contact = await module.find_repeater_contact(mc)
+            contact = await module.find_repeater_contact(mc)
 
-                    assert contact is None
-                    # Should have logged available contacts
-                    mock_log.info.assert_called()
+            assert contact is None
+            # Should have logged available contacts
+            mock_log.info.assert_called()
 
 
 class TestLoginFunctionality:
@@ -600,29 +623,26 @@ class TestLoginFunctionality:
         mc.commands.send_login = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    # Return success for all commands
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "extract_contact_info") as mock_extract,
+            patch.object(module, "query_repeater_with_retry") as mock_query,
+            patch.object(module, "insert_metrics", return_value=1),
+        ):
+            # Return success for all commands
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_extract.return_value = {"adv_name": "TestRepeater"}
+            mock_query.return_value = (True, {"bat": 3850}, None)
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
+            await module.collect_repeater()
 
-                        with patch.object(module, "extract_contact_info") as mock_extract:
-                            mock_extract.return_value = {"adv_name": "TestRepeater"}
-
-                            with patch.object(module, "query_repeater_with_retry") as mock_query:
-                                mock_query.return_value = (True, {"bat": 3850}, None)
-
-                                with patch.object(module, "insert_metrics", return_value=1):
-                                    await module.collect_repeater()
-
-                                    # Verify login was attempted (run_command called with send_login)
-                                    login_calls = [
-                                        c for c in mock_run.call_args_list if c[0][2] == "send_login"
-                                    ]
-                                    assert len(login_calls) == 1
+            # Verify login was attempted (run_command called with send_login)
+            login_calls = [c for c in mock_run.call_args_list if c[0][2] == "send_login"]
+            assert len(login_calls) == 1
 
     @pytest.mark.asyncio
     async def test_handles_login_exception(
@@ -654,22 +674,22 @@ class TestLoginFunctionality:
                 raise Exception("Login not supported")
             return (True, "OK", {}, None)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command", side_effect=mock_run_command):
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command", side_effect=mock_run_command),
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "extract_contact_info") as mock_extract,
+            patch.object(module, "query_repeater_with_retry") as mock_query,
+            patch.object(module, "insert_metrics", return_value=1),
+        ):
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_extract.return_value = {"adv_name": "TestRepeater"}
+            mock_query.return_value = (True, {"bat": 3850}, None)
 
-                        with patch.object(module, "extract_contact_info") as mock_extract:
-                            mock_extract.return_value = {"adv_name": "TestRepeater"}
-
-                            with patch.object(module, "query_repeater_with_retry") as mock_query:
-                                mock_query.return_value = (True, {"bat": 3850}, None)
-
-                                with patch.object(module, "insert_metrics", return_value=1):
-                                    # Should not raise - login failure should be handled
-                                    exit_code = await module.collect_repeater()
-                                    assert exit_code == 0
+            # Should not raise - login failure should be handled
+            exit_code = await module.collect_repeater()
+            assert exit_code == 0
 
 
 class TestTelemetryCollection:
@@ -695,44 +715,34 @@ class TestTelemetryCollection:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "extract_contact_info") as mock_extract,
+            patch.object(module, "query_repeater_with_retry") as mock_query,
+            patch.object(
+                module,
+                "with_retries",
+                new=AsyncMock(return_value=(True, {"lpp": b"\x00\x67\x01\x00"}, None)),
+            ),
+            patch.object(module, "extract_lpp_from_payload") as mock_lpp,
+            patch.object(module, "extract_telemetry_metrics") as mock_telem,
+        ):
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_extract.return_value = {"adv_name": "TestRepeater"}
+            mock_query.return_value = (True, {"bat": 3850}, None)
+            mock_lpp.return_value = {"temperature": [(0, 25.5)]}
+            mock_telem.return_value = {"telemetry.temperature.0": 25.5}
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
+            exit_code = await module.collect_repeater()
 
-                        with patch.object(module, "extract_contact_info") as mock_extract:
-                            mock_extract.return_value = {"adv_name": "TestRepeater"}
-
-                            with patch.object(module, "query_repeater_with_retry") as mock_query:
-                                mock_query.return_value = (True, {"bat": 3850}, None)
-
-                                # Use AsyncMock since with_retries is awaited
-                                with patch.object(
-                                    module,
-                                    "with_retries",
-                                    new=AsyncMock(
-                                        return_value=(True, {"lpp": b"\x00\x67\x01\x00"}, None)
-                                    ),
-                                ):
-                                    with patch.object(
-                                        module, "extract_lpp_from_payload"
-                                    ) as mock_lpp:
-                                        mock_lpp.return_value = {"temperature": [(0, 25.5)]}
-
-                                        with patch.object(
-                                            module, "extract_telemetry_metrics"
-                                        ) as mock_telem:
-                                            mock_telem.return_value = {"telemetry.temperature.0": 25.5}
-
-                                            exit_code = await module.collect_repeater()
-
-                                            assert exit_code == 0
-                                            # Verify telemetry was processed
-                                            mock_lpp.assert_called_once()
-                                            mock_telem.assert_called_once()
+            assert exit_code == 0
+            # Verify telemetry was processed
+            mock_lpp.assert_called_once()
+            mock_telem.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_handles_telemetry_failure_gracefully(
@@ -754,32 +764,28 @@ class TestTelemetryCollection:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "extract_contact_info") as mock_extract,
+            patch.object(module, "query_repeater_with_retry") as mock_query,
+            patch.object(module, "insert_metrics", return_value=1),
+            patch.object(
+                module,
+                "with_retries",
+                new=AsyncMock(return_value=(False, None, Exception("Timeout"))),
+            ),
+        ):
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_extract.return_value = {"adv_name": "TestRepeater"}
+            mock_query.return_value = (True, {"bat": 3850}, None)
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
-
-                        with patch.object(module, "extract_contact_info") as mock_extract:
-                            mock_extract.return_value = {"adv_name": "TestRepeater"}
-
-                            with patch.object(module, "query_repeater_with_retry") as mock_query:
-                                mock_query.return_value = (True, {"bat": 3850}, None)
-
-                                with patch.object(module, "insert_metrics", return_value=1):
-                                    # Use AsyncMock since with_retries is awaited
-                                    with patch.object(
-                                        module,
-                                        "with_retries",
-                                        new=AsyncMock(
-                                            return_value=(False, None, Exception("Timeout"))
-                                        ),
-                                    ):
-                                        # Should still succeed (status metrics were saved)
-                                        exit_code = await module.collect_repeater()
-                                        assert exit_code == 0
+            # Should still succeed (status metrics were saved)
+            exit_code = await module.collect_repeater()
+            assert exit_code == 0
 
 
 class TestDatabaseErrorHandling:
@@ -804,25 +810,22 @@ class TestDatabaseErrorHandling:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "extract_contact_info") as mock_extract,
+            patch.object(module, "query_repeater_with_retry") as mock_query,
+            patch.object(module, "insert_metrics", side_effect=Exception("DB error")),
+        ):
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_extract.return_value = {"adv_name": "TestRepeater"}
+            mock_query.return_value = (True, {"bat": 3850}, None)
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
-
-                        with patch.object(module, "extract_contact_info") as mock_extract:
-                            mock_extract.return_value = {"adv_name": "TestRepeater"}
-
-                            with patch.object(module, "query_repeater_with_retry") as mock_query:
-                                mock_query.return_value = (True, {"bat": 3850}, None)
-
-                                with patch.object(
-                                    module, "insert_metrics", side_effect=Exception("DB error")
-                                ):
-                                    exit_code = await module.collect_repeater()
-                                    assert exit_code == 1
+            exit_code = await module.collect_repeater()
+            assert exit_code == 1
 
 
 class TestExceptionHandling:
@@ -847,18 +850,18 @@ class TestExceptionHandling:
         mc.commands = MagicMock()
         ctx_mock = async_context_manager_factory(mc)
 
-        with patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb):
-            with patch.object(module, "connect_with_lock", return_value=ctx_mock):
-                with patch.object(module, "run_command") as mock_run:
-                    mock_run.return_value = (True, "OK", {}, None)
+        with (
+            patch.object(module, "get_repeater_circuit_breaker", return_value=mock_cb),
+            patch.object(module, "connect_with_lock", return_value=ctx_mock),
+            patch.object(module, "run_command") as mock_run,
+            patch.object(module, "find_repeater_contact") as mock_find,
+            patch.object(module, "extract_contact_info") as mock_extract,
+        ):
+            mock_run.return_value = (True, "OK", {}, None)
+            mock_find.return_value = {"adv_name": "TestRepeater"}
+            mock_extract.side_effect = Exception("Unexpected error")
 
-                    with patch.object(module, "find_repeater_contact") as mock_find:
-                        mock_find.return_value = {"adv_name": "TestRepeater"}
+            await module.collect_repeater()
 
-                        with patch.object(module, "extract_contact_info") as mock_extract:
-                            mock_extract.side_effect = Exception("Unexpected error")
-
-                            exit_code = await module.collect_repeater()
-
-                            # Circuit breaker should record failure
-                            mock_cb.record_failure.assert_called_once()
+            # Circuit breaker should record failure
+            mock_cb.record_failure.assert_called_once()

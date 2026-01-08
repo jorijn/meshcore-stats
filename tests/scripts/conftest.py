@@ -4,7 +4,6 @@ import importlib.util
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
