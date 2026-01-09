@@ -13,6 +13,15 @@
         "github-actions"
       ],
       "pinDigests": true
+    },
+    {
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/jorijn/meshcore-stats"
+      ],
+      "pinDigests": false
     }
   ]
 }
