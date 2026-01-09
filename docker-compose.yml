@@ -15,7 +15,7 @@ services:
   # MeshCore Stats - Data collection and rendering
   # ==========================================================================
   meshcore-stats:
-    image: ghcr.io/jorijn/meshcore-stats:0.2.11 # x-release-please-version
+    image: ghcr.io/jorijn/meshcore-stats:0.2.11@sha256:82ca2230abba7d8846315a4fa09f1a2407695caf73fef029e6e6ea83c60c4290 # x-release-please-version
     container_name: meshcore-stats
     restart: unless-stopped
 
@@ -78,7 +78,7 @@ services:
   # nginx - Static site server
   # ==========================================================================
   nginx:
-    image: nginx:1.29-alpine
+    image: nginx:1.29-alpine@sha256:8491795299c8e739b7fcc6285d531d9812ce2666e07bd3dd8db00020ad132295
     container_name: meshcore-stats-nginx
     restart: unless-stopped
 
