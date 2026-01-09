@@ -162,7 +162,7 @@ For environments where Docker is not available.
 
 #### Requirements
 
-- Python 3.10+
+- Python 3.11+ (3.14 recommended)
 - SQLite3
 - [uv](https://github.com/astral-sh/uv)
 
