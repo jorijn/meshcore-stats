@@ -1,4 +1,9 @@
 # =============================================================================
+# Stage 0: uv binary
+# =============================================================================
+FROM ghcr.io/astral-sh/uv:0.9.9@sha256:f6e3549ed287fee0ddde2460a2a74a2d74366f84b04aaa34c1f19fec40da8652 AS uv
+
+# =============================================================================
 # Stage 1: Build dependencies
 # =============================================================================
 FROM python:3.12-slim-bookworm AS builder
@@ -37,9 +42,12 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" \
     UV_PROJECT_ENVIRONMENT=/opt/venv
 
+# Copy uv binary from pinned image
+COPY --from=uv /uv /usr/local/bin/uv
+
 # Install Python dependencies
 COPY pyproject.toml uv.lock ./
-RUN pip install --no-cache-dir --upgrade pip uv && \
+RUN pip install --no-cache-dir --upgrade pip && \
     uv sync --frozen --no-dev --no-install-project
 
 # =============================================================================
