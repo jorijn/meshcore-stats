@@ -366,6 +366,7 @@ Jobs configured in `docker/ofelia.ini`:
 | Release | `X.Y.Z`, `X.Y`, `latest` |
 | Nightly (4 AM UTC) | Rebuilds all version tags + `nightly`, `nightly-YYYYMMDD` |
 | Manual | `sha-xxxxxx` |
+| Pull request | Builds image (linux/amd64) without pushing and runs a smoke test |
 
 **Nightly rebuilds** ensure version tags always include the latest OS security patches. This is a common pattern used by official Docker images (nginx, postgres, node). Users needing reproducibility should pin by SHA digest or use dated nightly tags.
 
