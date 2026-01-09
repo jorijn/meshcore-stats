@@ -370,7 +370,7 @@ Jobs configured in `docker/ofelia.ini`:
 
 **Nightly rebuilds** ensure version tags always include the latest OS security patches. This is a common pattern used by official Docker images (nginx, postgres, node). Users needing reproducibility should pin by SHA digest or use dated nightly tags.
 
-All GitHub Actions are pinned by full SHA for security. Renovate is configured in `renovate.json` to update dependencies and maintain lockfiles.
+GitHub Actions use version tags in workflows, and Renovate is configured in `renovate.json` to pin action digests and maintain lockfiles.
 
 The test and lint workflow (`.github/workflows/test.yml`) installs dependencies with uv (`uv sync --locked --extra dev`) and runs commands via `uv run`, using `uv.lock` as the source of truth.
 
