@@ -30,7 +30,8 @@
       "description": "Auto-merge patch and digest updates once checks pass",
       "matchUpdateTypes": [
         "patch",
-        "digest"
+        "digest",
+        "lockFileMaintenance"
       ],
       "automerge": true
     }
