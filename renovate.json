@@ -3,6 +3,9 @@
   "extends": [
     "config:best-practices"
   ],
+  "rebaseWhen": "behind-base-branch",
+  "automergeType": "pr",
+  "platformAutomerge": true,
   "lockFileMaintenance": {
     "enabled": true
   },
@@ -22,6 +25,14 @@
         "ghcr.io/jorijn/meshcore-stats"
       ],
       "pinDigests": false
+    },
+    {
+      "description": "Auto-merge patch and digest updates once checks pass",
+      "matchUpdateTypes": [
+        "patch",
+        "digest"
+      ],
+      "automerge": true
     }
   ]
 }
