@@ -151,7 +151,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-release.outputs.tags }}
           labels: ${{ steps.meta-release.outputs.labels }}
@@ -167,7 +167,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-nightly.outputs.tags }}
           labels: ${{ steps.meta-nightly.outputs.labels }}
@@ -183,7 +183,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64,linux/arm64
           push: ${{ inputs.push }}
           tags: ${{ steps.meta-manual.outputs.tags }}
           labels: ${{ steps.meta-manual.outputs.labels }}
