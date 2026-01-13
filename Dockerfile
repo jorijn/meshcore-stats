@@ -58,16 +58,19 @@ RUN set -ex; \
     if [ "$TARGETARCH" = "amd64" ]; then \
         UV_ARCH="x86_64"; \
         UV_SHA256="$UV_SHA256_AMD64"; \
+        UV_LIBC="gnu"; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         UV_ARCH="aarch64"; \
         UV_SHA256="$UV_SHA256_ARM64"; \
+        UV_LIBC="gnu"; \
     elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
         UV_ARCH="armv7"; \
         UV_SHA256="$UV_SHA256_ARMV7"; \
+        UV_LIBC="gnueabihf"; \
     else \
         echo "Unsupported architecture: $TARGETARCH${TARGETVARIANT:+/$TARGETVARIANT}" && exit 1; \
     fi; \
-    curl -fsSL "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${UV_ARCH}-unknown-linux-gnu.tar.gz" \
+    curl -fsSL "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${UV_ARCH}-unknown-linux-${UV_LIBC}.tar.gz" \
     -o /tmp/uv.tar.gz \
     && echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum -c - \
     && tar -xzf /tmp/uv.tar.gz -C /usr/local/bin --strip-components=1 --wildcards "*/uv" \
