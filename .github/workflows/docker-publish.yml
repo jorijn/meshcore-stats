@@ -263,7 +263,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           load: true
           push: false
           tags: meshcore-stats:pr-${{ github.event.pull_request.number }}
