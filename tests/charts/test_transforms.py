@@ -67,9 +67,48 @@ class TestCounterToRateConversion:
         assert ts.points[0].value == pytest.approx(expected_rate)
         assert ts.points[1].value == pytest.approx(expected_rate)
 
-    def test_applies_scale_factor(self, initialized_db, configured_env):
+    def test_counter_rate_short_interval_under_step_is_skipped(
+        self,
+        initialized_db,
+        configured_env,
+        monkeypatch,
+    ):
+        """Short sampling intervals are skipped to avoid rate spikes."""
+        base_ts = 1704067200
+
+        monkeypatch.setenv("REPEATER_STEP", "900")
+        import meshmon.env
+
+        meshmon.env._config = None
+
+        insert_metrics(base_ts, "repeater", {"nb_recv": 0.0}, initialized_db)
+        insert_metrics(base_ts + 900, "repeater", {"nb_recv": 100.0}, initialized_db)
+        insert_metrics(base_ts + 904, "repeater", {"nb_recv": 110.0}, initialized_db)
+        insert_metrics(base_ts + 1800, "repeater", {"nb_recv": 200.0}, initialized_db)
+
+        ts = load_timeseries_from_db(
+            role="repeater",
+            metric="nb_recv",
+            end_time=datetime.fromtimestamp(base_ts + 1800),
+            lookback=timedelta(hours=2),
+            period="day",
+        )
+
+        expected_rate = (100.0 / 900.0) * 60.0
+        assert len(ts.points) == 2
+        assert ts.points[0].timestamp == datetime.fromtimestamp(base_ts + 900)
+        assert ts.points[1].timestamp == datetime.fromtimestamp(base_ts + 1800)
+        for point in ts.points:
+            assert point.value == pytest.approx(expected_rate)
+
+    def test_applies_scale_factor(self, initialized_db, configured_env, monkeypatch):
         """Counter rate is scaled (typically x60 for per-minute)."""
         base_ts = 1704067200
+
+        monkeypatch.setenv("REPEATER_STEP", "60")
+        import meshmon.env
+
+        meshmon.env._config = None
 
         # Insert values 60 seconds apart for easy math
         insert_metrics(base_ts, "repeater", {"nb_recv": 0.0}, initialized_db)
