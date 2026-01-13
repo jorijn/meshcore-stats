@@ -1,7 +1,7 @@
 # =============================================================================
 # Stage 0: Ofelia binary
 # =============================================================================
-FROM golang:1.23-bookworm@sha256:5e2986d9953e851453ced4858c6c0bc472ca5c89f5b527a7060c399b1c0da8b6 AS ofelia-builder
+FROM golang:1.23-bookworm@sha256:167053a2bb901972bf2c1611f8f52c44d5fe7e762e5cab213708d82c421614db AS ofelia-builder
 
 # Ofelia version (built from source for multi-arch support)
 ARG OFELIA_VERSION=0.3.12
@@ -30,12 +30,12 @@ RUN set -ex; \
     if [ -n "${GOARM:-}" ]; then \
         export GOARM; \
     fi; \
-    CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" go build -o /usr/local/bin/ofelia ./cmd/ofelia
+    CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" go build -o /usr/local/bin/ofelia .
 
 # =============================================================================
 # Stage 1: Build dependencies
 # =============================================================================
-FROM python:3.14-slim-bookworm@sha256:e8a1ad81a9fef9dc56372fb49b50818cac71f5fae238b21d7738d73ccae8f803 AS builder
+FROM python:3.14-slim-bookworm@sha256:3be2c910db2dacfb3e576f94c7ffc07c10b115cbcd3de99d49bfb0b4ccfd75e7 AS builder
 
 # uv version and checksums (verified from GitHub releases)
 ARG UV_VERSION=0.9.24
@@ -70,7 +70,7 @@ RUN set -ex; \
     curl -fsSL "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${UV_ARCH}-unknown-linux-gnu.tar.gz" \
     -o /tmp/uv.tar.gz \
     && echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum -c - \
-    && tar -xzf /tmp/uv.tar.gz -C /usr/local/bin uv \
+    && tar -xzf /tmp/uv.tar.gz -C /usr/local/bin --strip-components=1 --wildcards "*/uv" \
     && rm /tmp/uv.tar.gz \
     && chmod +x /usr/local/bin/uv
 
@@ -87,7 +87,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # =============================================================================
 # Stage 2: Runtime
 # =============================================================================
-FROM python:3.14-slim-bookworm@sha256:e8a1ad81a9fef9dc56372fb49b50818cac71f5fae238b21d7738d73ccae8f803
+FROM python:3.14-slim-bookworm@sha256:3be2c910db2dacfb3e576f94c7ffc07c10b115cbcd3de99d49bfb0b4ccfd75e7
 
 # OCI Labels
 LABEL org.opencontainers.image.source="https://github.com/jorijn/meshcore-stats"
