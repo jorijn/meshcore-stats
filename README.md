@@ -56,6 +56,7 @@ docker compose logs meshcore-stats | head -20
 - Remote repeater node reachable via LoRa from the companion
 
 **Resource requirements:** ~100MB memory, ~100MB disk per year of data.
+**Container architectures:** `linux/amd64`, `linux/arm64`, and `linux/arm/v7` (32-bit).
 
 ## Installation
 

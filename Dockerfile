@@ -1,18 +1,49 @@
 # =============================================================================
-# Stage 0: uv binary
+# Stage 0: Ofelia binary
 # =============================================================================
-FROM ghcr.io/astral-sh/uv:0.9.24@sha256:816fdce3387ed2142e37d2e56e1b1b97ccc1ea87731ba199dc8a25c04e4997c5 AS uv
+FROM golang:1.23-bookworm@sha256:5e2986d9953e851453ced4858c6c0bc472ca5c89f5b527a7060c399b1c0da8b6 AS ofelia-builder
+
+# Ofelia version (built from source for multi-arch support)
+ARG OFELIA_VERSION=0.3.12
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src/ofelia
+RUN git clone --depth 1 --branch "v${OFELIA_VERSION}" https://github.com/mcuadros/ofelia.git /src/ofelia
+
+RUN set -ex; \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        GOARCH="amd64"; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        GOARCH="arm64"; \
+    elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+        GOARCH="arm"; \
+        GOARM="7"; \
+    else \
+        echo "Unsupported architecture: $TARGETARCH${TARGETVARIANT:+/$TARGETVARIANT}" && exit 1; \
+    fi; \
+    if [ -n "${GOARM:-}" ]; then \
+        export GOARM; \
+    fi; \
+    CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" go build -o /usr/local/bin/ofelia ./cmd/ofelia
 
 # =============================================================================
 # Stage 1: Build dependencies
 # =============================================================================
 FROM python:3.14-slim-bookworm@sha256:e8a1ad81a9fef9dc56372fb49b50818cac71f5fae238b21d7738d73ccae8f803 AS builder
 
-# Ofelia version and checksums (verified from GitHub releases)
-ARG OFELIA_VERSION=0.3.12
+# uv version and checksums (verified from GitHub releases)
+ARG UV_VERSION=0.9.24
+ARG UV_SHA256_AMD64=fb13ad85106da6b21dd16613afca910994446fe94a78ee0b5bed9c75cd066078
+ARG UV_SHA256_ARM64=9b291a1a4f2fefc430e4fc49c00cb93eb448d41c5c79edf45211ceffedde3334
+ARG UV_SHA256_ARMV7=8d05b55fe2108ecab3995c2b656679a72c543fd9dc72eeb3a525106a709cfdcb
 ARG TARGETARCH
-ARG OFELIA_SHA256_AMD64=cf06d2199abafbd3aa5afe0f8266e478818faacd11555b99200707321035c931
-ARG OFELIA_SHA256_ARM64=57760ef7f17a2cd55b5b1e1946f79b91b24bde40d47e81a0d75fd1470d883c1a
+ARG TARGETVARIANT
 
 # Install build dependencies for Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,28 +53,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and verify Ofelia binary in builder stage (keeps curl out of runtime)
+# Download and verify uv binary in builder stage
 RUN set -ex; \
     if [ "$TARGETARCH" = "amd64" ]; then \
-        OFELIA_SHA256="$OFELIA_SHA256_AMD64"; \
+        UV_ARCH="x86_64"; \
+        UV_SHA256="$UV_SHA256_AMD64"; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
-        OFELIA_SHA256="$OFELIA_SHA256_ARM64"; \
+        UV_ARCH="aarch64"; \
+        UV_SHA256="$UV_SHA256_ARM64"; \
+    elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+        UV_ARCH="armv7"; \
+        UV_SHA256="$UV_SHA256_ARMV7"; \
     else \
-        echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+        echo "Unsupported architecture: $TARGETARCH${TARGETVARIANT:+/$TARGETVARIANT}" && exit 1; \
     fi; \
-    curl -fsSL "https://github.com/mcuadros/ofelia/releases/download/v${OFELIA_VERSION}/ofelia_${OFELIA_VERSION}_linux_${TARGETARCH}.tar.gz" -o /tmp/ofelia.tar.gz \
-    && echo "${OFELIA_SHA256}  /tmp/ofelia.tar.gz" | sha256sum -c - \
-    && tar -xzf /tmp/ofelia.tar.gz -C /usr/local/bin ofelia \
-    && rm /tmp/ofelia.tar.gz \
-    && chmod +x /usr/local/bin/ofelia
+    curl -fsSL "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${UV_ARCH}-unknown-linux-gnu.tar.gz" \
+    -o /tmp/uv.tar.gz \
+    && echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/uv.tar.gz -C /usr/local/bin uv \
+    && rm /tmp/uv.tar.gz \
+    && chmod +x /usr/local/bin/uv
 
 # Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" \
     UV_PROJECT_ENVIRONMENT=/opt/venv
-
-# Copy uv binary from pinned image
-COPY --from=uv /uv /usr/local/bin/uv
 
 # Install Python dependencies
 COPY pyproject.toml uv.lock ./
@@ -83,7 +117,7 @@ RUN groupadd -g 1000 meshmon \
     && chown -R meshmon:meshmon /data /out /tmp/matplotlib
 
 # Copy Ofelia binary from builder (keeps curl out of runtime image)
-COPY --from=builder /usr/local/bin/ofelia /usr/local/bin/ofelia
+COPY --from=ofelia-builder /usr/local/bin/ofelia /usr/local/bin/ofelia
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
