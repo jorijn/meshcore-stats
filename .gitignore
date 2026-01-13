@@ -25,6 +25,7 @@ meshcore.conf
 
 # Docker local overrides
 docker-compose.override.yml
+.buildx-cache/
 
 # Data directories (keep structure, ignore content)
 data/snapshots/companion/**/*.json

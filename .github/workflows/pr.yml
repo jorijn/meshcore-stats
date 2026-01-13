@@ -1,0 +1,137 @@
+name: PR Container Checks
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - docker-bake.hcl
+      - docker/**
+      - .github/workflows/**
+      - pyproject.toml
+      - uv.lock
+      - src/**
+      - scripts/**
+
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Lint workflows (actionlint)
+        uses: rhysd/actionlint@0933c147c9d6587653d45fdcb4c497c57a65f9af # v1.7.10
+
+      - name: Lint Dockerfile (hadolint)
+        uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
+        with:
+          dockerfile: Dockerfile
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [lint]
+    env:
+      IMAGE_NAME: ghcr.io/jorijn/meshcore-stats
+      PLATFORMS: linux/amd64,linux/arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Build metadata
+        id: vars
+        run: |
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "version=pr-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Build multi-arch (amd64+arm64)
+        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
+        env:
+          BUILDKIT_PROGRESS: plain
+          CACHE_FROM: type=gha
+          CACHE_TO: type=gha,mode=max
+          PLATFORMS: ${{ env.PLATFORMS }}
+          VERSION: ${{ steps.vars.outputs.version }}
+          VCS_REF: ${{ github.sha }}
+          BUILD_DATE: ${{ steps.vars.outputs.build_date }}
+        with:
+          files: docker-bake.hcl
+          targets: pr-multiarch
+
+      - name: Build native image (load)
+        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
+        env:
+          BUILDKIT_PROGRESS: plain
+          CACHE_FROM: type=gha
+          CACHE_TO: type=gha,mode=max
+          LOCAL_PLATFORM: linux/amd64
+          VERSION: ${{ steps.vars.outputs.version }}
+          VCS_REF: ${{ github.sha }}
+          BUILD_DATE: ${{ steps.vars.outputs.build_date }}
+        with:
+          files: docker-bake.hcl
+          targets: pr-native
+
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [lint]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Build metadata
+        id: scan-vars
+        run: |
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "version=pr-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build native image for scan (load)
+        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
+        env:
+          BUILDKIT_PROGRESS: plain
+          CACHE_FROM: type=gha
+          CACHE_TO: type=gha,mode=max
+          LOCAL_PLATFORM: linux/amd64
+          VERSION: ${{ steps.scan-vars.outputs.version }}
+          VCS_REF: ${{ github.sha }}
+          BUILD_DATE: ${{ steps.scan-vars.outputs.build_date }}
+        with:
+          files: docker-bake.hcl
+          targets: pr-native
+
+      - name: Trivy image scan (report-only)
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          image-ref: meshcore-stats:pr
+          format: sarif
+          output: trivy-report.sarif
+          exit-code: '0'
+          vuln-type: os,library
+          ignore-unfixed: true
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: trivy-report-pr
+          path: trivy-report.sarif
+          if-no-files-found: warn
+          retention-days: 7

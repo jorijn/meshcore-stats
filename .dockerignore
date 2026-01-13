@@ -1,42 +1,51 @@
-# Git
+# VCS
 .git
 .gitignore
+.github
 
 # Python
-__pycache__
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-.venv
-venv
-ENV
-env
+.venv/
+venv/
+ENV/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 
-# IDE
-.idea
-.vscode
+# Editor/IDE
+.idea/
+.vscode/
 *.swp
 *.swo
 *~
 
-# Project directories (generated/runtime)
-data/
-out/
-
-# Configuration (use environment variables in Docker)
+# Local env/config
+.env
+.env.*
 .envrc
-.direnv
+.direnv/
 meshcore.conf
 
-# Documentation
+# Generated/runtime data
+.data/
+data/
+out/
+.buildx-cache/
+
+# Docs/tests (not needed in image)
 docs/
+tests/
 *.md
 !README.md
+!LICENSE
 
-# Development files
-.codex/
-*.log
-
-# macOS
+# Misc
 .DS_Store
+Thumbs.db
+*.log
+.codex/

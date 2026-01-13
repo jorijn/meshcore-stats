@@ -56,7 +56,7 @@ docker compose logs meshcore-stats | head -20
 - Remote repeater node reachable via LoRa from the companion
 
 **Resource requirements:** ~100MB memory, ~100MB disk per year of data.
-**Container architectures:** `linux/amd64`, `linux/arm64`, and `linux/arm/v7` (32-bit).
+**Container architectures:** `linux/amd64`, `linux/arm64`.
 
 ## Installation
 
@@ -156,6 +156,46 @@ cp data/state/metrics.db data/state/metrics.db.backup
 ```
 
 > **Note**: `docker compose down` preserves your data. Use `docker compose down -v` only if you want to delete everything.
+
+## Container Images & CI
+
+### Tags and Platforms
+
+- **Release tags** (on `vMAJOR.MINOR.PATCH`): `MAJOR`, `MAJOR.MINOR`, `MAJOR.MINOR.PATCH`, `latest`
+- **Nightly tag**: `nightly`
+- **Platforms**: `linux/amd64`, `linux/arm64`
+
+### Security Artifacts
+
+- **SBOM and provenance** are attached to the pushed images in GHCR (view in the image details/attestations UI).
+- **Vulnerability reports** are uploaded as GitHub Actions artifacts for each release/nightly build.
+
+Example cosign verification (release tag):
+
+```bash
+cosign verify \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp 'https://github.com/jorijn/meshcore-stats/.github/workflows/release.yml@refs/tags/v1.2.3' \
+  ghcr.io/jorijn/meshcore-stats:1.2.3
+```
+
+### Local Workflow Testing
+
+Prerequisites:
+- Docker Desktop (or Docker Engine) with Buildx enabled
+- QEMU/binfmt installed for multi-arch builds
+
+Commands:
+
+```bash
+# Native-arch build (loads into local Docker)
+make docker-build
+
+# Multi-arch build validation (amd64 + arm64, no push)
+make docker-buildx-all
+```
+
+Use `make docker-buildx-all` for full multi-arch validation.
 
 ### Manual Installation (Alternative)
 

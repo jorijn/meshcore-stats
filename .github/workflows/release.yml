@@ -1,0 +1,104 @@
+name: Release Container
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      IMAGE_NAME: ghcr.io/jorijn/meshcore-stats
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Validate tag and set metadata
+        id: vars
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Tag must match vMAJOR.MINOR.PATCH (e.g., v1.2.3)." >&2
+            exit 1
+          fi
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          PATCH="${BASH_REMATCH[3]}"
+          VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_tags=${IMAGE_NAME}:${MAJOR},${IMAGE_NAME}:${MAJOR}.${MINOR},${IMAGE_NAME}:${VERSION},${IMAGE_NAME}:latest" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push release image
+        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
+        env:
+          BUILDKIT_PROGRESS: plain
+          CACHE_FROM: type=gha
+          CACHE_TO: type=gha,mode=max
+          PLATFORMS: linux/amd64,linux/arm64
+          VERSION: ${{ steps.vars.outputs.version }}
+          VCS_REF: ${{ github.sha }}
+          BUILD_DATE: ${{ steps.vars.outputs.build_date }}
+          RELEASE_TAGS: ${{ steps.vars.outputs.release_tags }}
+        with:
+          files: docker-bake.hcl
+          targets: release
+          provenance: true
+          sbom: true
+
+      - name: Verify multi-arch manifest
+        run: |
+          docker buildx imagetools inspect "${IMAGE_NAME}:${{ steps.vars.outputs.version }}" | tee /tmp/imagetools.txt
+          grep -q "linux/amd64" /tmp/imagetools.txt
+          grep -q "linux/arm64" /tmp/imagetools.txt
+
+      - name: Resolve manifest digest
+        id: digest
+        run: |
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE_NAME}:${{ steps.vars.outputs.version }}" --format '{{.Digest}}')
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Trivy image scan (report-only)
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.version }}
+          format: sarif
+          output: trivy-release.sarif
+          exit-code: '0'
+          vuln-type: os,library
+          ignore-unfixed: true
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: trivy-release
+          path: trivy-release.sarif
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+
+      - name: Cosign sign image (keyless)
+        run: |
+          cosign sign --yes "${IMAGE_NAME}@${{ steps.digest.outputs.digest }}"

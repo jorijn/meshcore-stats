@@ -359,16 +359,11 @@ Jobs configured in `docker/ofelia.ini`:
 
 ### GitHub Actions Workflow
 
-`.github/workflows/docker-publish.yml` builds and publishes Docker images for `linux/amd64`, `linux/arm64`, and `linux/arm/v7`:
+Container workflows (amd64 + arm64 only):
 
-| Trigger | Tags Created |
-|---------|--------------|
-| Release | `X.Y.Z`, `X.Y`, `latest` |
-| Nightly (4 AM UTC) | Rebuilds all version tags + `nightly`, `nightly-YYYYMMDD` |
-| Manual | `sha-xxxxxx` |
-| Pull request | Builds image (linux/amd64) without pushing and runs a smoke test |
-
-**Nightly rebuilds** ensure version tags always include the latest OS security patches. This is a common pattern used by official Docker images (nginx, postgres, node). Users needing reproducibility should pin by SHA digest or use dated nightly tags.
+- `pr.yml`: pull_request lint (actionlint/hadolint), container-relevant path filter, multi-arch build (no push), native image build for report-only Trivy scan.
+- `release.yml`: tag push `vMAJOR.MINOR.PATCH` → push `MAJOR`, `MAJOR.MINOR`, `MAJOR.MINOR.PATCH`, `latest` with SBOM + provenance attestations, Trivy report artifact, cosign keyless signing, and manifest platform verification.
+- `nightly.yml`: scheduled + workflow_dispatch → push `nightly` with SBOM + provenance attestations, Trivy report artifact, cosign keyless signing, and manifest platform verification.
 
 GitHub Actions use version tags in workflows, and Renovate is configured in `renovate.json` to pin action digests, maintain lockfiles, and auto-merge patch + digest updates once required checks pass (with automatic rebases when behind `main`).
 

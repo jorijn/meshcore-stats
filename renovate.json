@@ -19,6 +19,12 @@
     },
     {
       "matchManagers": [
+        "dockerfile"
+      ],
+      "pinDigests": true
+    },
+    {
+      "matchManagers": [
         "docker-compose"
       ],
       "matchPackageNames": [
