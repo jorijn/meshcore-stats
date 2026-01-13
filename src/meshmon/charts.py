@@ -36,6 +36,7 @@ ThemeName = Literal["light", "dark"]
 BIN_30_MINUTES = 1800  # 30 minutes in seconds
 BIN_2_HOURS = 7200  # 2 hours in seconds
 BIN_1_DAY = 86400  # 1 day in seconds
+MIN_COUNTER_INTERVAL_RATIO = 0.9  # Allow small scheduling jitter
 
 
 @dataclass(frozen=True)
@@ -223,25 +224,38 @@ def load_timeseries_from_db(
     # For counter metrics, calculate rate of change
     if is_counter:
         rate_points: list[tuple[datetime, float]] = []
+        cfg = get_config()
+        min_interval = max(
+            1.0,
+            (cfg.companion_step if role == "companion" else cfg.repeater_step)
+            * MIN_COUNTER_INTERVAL_RATIO,
+        )
 
-        for i in range(1, len(raw_points)):
-            prev_ts, prev_val = raw_points[i - 1]
-            curr_ts, curr_val = raw_points[i]
-
-            delta_val = curr_val - prev_val
+        prev_ts, prev_val = raw_points[0]
+        for curr_ts, curr_val in raw_points[1:]:
             delta_secs = (curr_ts - prev_ts).total_seconds()
 
             if delta_secs <= 0:
                 continue
+            if delta_secs < min_interval:
+                log.debug(
+                    f"Skipping counter sample for {metric} at {curr_ts} "
+                    f"({delta_secs:.1f}s < {min_interval:.1f}s)"
+                )
+                continue
+
+            delta_val = curr_val - prev_val
 
             # Skip negative deltas (device reboot)
             if delta_val < 0:
                 log.debug(f"Counter reset detected for {metric} at {curr_ts}")
+                prev_ts, prev_val = curr_ts, curr_val
                 continue
 
             # Calculate per-second rate, then apply scaling (typically x60 for per-minute)
             rate = (delta_val / delta_secs) * scale
             rate_points.append((curr_ts, rate))
+            prev_ts, prev_val = curr_ts, curr_val
 
         raw_points = rate_points
     else:
