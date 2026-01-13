@@ -250,27 +250,41 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            tag_suffix: amd64
+          - platform: linux/arm64
+            tag_suffix: arm64
+          - platform: linux/arm/v7
+            tag_suffix: armv7
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
-      - name: Build image (PR)
+      - name: Build image (PR - ${{ matrix.platform }})
         id: build-pr
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: ${{ matrix.platform }}
           load: true
           push: false
-          tags: meshcore-stats:pr-${{ github.event.pull_request.number }}
+          tags: meshcore-stats:pr-${{ github.event.pull_request.number }}-${{ matrix.tag_suffix }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke test (PR)
+      - name: Smoke test (PR - ${{ matrix.platform }})
         run: |
-          docker run --rm meshcore-stats:pr-${{ github.event.pull_request.number }} \
+          docker run --rm --platform ${{ matrix.platform }} \
+            meshcore-stats:pr-${{ github.event.pull_request.number }}-${{ matrix.tag_suffix }} \
             python -c "from meshmon.db import init_db; from meshmon.env import get_config; print('Smoke test passed')"
