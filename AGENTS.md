@@ -359,7 +359,7 @@ Jobs configured in `docker/ofelia.ini`:
 
 ### GitHub Actions Workflow
 
-`.github/workflows/docker-publish.yml` builds and publishes Docker images:
+`.github/workflows/docker-publish.yml` builds and publishes Docker images for `linux/amd64`, `linux/arm64`, and `linux/arm/v7`:
 
 | Trigger | Tags Created |
 |---------|--------------|
