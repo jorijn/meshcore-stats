@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "meshcore-stats"
-version = "0.2.14"
+version = "0.2.15"
 description = "MeshCore LoRa mesh network monitoring and statistics"
 readme = "README.md"
 requires-python = ">=3.11"
