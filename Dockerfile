@@ -1,7 +1,7 @@
 # =============================================================================
 # Stage 0: Ofelia binary
 # =============================================================================
-FROM golang:1.23-bookworm@sha256:167053a2bb901972bf2c1611f8f52c44d5fe7e762e5cab213708d82c421614db AS ofelia-builder
+FROM golang:1.25-bookworm@sha256:2c7c65601b020ee79db4c1a32ebee0bf3d6b298969ec683e24fcbea29305f10e AS ofelia-builder
 
 # Ofelia version (built from source for multi-arch support)
 ARG OFELIA_VERSION=0.3.12
