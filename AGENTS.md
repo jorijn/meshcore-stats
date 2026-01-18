@@ -678,6 +678,7 @@ The static site uses a modern, responsive design with the following features:
 - **Repeater pages at root**: `/day.html`, `/week.html`, etc. (entry point)
 - **Companion pages**: `/companion/day.html`, `/companion/week.html`, etc.
 - **`.htaccess`**: Sets `DirectoryIndex day.html` so `/` loads repeater day view
+- **Relative links**: All internal navigation and static asset references are relative (no leading `/`) so the dashboard can be served from a reverse-proxy subpath.
 
 ### Page Layout
 1. **Header**: Site branding, node name, pubkey prefix, status indicator, last updated time

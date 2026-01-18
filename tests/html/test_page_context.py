@@ -229,5 +229,28 @@ class TestBuildPageContext:
             at_root=False,
         )
 
-        assert root_context["css_path"] == "/"
+        assert root_context["css_path"] == ""
         assert non_root_context["css_path"] == "../"
+
+    def test_links_use_relative_paths(self, configured_env, sample_row):
+        """Navigation and asset links are relative for subpath deployments."""
+        root_context = build_page_context(
+            role="repeater",
+            period="day",
+            row=sample_row,
+            at_root=True,
+        )
+        non_root_context = build_page_context(
+            role="companion",
+            period="day",
+            row=sample_row,
+            at_root=False,
+        )
+
+        assert root_context["repeater_link"] == "day.html"
+        assert root_context["companion_link"] == "companion/day.html"
+        assert root_context["reports_link"] == "reports/"
+
+        assert non_root_context["repeater_link"] == "../day.html"
+        assert non_root_context["companion_link"] == "day.html"
+        assert non_root_context["reports_link"] == "../reports/"
