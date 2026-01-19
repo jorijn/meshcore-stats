@@ -571,6 +571,7 @@ def build_page_context(
     period: str,
     row: dict | None,
     at_root: bool,
+    html_path: str,
 ) -> dict[str, Any]:
     """Build template context dictionary for node pages.
 
@@ -635,8 +636,8 @@ def build_page_context(
     }
 
     # CSS and link paths - depend on whether we're at root or in /companion/
-    css_path = "/" if at_root else "../"
-    base_path = "" if at_root else "/companion"
+    css_path = f"{html_path}" if at_root else f"{html_path}../"
+    base_path = html_path if at_root else f"{html_path}companion"
 
     return {
         # Page meta
@@ -685,6 +686,7 @@ def render_node_page(
     period: str,
     row: dict | None,
     at_root: bool = False,
+    html_path: str = '',
 ) -> str:
     """Render a node page (companion or repeater).
 
@@ -695,7 +697,7 @@ def render_node_page(
         at_root: Whether page is at site root (vs /companion/)
     """
     env = get_jinja_env()
-    context = build_page_context(role, period, row, at_root)
+    context = build_page_context(role, period, row, at_root, html_path)
     template = env.get_template("node.html")
     return str(template.render(**context))
 
@@ -750,7 +752,7 @@ def write_site(
     for period in ["day", "week", "month", "year"]:
         page_path = cfg.out_dir / f"{period}.html"
         page_path.write_text(
-            render_node_page("repeater", period, repeater_row, at_root=True),
+            render_node_page("repeater", period, repeater_row, at_root=True, html_path=cfg.html_path),
             encoding="utf-8",
         )
         written.append(page_path)
@@ -760,7 +762,7 @@ def write_site(
     for period in ["day", "week", "month", "year"]:
         page_path = cfg.out_dir / "companion" / f"{period}.html"
         page_path.write_text(
-            render_node_page("companion", period, companion_row),
+            render_node_page("companion", period, companion_row, html_path=cfg.html_path),
             encoding="utf-8",
         )
         written.append(page_path)
