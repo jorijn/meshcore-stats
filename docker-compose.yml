@@ -78,7 +78,7 @@ services:
   # nginx - Static site server
   # ==========================================================================
   nginx:
-    image: nginx:1.29-alpine@sha256:b0f7830b6bfaa1258f45d94c240ab668ced1b3651c8a222aefe6683447c7bf55
+    image: nginx:1.29-alpine@sha256:7d7a15b8a280c661051955f14c2b91fed3e23724ddba18d2f53e8b44e74ab37a
     container_name: meshcore-stats-nginx
     restart: unless-stopped
 
