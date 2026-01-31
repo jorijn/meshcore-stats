@@ -480,6 +480,7 @@ def build_chart_groups(
     role: str,
     period: str,
     chart_stats: dict | None = None,
+    asset_prefix: str = "",
 ) -> list[dict]:
     """Build chart groups for template.
 
@@ -490,6 +491,7 @@ def build_chart_groups(
         role: "companion" or "repeater"
         period: Time period ("day", "week", etc.)
         chart_stats: Stats dict from chart_stats.json (optional)
+        asset_prefix: Relative path prefix to reach /assets from page location
     """
     cfg = get_config()
     groups_config = REPEATER_CHART_GROUPS if role == "repeater" else COMPANION_CHART_GROUPS
@@ -551,8 +553,9 @@ def build_chart_groups(
                 chart_data["use_svg"] = True
             else:
                 # Fallback to PNG paths
-                chart_data["src_light"] = f"/assets/{role}/{metric}_{period}_light.png"
-                chart_data["src_dark"] = f"/assets/{role}/{metric}_{period}_dark.png"
+                asset_base = f"{asset_prefix}assets/{role}/"
+                chart_data["src_light"] = f"{asset_base}{metric}_{period}_light.png"
+                chart_data["src_dark"] = f"{asset_base}{metric}_{period}_dark.png"
                 chart_data["use_svg"] = False
 
             charts.append(chart_data)
@@ -614,7 +617,10 @@ def build_page_context(
 
     # Load chart stats and build chart groups
     chart_stats = load_chart_stats(role)
-    chart_groups = build_chart_groups(role, period, chart_stats)
+
+    # Relative path prefixes (avoid absolute paths for subpath deployments)
+    css_path = "" if at_root else "../"
+    asset_prefix = "" if at_root else "../"
 
     # Period config
     page_title, page_subtitle = PERIOD_CONFIG.get(period, ("Observations", "Radio telemetry"))
@@ -634,9 +640,18 @@ def build_page_context(
         ),
     }
 
-    # CSS and link paths - depend on whether we're at root or in /companion/
-    css_path = "/" if at_root else "../"
-    base_path = "" if at_root else "/companion"
+    chart_groups = build_chart_groups(role, period, chart_stats, asset_prefix=asset_prefix)
+
+    # Navigation links depend on whether we're at root or in /companion/
+    base_path = ""
+    if at_root:
+        repeater_link = "day.html"
+        companion_link = "companion/day.html"
+        reports_link = "reports/"
+    else:
+        repeater_link = "../day.html"
+        companion_link = "day.html"
+        reports_link = "../reports/"
 
     return {
         # Page meta
@@ -665,9 +680,9 @@ def build_page_context(
         # Navigation
         "period": period,
         "base_path": base_path,
-        "repeater_link": f"{css_path}day.html",
-        "companion_link": f"{css_path}companion/day.html",
-        "reports_link": f"{css_path}reports/",
+        "repeater_link": repeater_link,
+        "companion_link": companion_link,
+        "reports_link": reports_link,
 
         # Timestamps
         "last_updated": last_updated,
