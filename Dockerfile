@@ -6,7 +6,7 @@ FROM ghcr.io/astral-sh/uv:0.9.28@sha256:59240a65d6b57e6c507429b45f01b8f2c7c0bbee
 # =============================================================================
 # Stage 1: Build dependencies
 # =============================================================================
-FROM python:3.14-slim-bookworm@sha256:adb6bdfbcc7c744c3b1a05976136555e2d82b7df01ac3efe71737d7f95ef0f2d AS builder
+FROM python:3.14-slim-bookworm@sha256:e87711ef5c86aaeaa7031718a69db79d334d94c545c709583f651b8185870941 AS builder
 
 # Ofelia version and checksums (verified from GitHub releases)
 ARG OFELIA_VERSION=0.3.12
@@ -53,7 +53,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # =============================================================================
 # Stage 2: Runtime
 # =============================================================================
-FROM python:3.14-slim-bookworm@sha256:adb6bdfbcc7c744c3b1a05976136555e2d82b7df01ac3efe71737d7f95ef0f2d
+FROM python:3.14-slim-bookworm@sha256:e87711ef5c86aaeaa7031718a69db79d334d94c545c709583f651b8185870941
 
 # OCI Labels
 LABEL org.opencontainers.image.source="https://github.com/jorijn/meshcore-stats"
