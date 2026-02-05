@@ -266,7 +266,8 @@ class TestHtmlOutput:
 
         content = (out_dir / "day.html").read_text()
 
-        assert "styles.css" in content
+        assert 'href="styles.css"' in content
+        assert 'href="/styles.css"' not in content
 
     def test_companion_pages_relative_css(self, html_env, metrics_rows):
         """Companion pages use relative path to CSS."""
@@ -277,4 +278,5 @@ class TestHtmlOutput:
         content = (out_dir / "companion" / "day.html").read_text()
 
         # Should reference parent directory CSS
-        assert "../styles.css" in content or "styles.css" in content
+        assert 'href="../styles.css"' in content
+        assert 'href="/styles.css"' not in content
