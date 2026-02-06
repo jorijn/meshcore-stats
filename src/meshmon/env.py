@@ -256,6 +256,8 @@ class Config:
         self.radio_spread_factor = get_str("RADIO_SPREAD_FACTOR", "SF8")
         self.radio_coding_rate = get_str("RADIO_CODING_RATE", "CR8")
 
+        self.html_path = get_str("HTML_PATH", "")
+
 
 # Global config instance
 _config: Config | None = None
