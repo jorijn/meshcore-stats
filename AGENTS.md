@@ -485,6 +485,8 @@ All configuration via `meshcore.conf` or environment variables. The config file 
 - `TELEMETRY_TIMEOUT_S`: Timeout for telemetry requests (default: 10)
 - `TELEMETRY_RETRY_ATTEMPTS`: Retry attempts for telemetry (default: 2)
 - `TELEMETRY_RETRY_BACKOFF_S`: Backoff between telemetry retries (default: 4)
+- When enabled, repeater telemetry charts are auto-discovered from `telemetry.*` metrics present in the database.
+- `telemetry.voltage.*` and `telemetry.gps.*` metrics are intentionally excluded from chart rendering.
 
 ### Intervals
 - `COMPANION_STEP`: Collection interval for companion (default: 60s)
@@ -497,6 +499,7 @@ All configuration via `meshcore.conf` or environment variables. The config file 
 - `REPORT_LON`: Longitude in decimal degrees (default: 0.0)
 - `REPORT_ELEV`: Elevation (default: 0.0)
 - `REPORT_ELEV_UNIT`: Elevation unit, "m" or "ft" (default: "m")
+- `DISPLAY_UNIT_SYSTEM`: `metric` or `imperial` for telemetry display formatting (default: `metric`)
 - `REPEATER_DISPLAY_NAME`: Display name for repeater in UI (default: "Repeater Node")
 - `COMPANION_DISPLAY_NAME`: Display name for companion in UI (default: "Companion Node")
 - `REPEATER_HARDWARE`: Repeater hardware model for sidebar (default: "LoRa Repeater")
@@ -542,6 +545,9 @@ Counter metrics are converted to rates during chart rendering by calculating del
   - Channel number distinguishes multiple sensors of the same type
   - Compound values (e.g., GPS) stored as: `telemetry.gps.0.latitude`, `telemetry.gps.0.longitude`
   - Telemetry collection does NOT affect circuit breaker state
+  - Repeater telemetry charts are auto-discovered from available `telemetry.*` metrics
+  - `telemetry.voltage.*` and `telemetry.gps.*` are collected but not charted
+  - Display conversion is chart/UI-only (DB values remain raw firmware values)
 
 ## Database Schema
 
@@ -698,6 +704,7 @@ Color-coded based on data freshness:
 - Shows datetime and value when hovering over chart data
 - Works without JavaScript (charts still display, just no tooltips)
 - Uses `data-points`, `data-x-start`, `data-x-end` attributes embedded in SVG
+- Telemetry tooltip units/precision follow `DISPLAY_UNIT_SYSTEM`
 
 ### Social Sharing
 Open Graph and Twitter Card meta tags for link previews:
@@ -731,6 +738,18 @@ Charts are generated as inline SVGs using matplotlib (`src/meshmon/charts.py`).
 - **Themes**: Light and dark variants (CSS `prefers-color-scheme` switches between them)
 - **Inline**: SVGs are embedded directly in HTML for zero additional requests
 - **Tooltips**: Data points embedded as JSON in SVG `data-points` attribute
+
+### Telemetry Chart Discovery
+- Applies to repeater charts only (companion telemetry is not grouped/rendered in dashboard UI)
+- Active only when `TELEMETRY_ENABLED=1`
+- Discovers all `telemetry.<type>.<channel>[.<subkey>]` metrics found in DB metadata
+- Excludes `telemetry.voltage.*` and `telemetry.gps.*` from charts
+- Appends a `Telemetry` chart section at the end of the repeater dashboard when metrics are present
+- Uses display-only unit conversion based on `DISPLAY_UNIT_SYSTEM`:
+  - `temperature`: `°C` -> `°F` (imperial)
+  - `barometer`/`pressure`: `hPa` -> `inHg` (imperial)
+  - `altitude`: `m` -> `ft` (imperial)
+  - `humidity`: unchanged (`%`)
 
 ### Time Aggregation (Binning)
 Data points are aggregated into bins to keep chart file sizes reasonable and lines clean:
@@ -772,6 +791,9 @@ Metrics use firmware field names directly from `req_status_sync`:
 | `recv_flood` | counter | Packets/min | Flood packets received |
 | `sent_direct` | counter | Packets/min | Direct packets transmitted |
 | `recv_direct` | counter | Packets/min | Direct packets received |
+
+Telemetry charts are discovered dynamically when telemetry is enabled and data exists.
+Units/labels are generated from metric keys at runtime, with display conversion controlled by `DISPLAY_UNIT_SYSTEM`.
 
 ### Companion Metrics Summary
 
@@ -861,6 +883,7 @@ With the EAV schema, adding new metrics is simple:
    - `METRIC_CONFIG` in `src/meshmon/metrics.py` (label, unit, type, transform)
    - `COMPANION_CHART_METRICS` or `REPEATER_CHART_METRICS` in `src/meshmon/metrics.py`
    - `COMPANION_CHART_GROUPS` or `REPEATER_CHART_GROUPS` in `src/meshmon/html.py`
+   - Exception: repeater `telemetry.*` metrics are auto-discovered, so they do not need to be added to static chart lists/groups.
 
 3. **To display in reports**: Add the firmware field name to:
    - `COMPANION_REPORT_METRICS` or `REPEATER_REPORT_METRICS` in `src/meshmon/reports.py`

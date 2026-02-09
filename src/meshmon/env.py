@@ -126,6 +126,14 @@ def get_path(key: str, default: str) -> Path:
     return Path(val).expanduser().resolve()
 
 
+def get_unit_system(key: str, default: str = "metric") -> str:
+    """Get display unit system env var, normalized to metric/imperial."""
+    val = os.environ.get(key, default).strip().lower()
+    if val in ("metric", "imperial"):
+        return val
+    return default
+
+
 class Config:
     """Configuration loaded from environment variables."""
 
@@ -162,6 +170,7 @@ class Config:
     # Paths
     state_dir: Path
     out_dir: Path
+    html_path: str
 
     # Report location metadata
     report_location_name: str | None
@@ -184,6 +193,9 @@ class Config:
     radio_bandwidth: str | None
     radio_spread_factor: str | None
     radio_coding_rate: str | None
+
+    # Display formatting
+    display_unit_system: str
 
     def __init__(self) -> None:
         # Connection settings
@@ -256,6 +268,10 @@ class Config:
         self.radio_spread_factor = get_str("RADIO_SPREAD_FACTOR", "SF8")
         self.radio_coding_rate = get_str("RADIO_CODING_RATE", "CR8")
 
+        # Display formatting
+        self.display_unit_system = get_unit_system("DISPLAY_UNIT_SYSTEM", "metric")
+
+        self.html_path = get_str("HTML_PATH", "") or ""
 
 # Global config instance
 _config: Config | None = None

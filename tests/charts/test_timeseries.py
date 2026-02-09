@@ -185,3 +185,43 @@ class TestLoadTimeseriesFromDb:
 
         timestamps = [p.timestamp for p in ts.points]
         assert timestamps == sorted(timestamps)
+
+    def test_telemetry_temperature_converts_to_imperial(self, initialized_db, configured_env, monkeypatch):
+        """Telemetry temperature converts from C to F when DISPLAY_UNIT_SYSTEM=imperial."""
+        monkeypatch.setenv("DISPLAY_UNIT_SYSTEM", "imperial")
+        import meshmon.env
+        meshmon.env._config = None
+
+        base_ts = 1704067200
+        insert_metrics(base_ts, "repeater", {"telemetry.temperature.1": 0.0}, initialized_db)
+        insert_metrics(base_ts + 900, "repeater", {"telemetry.temperature.1": 10.0}, initialized_db)
+
+        ts = load_timeseries_from_db(
+            role="repeater",
+            metric="telemetry.temperature.1",
+            end_time=datetime.fromtimestamp(base_ts + 1000),
+            lookback=timedelta(hours=1),
+            period="day",
+        )
+
+        assert [p.value for p in ts.points] == pytest.approx([32.0, 50.0])
+
+    def test_telemetry_temperature_stays_metric(self, initialized_db, configured_env, monkeypatch):
+        """Telemetry temperature remains Celsius when DISPLAY_UNIT_SYSTEM=metric."""
+        monkeypatch.setenv("DISPLAY_UNIT_SYSTEM", "metric")
+        import meshmon.env
+        meshmon.env._config = None
+
+        base_ts = 1704067200
+        insert_metrics(base_ts, "repeater", {"telemetry.temperature.1": 0.0}, initialized_db)
+        insert_metrics(base_ts + 900, "repeater", {"telemetry.temperature.1": 10.0}, initialized_db)
+
+        ts = load_timeseries_from_db(
+            role="repeater",
+            metric="telemetry.temperature.1",
+            end_time=datetime.fromtimestamp(base_ts + 1000),
+            lookback=timedelta(hours=1),
+            period="day",
+        )
+
+        assert [p.value for p in ts.points] == pytest.approx([0.0, 10.0])

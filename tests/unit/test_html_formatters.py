@@ -108,6 +108,29 @@ class TestFormatStatValue:
         """Unknown metrics format with 2 decimals."""
         assert _format_stat_value(123.456, "unknown_metric") == "123.46"
 
+    def test_telemetry_metric_units_and_decimals_metric(self, monkeypatch):
+        """Telemetry metrics use metric units when DISPLAY_UNIT_SYSTEM=metric."""
+        monkeypatch.setenv("DISPLAY_UNIT_SYSTEM", "metric")
+        import meshmon.env
+        meshmon.env._config = None
+
+        assert _format_stat_value(20.0, "telemetry.temperature.1") == "20.0 °C"
+        assert _format_stat_value(85.0, "telemetry.humidity.1") == "85.0 %"
+        assert _format_stat_value(1008.1, "telemetry.barometer.1") == "1008.1 hPa"
+        assert _format_stat_value(42.0, "telemetry.altitude.1") == "42.0 m"
+
+    def test_telemetry_metric_units_and_decimals_imperial(self, monkeypatch):
+        """Telemetry metrics format imperial display values with imperial units."""
+        monkeypatch.setenv("DISPLAY_UNIT_SYSTEM", "imperial")
+        import meshmon.env
+        meshmon.env._config = None
+
+        # Chart stats are already converted in charts.py; formatter should not convert again.
+        assert _format_stat_value(68.0, "telemetry.temperature.1") == "68.0 °F"
+        assert _format_stat_value(29.77, "telemetry.barometer.1") == "29.77 inHg"
+        assert _format_stat_value(137.8, "telemetry.altitude.1") == "137.8 ft"
+        assert _format_stat_value(85.0, "telemetry.humidity.1") == "85.0 %"
+
 
 class TestLoadSvgContent:
     """Test _load_svg_content function."""

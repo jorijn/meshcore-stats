@@ -7,12 +7,18 @@ from meshmon.metrics import (
     METRIC_CONFIG,
     REPEATER_CHART_METRICS,
     MetricConfig,
+    convert_telemetry_value,
+    discover_telemetry_chart_metrics,
     get_chart_metrics,
     get_graph_scale,
     get_metric_config,
     get_metric_label,
     get_metric_unit,
+    get_telemetry_metric_decimals,
+    get_telemetry_metric_label,
+    get_telemetry_metric_unit,
     is_counter_metric,
+    is_telemetry_metric,
     transform_value,
 )
 
@@ -105,6 +111,130 @@ class TestGetChartMetrics:
         with pytest.raises(ValueError, match="Unknown role"):
             get_chart_metrics("")
 
+    def test_repeater_includes_telemetry_when_enabled(self):
+        """Repeater chart metrics include discovered telemetry when enabled."""
+        available_metrics = [
+            "bat",
+            "telemetry.temperature.1",
+            "telemetry.humidity.1",
+            "telemetry.voltage.1",
+        ]
+
+        metrics = get_chart_metrics(
+            "repeater",
+            available_metrics=available_metrics,
+            telemetry_enabled=True,
+        )
+
+        assert "telemetry.temperature.1" in metrics
+        assert "telemetry.humidity.1" in metrics
+        assert "telemetry.voltage.1" not in metrics
+
+    def test_repeater_does_not_include_telemetry_when_disabled(self):
+        """Repeater chart metrics exclude telemetry when telemetry is disabled."""
+        available_metrics = ["telemetry.temperature.1", "telemetry.humidity.1"]
+
+        metrics = get_chart_metrics(
+            "repeater",
+            available_metrics=available_metrics,
+            telemetry_enabled=False,
+        )
+
+        assert not any(metric.startswith("telemetry.") for metric in metrics)
+
+    def test_companion_never_includes_telemetry(self):
+        """Companion chart metrics stay unchanged, even with telemetry enabled."""
+        metrics = get_chart_metrics(
+            "companion",
+            available_metrics=["telemetry.temperature.1"],
+            telemetry_enabled=True,
+        )
+        assert metrics == COMPANION_CHART_METRICS
+
+
+class TestTelemetryMetricHelpers:
+    """Tests for telemetry metric parsing, discovery, and display helpers."""
+
+    def test_is_telemetry_metric(self):
+        """Telemetry metrics are detected by key pattern."""
+        assert is_telemetry_metric("telemetry.temperature.1") is True
+        assert is_telemetry_metric("telemetry.gps.0.latitude") is True
+        assert is_telemetry_metric("bat") is False
+
+    def test_discovery_excludes_voltage(self):
+        """telemetry.voltage.* metrics are excluded from chart discovery."""
+        discovered = discover_telemetry_chart_metrics(
+            [
+                "telemetry.temperature.1",
+                "telemetry.voltage.1",
+                "telemetry.humidity.1",
+                "telemetry.gps.0.latitude",
+            ]
+        )
+        assert "telemetry.temperature.1" in discovered
+        assert "telemetry.humidity.1" in discovered
+        assert "telemetry.voltage.1" not in discovered
+        assert "telemetry.gps.0.latitude" not in discovered
+
+    def test_discovery_is_deterministic(self):
+        """Discovery order is deterministic and sorted by display intent."""
+        discovered = discover_telemetry_chart_metrics(
+            [
+                "telemetry.temperature.2",
+                "telemetry.humidity.1",
+                "telemetry.temperature.1",
+            ]
+        )
+        assert discovered == [
+            "telemetry.humidity.1",
+            "telemetry.temperature.1",
+            "telemetry.temperature.2",
+        ]
+
+    def test_telemetry_label_is_human_readable(self):
+        """Telemetry labels are transformed into readable UI labels."""
+        label = get_telemetry_metric_label("telemetry.temperature.1")
+        assert "Temperature" in label
+        assert "CH1" in label
+
+    def test_telemetry_unit_mapping(self):
+        """Telemetry units adapt to selected unit system."""
+        assert get_telemetry_metric_unit("telemetry.temperature.1", "metric") == "°C"
+        assert get_telemetry_metric_unit("telemetry.temperature.1", "imperial") == "°F"
+        assert get_telemetry_metric_unit("telemetry.barometer.1", "metric") == "hPa"
+        assert get_telemetry_metric_unit("telemetry.barometer.1", "imperial") == "inHg"
+        assert get_telemetry_metric_unit("telemetry.altitude.1", "metric") == "m"
+        assert get_telemetry_metric_unit("telemetry.altitude.1", "imperial") == "ft"
+        assert get_telemetry_metric_unit("telemetry.humidity.1", "imperial") == "%"
+
+    def test_telemetry_decimals_mapping(self):
+        """Telemetry decimals adapt to metric type and unit system."""
+        assert get_telemetry_metric_decimals("telemetry.temperature.1", "metric") == 1
+        assert get_telemetry_metric_decimals("telemetry.barometer.1", "imperial") == 2
+        assert get_telemetry_metric_decimals("telemetry.unknown.1", "imperial") == 2
+
+    def test_convert_temperature_c_to_f(self):
+        """Temperature converts from Celsius to Fahrenheit for imperial display."""
+        assert convert_telemetry_value("telemetry.temperature.1", 0.0, "imperial") == pytest.approx(32.0)
+        assert convert_telemetry_value("telemetry.temperature.1", 20.0, "imperial") == pytest.approx(68.0)
+
+    def test_convert_barometer_hpa_to_inhg(self):
+        """Barometric pressure converts from hPa to inHg for imperial display."""
+        assert convert_telemetry_value("telemetry.barometer.1", 1013.25, "imperial") == pytest.approx(29.92126, rel=1e-5)
+
+    def test_convert_altitude_m_to_ft(self):
+        """Altitude converts from meters to feet for imperial display."""
+        assert convert_telemetry_value("telemetry.altitude.1", 100.0, "imperial") == pytest.approx(328.08399, rel=1e-5)
+
+    def test_convert_humidity_unchanged(self):
+        """Humidity remains unchanged across unit systems."""
+        assert convert_telemetry_value("telemetry.humidity.1", 85.5, "metric") == pytest.approx(85.5)
+        assert convert_telemetry_value("telemetry.humidity.1", 85.5, "imperial") == pytest.approx(85.5)
+
+    def test_convert_unknown_metric_unchanged(self):
+        """Unknown telemetry metric types remain unchanged."""
+        assert convert_telemetry_value("telemetry.custom.1", 12.34, "imperial") == pytest.approx(12.34)
+
 
 class TestGetMetricConfig:
     """Test get_metric_config function."""
@@ -191,6 +321,12 @@ class TestGetMetricLabel:
         label = get_metric_label("unknown_metric")
         assert label == "unknown_metric"
 
+    def test_telemetry_metric_returns_human_label(self):
+        """Telemetry metrics return a human-readable label."""
+        label = get_metric_label("telemetry.temperature.1")
+        assert "Temperature" in label
+        assert "CH1" in label
+
 
 class TestGetMetricUnit:
     """Test get_metric_unit function."""
@@ -214,6 +350,16 @@ class TestGetMetricUnit:
         """Unknown metrics return empty string."""
         unit = get_metric_unit("unknown_metric")
         assert unit == ""
+
+    def test_telemetry_metric_metric_units(self):
+        """Telemetry metrics use metric units by default."""
+        unit = get_metric_unit("telemetry.temperature.1")
+        assert unit == "°C"
+
+    def test_telemetry_metric_imperial_units(self):
+        """Telemetry metrics switch units when unit system is imperial."""
+        unit = get_metric_unit("telemetry.barometer.1", unit_system="imperial")
+        assert unit == "inHg"
 
 
 class TestTransformValue:

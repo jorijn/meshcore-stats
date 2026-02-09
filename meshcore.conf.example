@@ -53,6 +53,15 @@ COMPANION_DISPLAY_NAME=My Companion
 # COMPANION_PUBKEY_PREFIX=!e5f6g7h8
 
 # =============================================================================
+# Display Units (telemetry formatting only)
+# =============================================================================
+# Select telemetry display unit system:
+#   metric   -> °C, hPa, m
+#   imperial -> °F, inHg, ft
+# Default: metric
+# DISPLAY_UNIT_SYSTEM=metric
+
+# =============================================================================
 # Location Metadata (for reports and sidebar display)
 # =============================================================================
 
@@ -126,6 +135,8 @@ RADIO_CODING_RATE=CR8
 # Enable telemetry collection from repeater's environmental sensors
 # (temperature, humidity, barometric pressure, etc.)
 # Requires sensor board attached to repeater (e.g., BME280, BME680)
+# Repeater dashboard charts for telemetry are auto-discovered from telemetry.* keys.
+# telemetry.voltage.* and telemetry.gps.* are collected but intentionally not charted.
 # Default: 0 (disabled)
 # TELEMETRY_ENABLED=1
 

@@ -22,7 +22,13 @@ from .formatters import (
     format_uptime,
     format_value,
 )
-from .metrics import get_chart_metrics, get_metric_label
+from .metrics import (
+    get_chart_metrics,
+    get_metric_label,
+    get_metric_unit,
+    get_telemetry_metric_decimals,
+    is_telemetry_metric,
+)
 
 if TYPE_CHECKING:
     from .reports import MonthlyAggregate, YearlyAggregate
@@ -427,6 +433,14 @@ def _format_stat_value(value: float | None, metric: str) -> str:
     """
     if value is None:
         return "-"
+
+    # Telemetry metrics can be auto-discovered and need dynamic unit conversion.
+    if is_telemetry_metric(metric):
+        cfg = get_config()
+        decimals = get_telemetry_metric_decimals(metric, cfg.display_unit_system)
+        unit = get_metric_unit(metric, cfg.display_unit_system)
+        formatted = f"{value:.{decimals}f}"
+        return f"{formatted} {unit}" if unit else formatted
 
     # Determine format and suffix based on metric (using firmware field names)
     # Battery voltage (already transformed to volts in charts.py)

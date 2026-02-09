@@ -19,9 +19,10 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
 from . import log
-from .db import get_metrics_for_period
+from .db import get_available_metrics, get_metrics_for_period
 from .env import get_config
 from .metrics import (
+    convert_telemetry_value,
     get_chart_metrics,
     get_graph_scale,
     is_counter_metric,
@@ -210,6 +211,7 @@ def load_timeseries_from_db(
 
     is_counter = is_counter_metric(metric)
     scale = get_graph_scale(metric)
+    unit_system = get_config().display_unit_system
 
     # Convert to (datetime, value) tuples with transform applied
     raw_points: list[tuple[datetime, float]] = []
@@ -261,6 +263,13 @@ def load_timeseries_from_db(
     else:
         # For gauges, just apply scaling
         raw_points = [(ts, val * scale) for ts, val in raw_points]
+
+    # Convert telemetry values to selected display unit system (display-only)
+    if metric.startswith("telemetry."):
+        raw_points = [
+            (ts, convert_telemetry_value(metric, val, unit_system))
+            for ts, val in raw_points
+        ]
 
     # Apply time binning if configured
     period_cfg = PERIOD_CONFIG.get(period)
@@ -591,10 +600,15 @@ def render_all_charts(
         Tuple of (list of generated chart paths, stats dict)
         Stats dict structure: {metric_name: {period: {min, avg, max, current}}}
     """
-    if metrics is None:
-        metrics = get_chart_metrics(role)
-
     cfg = get_config()
+    if metrics is None:
+        available_metrics = get_available_metrics(role)
+        metrics = get_chart_metrics(
+            role,
+            available_metrics=available_metrics,
+            telemetry_enabled=cfg.telemetry_enabled,
+        )
+
     charts_dir = cfg.out_dir / "assets" / role
     charts_dir.mkdir(parents=True, exist_ok=True)
 

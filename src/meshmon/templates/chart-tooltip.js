@@ -28,6 +28,16 @@
       dark: { fill: '#f59e0b', stroke: '#0f1114' }
     }
   };
+  var UNIT_SYSTEM =
+    (document.documentElement &&
+      document.documentElement.dataset &&
+      document.documentElement.dataset.unitSystem) ||
+    'metric';
+  if (UNIT_SYSTEM !== 'imperial') {
+    UNIT_SYSTEM = 'metric';
+  }
+
+  var TELEMETRY_REGEX = /^telemetry\.([a-z0-9_]+)\.(\d+)(?:\.([a-z0-9_]+))?$/;
 
   /**
    * Metric display configuration keyed by firmware field name.
@@ -65,6 +75,68 @@
   // Formatting Utilities
   // ============================================================================
 
+  function parseTelemetryMetric(metric) {
+    var match = TELEMETRY_REGEX.exec(metric);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      sensorType: match[1],
+      channel: parseInt(match[2], 10),
+      subkey: match[3] || null
+    };
+  }
+
+  function humanizeToken(token) {
+    if (!token) {
+      return '';
+    }
+    if (token.toLowerCase() === 'gps') {
+      return 'GPS';
+    }
+    return token
+      .split('_')
+      .map(function (part) {
+        if (!part) {
+          return '';
+        }
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      })
+      .join(' ');
+  }
+
+  function getTelemetryLabel(metric) {
+    var telemetry = parseTelemetryMetric(metric);
+    if (!telemetry) {
+      return metric;
+    }
+    var label = humanizeToken(telemetry.sensorType);
+    if (telemetry.subkey) {
+      label += ' ' + humanizeToken(telemetry.subkey);
+    }
+    return label + ' (CH' + telemetry.channel + ')';
+  }
+
+  function getTelemetryFormat(sensorType, unitSystem) {
+    if (sensorType === 'temperature') {
+      return { unit: unitSystem === 'imperial' ? '\u00B0F' : '\u00B0C', decimals: 1 };
+    }
+    if (sensorType === 'humidity') {
+      return { unit: '%', decimals: 1 };
+    }
+    if (sensorType === 'barometer' || sensorType === 'pressure') {
+      return {
+        unit: unitSystem === 'imperial' ? 'inHg' : 'hPa',
+        decimals: unitSystem === 'imperial' ? 2 : 1
+      };
+    }
+    if (sensorType === 'altitude') {
+      return { unit: unitSystem === 'imperial' ? 'ft' : 'm', decimals: 1 };
+    }
+    return { unit: '', decimals: 2 };
+  }
+
   /**
    * Format a Unix timestamp as a localized date/time string.
    * Uses browser language preference for locale (determines 12/24 hour format).
@@ -93,9 +165,30 @@
    * Format a numeric value with the appropriate decimals and unit for a metric.
    */
   function formatMetricValue(value, metric) {
+    var telemetry = parseTelemetryMetric(metric);
+    if (telemetry) {
+      var telemetryFormat = getTelemetryFormat(telemetry.sensorType, UNIT_SYSTEM);
+      var telemetryFormatted = value.toFixed(telemetryFormat.decimals);
+      return telemetryFormat.unit
+        ? telemetryFormatted + ' ' + telemetryFormat.unit
+        : telemetryFormatted;
+    }
+
     var config = METRIC_CONFIG[metric] || { label: metric, unit: '', decimals: 2 };
     var formatted = value.toFixed(config.decimals);
     return config.unit ? formatted + ' ' + config.unit : formatted;
+  }
+
+  function getMetricLabel(metric) {
+    var telemetry = parseTelemetryMetric(metric);
+    if (telemetry) {
+      return getTelemetryLabel(metric);
+    }
+    var config = METRIC_CONFIG[metric];
+    if (config && config.label) {
+      return config.label;
+    }
+    return metric;
   }
 
   // ============================================================================
@@ -403,7 +496,7 @@
     showTooltip(
       event,
       formatTimestamp(closestPoint.ts, period),
-      formatMetricValue(closestPoint.v, metric)
+      getMetricLabel(metric) + ': ' + formatMetricValue(closestPoint.v, metric)
     );
 
     positionIndicator(svg, closestPoint, xStart, xEnd, yMin, yMax, plotArea);
