@@ -6,6 +6,7 @@ from meshmon.html import (
     PERIOD_CONFIG,
     REPEATER_CHART_GROUPS,
     _build_traffic_table_rows,
+    build_chart_groups,
     build_companion_metrics,
     build_node_details,
     build_radio_config,
@@ -457,3 +458,32 @@ class TestChartGroupConstants:
         for _period, (title, subtitle) in PERIOD_CONFIG.items():
             assert isinstance(title, str)
             assert isinstance(subtitle, str)
+
+
+class TestBuildChartGroups:
+    """Tests for build_chart_groups."""
+
+    def test_png_paths_use_relative_prefix(self, configured_env):
+        """PNG fallback paths respect provided asset prefix."""
+        out_dir = configured_env["out_dir"]
+        asset_dir = out_dir / "assets" / "repeater"
+        asset_dir.mkdir(parents=True, exist_ok=True)
+        (asset_dir / "bat_day_light.png").write_bytes(b"fake")
+
+        groups = build_chart_groups(
+            role="repeater",
+            period="day",
+            chart_stats={},
+            asset_prefix="../",
+        )
+
+        chart = next(
+            chart
+            for group in groups
+            for chart in group["charts"]
+            if chart["metric"] == "bat"
+        )
+
+        assert chart["use_svg"] is False
+        assert chart["src_light"] == "../assets/repeater/bat_day_light.png"
+        assert chart["src_dark"] == "../assets/repeater/bat_day_dark.png"
