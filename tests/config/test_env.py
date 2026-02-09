@@ -130,6 +130,23 @@ class TestConfigComplete:
         assert config.telemetry_retry_attempts == 3
         assert config.telemetry_retry_backoff_s == 5
 
+    def test_display_unit_system_defaults_to_metric(self, clean_env):
+        """DISPLAY_UNIT_SYSTEM defaults to metric."""
+        config = Config()
+        assert config.display_unit_system == "metric"
+
+    def test_display_unit_system_accepts_imperial(self, clean_env, monkeypatch):
+        """DISPLAY_UNIT_SYSTEM=imperial is honored."""
+        monkeypatch.setenv("DISPLAY_UNIT_SYSTEM", "imperial")
+        config = Config()
+        assert config.display_unit_system == "imperial"
+
+    def test_display_unit_system_invalid_falls_back_to_metric(self, clean_env, monkeypatch):
+        """Invalid DISPLAY_UNIT_SYSTEM falls back to metric."""
+        monkeypatch.setenv("DISPLAY_UNIT_SYSTEM", "kelvin")
+        config = Config()
+        assert config.display_unit_system == "metric"
+
     def test_all_location_settings(self, clean_env, monkeypatch):
         """All location/report settings are loaded."""
         monkeypatch.setenv("REPORT_LOCATION_NAME", "Mountain Peak Observatory")

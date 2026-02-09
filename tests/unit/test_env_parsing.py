@@ -236,6 +236,7 @@ class TestConfig:
         # Telemetry defaults
         assert config.telemetry_enabled is False
         assert config.telemetry_timeout_s == 10
+        assert config.display_unit_system == "metric"
 
         # Display defaults
         assert config.repeater_display_name == "Repeater Node"
@@ -249,6 +250,7 @@ class TestConfig:
         monkeypatch.setenv("COMPANION_STEP", "120")
         monkeypatch.setenv("REPEATER_NAME", "TestRepeater")
         monkeypatch.setenv("TELEMETRY_ENABLED", "true")
+        monkeypatch.setenv("DISPLAY_UNIT_SYSTEM", "imperial")
         monkeypatch.setenv("REPORT_LAT", "51.5074")
 
         config = Config()
@@ -259,7 +261,14 @@ class TestConfig:
         assert config.companion_step == 120
         assert config.repeater_name == "TestRepeater"
         assert config.telemetry_enabled is True
+        assert config.display_unit_system == "imperial"
         assert config.report_lat == pytest.approx(51.5074)
+
+    def test_invalid_display_unit_system_falls_back_to_metric(self, monkeypatch, clean_env):
+        """Invalid DISPLAY_UNIT_SYSTEM falls back to metric."""
+        monkeypatch.setenv("DISPLAY_UNIT_SYSTEM", "custom")
+        config = Config()
+        assert config.display_unit_system == "metric"
 
     def test_paths_are_path_objects(self, monkeypatch, clean_env, tmp_path):
         """Path configs are Path objects."""

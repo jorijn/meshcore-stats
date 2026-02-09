@@ -46,6 +46,7 @@ docker compose logs meshcore-stats | head -20
 
 - **Data Collection** - Metrics from local companion and remote repeater nodes
 - **Interactive Charts** - SVG charts with day/week/month/year views and tooltips
+- **Auto Telemetry Charts** - Repeater `telemetry.*` metrics are charted automatically when telemetry is enabled (`telemetry.voltage.*` excluded)
 - **Statistics Reports** - Monthly and yearly report generation
 - **Light/Dark Theme** - Automatic theme switching based on system preference
 
@@ -89,6 +90,16 @@ COMPANION_DISPLAY_NAME=My Companion
 ```
 
 See [meshcore.conf.example](meshcore.conf.example) for all available options.
+
+Optional telemetry display settings:
+
+```ini
+# Enable environmental telemetry collection from repeater
+TELEMETRY_ENABLED=1
+
+# Telemetry display units only (DB values stay unchanged)
+DISPLAY_UNIT_SYSTEM=metric   # or imperial
+```
 
 #### 3. Create Data Directories
 

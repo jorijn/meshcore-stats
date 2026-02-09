@@ -15,6 +15,7 @@ def clean_env(monkeypatch):
         "COMPANION_",
         "REMOTE_",
         "TELEMETRY_",
+        "DISPLAY_",
         "REPORT_",
         "RADIO_",
         "STATE_DIR",
