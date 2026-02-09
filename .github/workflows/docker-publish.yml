@@ -62,7 +62,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       # For nightly builds, get the latest release version
       - name: Get latest release version
@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload Trivy scan results
         if: "!(github.event_name == 'schedule' && steps.get-version.outputs.skip == 'true')"
-        uses: github/codeql-action/upload-sarif@cdefb33c0f6224e58673d9004f47f7cb3e328b89 # v4.31.10
+        uses: github/codeql-action/upload-sarif@19b2f06db2b6f5108140aeb04014ef02b648f789 # v4.31.11
         with:
           sarif_file: "trivy-results.sarif"
         continue-on-error: true
@@ -253,7 +253,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0

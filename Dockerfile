@@ -1,12 +1,12 @@
 # =============================================================================
 # Stage 0: uv binary
 # =============================================================================
-FROM ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b AS uv
+FROM ghcr.io/astral-sh/uv:0.9.30@sha256:538e0b39736e7feae937a65983e49d2ab75e1559d35041f9878b7b7e51de91e4 AS uv
 
 # =============================================================================
 # Stage 1: Build dependencies
 # =============================================================================
-FROM python:3.14-slim-bookworm@sha256:adb6bdfbcc7c744c3b1a05976136555e2d82b7df01ac3efe71737d7f95ef0f2d AS builder
+FROM python:3.14-slim-bookworm@sha256:f0540d0436a220db0a576ccfe75631ab072391e43a24b88972ef9833f699095f AS builder
 
 # Ofelia version and checksums (verified from GitHub releases)
 ARG OFELIA_VERSION=0.3.12
@@ -53,7 +53,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # =============================================================================
 # Stage 2: Runtime
 # =============================================================================
-FROM python:3.14-slim-bookworm@sha256:adb6bdfbcc7c744c3b1a05976136555e2d82b7df01ac3efe71737d7f95ef0f2d
+FROM python:3.14-slim-bookworm@sha256:f0540d0436a220db0a576ccfe75631ab072391e43a24b88972ef9833f699095f
 
 # OCI Labels
 LABEL org.opencontainers.image.source="https://github.com/jorijn/meshcore-stats"
