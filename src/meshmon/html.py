@@ -508,8 +508,28 @@ def build_chart_groups(
         asset_prefix: Relative path prefix to reach /assets from page location
     """
     cfg = get_config()
-    groups_config = REPEATER_CHART_GROUPS if role == "repeater" else COMPANION_CHART_GROUPS
-    chart_metrics = get_chart_metrics(role)
+    available_metrics = sorted(chart_stats.keys()) if chart_stats else []
+    chart_metrics = get_chart_metrics(
+        role,
+        available_metrics=available_metrics,
+        telemetry_enabled=cfg.telemetry_enabled,
+    )
+    groups_config = [
+        {"title": group["title"], "metrics": list(group["metrics"])}
+        for group in (
+            REPEATER_CHART_GROUPS if role == "repeater" else COMPANION_CHART_GROUPS
+        )
+    ]
+
+    if role == "repeater" and cfg.telemetry_enabled:
+        telemetry_metrics = [metric for metric in chart_metrics if is_telemetry_metric(metric)]
+        if telemetry_metrics:
+            groups_config.append(
+                {
+                    "title": "Telemetry",
+                    "metrics": telemetry_metrics,
+                }
+            )
 
     if chart_stats is None:
         chart_stats = {}
@@ -673,6 +693,7 @@ def build_page_context(
         "meta_description": meta_descriptions.get(role, "MeshCore mesh network statistics dashboard."),
         "og_image": None,
         "css_path": css_path,
+        "display_unit_system": cfg.display_unit_system,
 
         # Node info
         "node_name": node_name,
