@@ -19,6 +19,7 @@
   <meta name="twitter:description" content="{{ meta_description }}">
 
   <link rel="stylesheet" href="{{ css_path }}styles.css">
+  {% if custom_head_html %}{{ custom_head_html | safe }}{% endif %}
 </head>
 <body>
   {% block body %}{% endblock %}

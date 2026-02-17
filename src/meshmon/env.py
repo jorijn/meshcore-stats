@@ -273,6 +273,9 @@ class Config:
 
         self.html_path = get_str("HTML_PATH", "") or ""
 
+        # Custom HTML injected into <head> (e.g. analytics scripts)
+        self.custom_head_html = get_str("CUSTOM_HEAD_HTML", "") or ""
+
 # Global config instance
 _config: Config | None = None
 

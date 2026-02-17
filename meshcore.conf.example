@@ -149,6 +149,14 @@ RADIO_CODING_RATE=CR8
 # TELEMETRY_RETRY_BACKOFF_S=4
 
 # =============================================================================
+# Custom HTML (Analytics, etc.)
+# =============================================================================
+# Inject custom HTML into the <head> of every page.
+# Useful for analytics scripts (Plausible, Matomo, etc.) without modifying source.
+# Example for Plausible:
+# CUSTOM_HEAD_HTML=<script defer data-domain="stats.example.com" src="https://plausible.io/js/script.js"></script>
+
+# =============================================================================
 # Paths (Native installation only)
 # =============================================================================
 # Docker: Leave these commented. The container uses /data/state and /out by default.
