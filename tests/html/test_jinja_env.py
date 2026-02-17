@@ -147,3 +147,28 @@ class TestTemplateRendering:
         assert "<html" in html
         assert "<head>" in html
         assert "<body>" in html
+
+    def test_custom_head_html_rendered_when_set(self):
+        """Custom head HTML appears in rendered output when provided."""
+        env = get_jinja_env()
+        template = env.get_template("base.html")
+
+        snippet = '<script defer data-domain="example.com" src="https://plausible.io/js/script.js"></script>'
+        html = template.render(
+            title="Test",
+            custom_head_html=snippet,
+        )
+
+        assert snippet in html
+        assert html.index(snippet) < html.index("</head>")
+
+    def test_custom_head_html_absent_when_empty(self):
+        """No extra content in head when custom_head_html is empty."""
+        env = get_jinja_env()
+        template = env.get_template("base.html")
+
+        html_with = template.render(title="Test", custom_head_html="")
+        html_without = template.render(title="Test")
+
+        # Both should produce identical output (no extra content)
+        assert html_with == html_without

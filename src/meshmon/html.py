@@ -727,6 +727,9 @@ def build_page_context(
         "page_title": page_title,
         "page_subtitle": page_subtitle,
         "chart_groups": chart_groups,
+
+        # Custom HTML
+        "custom_head_html": cfg.custom_head_html,
     }
 
 
@@ -1304,6 +1307,7 @@ def render_report_page(
         "monthly_links": monthly_links,
         "prev_report": prev_report,
         "next_report": next_report,
+        "custom_head_html": cfg.custom_head_html,
     }
 
     template = env.get_template("report.html")
@@ -1341,6 +1345,7 @@ def render_reports_index(report_sections: list[dict]) -> str:
         "css_path": "../",
         "report_sections": report_sections,
         "month_abbrs": month_abbrs,
+        "custom_head_html": cfg.custom_head_html,
     }
 
     template = env.get_template("report_index.html")
