@@ -15,7 +15,7 @@ services:
   # MeshCore Stats - Data collection and rendering
   # ==========================================================================
   meshcore-stats:
-    image: ghcr.io/jorijn/meshcore-stats:0.2.16 # x-release-please-version
+    image: ghcr.io/jorijn/meshcore-stats:0.2.17 # x-release-please-version
     container_name: meshcore-stats
     restart: unless-stopped
 
